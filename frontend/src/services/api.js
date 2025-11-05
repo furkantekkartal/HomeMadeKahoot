@@ -43,6 +43,7 @@ export const sessionAPI = {
   getMySessions: () => api.get('/sessions/my'),
   saveResult: (data) => api.post('/sessions/results', data),
   getMyResults: () => api.get('/sessions/results/my'),
+  getTeacherAnalytics: (filters) => api.get('/sessions/analytics', { params: filters }),
 };
 
 export default api;

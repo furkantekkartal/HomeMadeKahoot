@@ -1,4 +1,5 @@
 const Session = require('../models/Session');
+const StudentResult = require('../models/StudentResult');
 
 const initializeSocketHandlers = (io) => {
   io.on('connection', (socket) => {
@@ -19,12 +20,20 @@ const initializeSocketHandlers = (io) => {
 
         socket.join(`session-${session._id}`);
 
-        // Add participant
-        const existingParticipant = session.participants.find(
-          p => p.socketId === socket.id || (userId && p.userId?.toString() === userId)
-        );
+        // Try to find existing participant by socketId, userId, or username
+        let existingParticipant = session.participants.find(p => p.socketId === socket.id);
+        
+        if (!existingParticipant && userId) {
+          existingParticipant = session.participants.find(p => p.userId?.toString() === userId);
+        }
+        
+        if (!existingParticipant && username && username !== 'Host') {
+          // Try to find by username (for reconnections)
+          existingParticipant = session.participants.find(p => p.username === username);
+        }
 
         if (!existingParticipant) {
+          // New participant
           session.participants.push({
             userId: userId || null,
             username,
@@ -33,8 +42,12 @@ const initializeSocketHandlers = (io) => {
             answers: []
           });
         } else {
+          // Update existing participant (reconnection or socket change)
           existingParticipant.socketId = socket.id;
-          if (username) existingParticipant.username = username;
+          if (username && username !== 'Host') {
+            existingParticipant.username = username;
+          }
+          // Preserve existing score and answers
         }
 
         await session.save();
@@ -94,8 +107,45 @@ const initializeSocketHandlers = (io) => {
           session.completedAt = new Date();
           await session.save();
 
-          // Sort participants by score and filter out Host
+          // Save student results to database
           const students = session.participants.filter(p => p.username !== 'Host');
+          for (const participant of students) {
+            if (session.quizId) {
+              const correctCount = participant.answers?.filter(a => a.isCorrect).length || 0;
+              const wrongCount = (participant.answers?.length || 0) - correctCount;
+              const totalQuestions = session.quizId.questions?.length || 0;
+              const successPercentage = totalQuestions > 0 
+                ? Math.round((correctCount / totalQuestions) * 100) 
+                : 0;
+
+              const studentResult = await StudentResult.create({
+                username: participant.username,
+                userId: participant.userId || null,
+                sessionId: session._id,
+                quizId: session.quizId._id,
+                quizName: session.quizId.title,
+                category: session.quizId.category,
+                difficulty: session.quizId.difficulty,
+                hostId: session.hostId,
+                questionCount: totalQuestions,
+                totalPoints: participant.score || 0,
+                correctAnswers: correctCount,
+                wrongAnswers: wrongCount,
+                successPercentage: successPercentage,
+                answers: participant.answers || [],
+                completedAt: session.completedAt
+              });
+              
+              console.log('Saved StudentResult:', {
+                username: studentResult.username,
+                hostId: studentResult.hostId,
+                quizName: studentResult.quizName,
+                totalPoints: studentResult.totalPoints
+              });
+            }
+          }
+
+          // Sort participants by score
           students.sort((a, b) => b.score - a.score);
 
           io.to(`session-${sessionId}`).emit('quiz-completed', {
@@ -129,8 +179,45 @@ const initializeSocketHandlers = (io) => {
         session.completedAt = new Date();
         await session.save();
 
-        // Sort participants by score and filter out Host
+        // Save student results to database
         const students = session.participants.filter(p => p.username !== 'Host');
+        for (const participant of students) {
+          if (session.quizId) {
+            const correctCount = participant.answers?.filter(a => a.isCorrect).length || 0;
+            const wrongCount = (participant.answers?.length || 0) - correctCount;
+            const totalQuestions = session.quizId.questions?.length || 0;
+            const successPercentage = totalQuestions > 0 
+              ? Math.round((correctCount / totalQuestions) * 100) 
+              : 0;
+
+              const studentResult = await StudentResult.create({
+                username: participant.username,
+                userId: participant.userId || null,
+                sessionId: session._id,
+                quizId: session.quizId._id,
+                quizName: session.quizId.title,
+                category: session.quizId.category,
+                difficulty: session.quizId.difficulty,
+                hostId: session.hostId,
+                questionCount: totalQuestions,
+                totalPoints: participant.score || 0,
+                correctAnswers: correctCount,
+                wrongAnswers: wrongCount,
+                successPercentage: successPercentage,
+                answers: participant.answers || [],
+                completedAt: session.completedAt
+              });
+              
+              console.log('Saved StudentResult (auto-complete):', {
+                username: studentResult.username,
+                hostId: studentResult.hostId,
+                quizName: studentResult.quizName,
+                totalPoints: studentResult.totalPoints
+              });
+            }
+          }
+
+        // Sort participants by score
         students.sort((a, b) => b.score - a.score);
 
         io.to(`session-${sessionId}`).emit('quiz-completed', {
@@ -140,25 +227,40 @@ const initializeSocketHandlers = (io) => {
           }))
         });
       } catch (error) {
+        console.error('Error finishing quiz:', error);
         socket.emit('error', { message: error.message });
       }
     });
 
     // Participant submits answer
-    socket.on('submit-answer', async ({ sessionId, questionIndex, answer, timeTaken }) => {
+    socket.on('submit-answer', async ({ sessionId, questionIndex, answer, timeTaken, username }) => {
       try {
         const session = await Session.findById(sessionId).populate('quizId');
         if (!session || session.status !== 'active') {
+          console.error('Cannot submit answer: session not found or not active', { sessionId, status: session?.status });
           return;
         }
 
         const question = session.quizId.questions[questionIndex];
         if (!question) {
+          console.error('Question not found', { questionIndex, totalQuestions: session.quizId.questions.length });
           return;
         }
 
-        const participant = session.participants.find(p => p.socketId === socket.id);
+        // Try to find participant by socketId first
+        let participant = session.participants.find(p => p.socketId === socket.id);
+        
+        // If not found by socketId, try to find by username (socket might have reconnected)
+        if (!participant && username) {
+          participant = session.participants.find(p => p.username === username && p.username !== 'Host');
+          if (participant) {
+            // Update socketId for reconnected participant
+            participant.socketId = socket.id;
+          }
+        }
+
         if (!participant) {
+          console.error('Participant not found', { socketId: socket.id, username, participants: session.participants.map(p => ({ username: p.username, socketId: p.socketId })) });
           return;
         }
 
@@ -207,20 +309,25 @@ const initializeSocketHandlers = (io) => {
     // Disconnect
     socket.on('disconnect', async () => {
       try {
-        // Find and remove participant from sessions
+        // Don't remove participants on disconnect - just clear their socketId
+        // This preserves their data if they reconnect
         const sessions = await Session.find({
           'participants.socketId': socket.id,
           status: { $in: ['waiting', 'active'] }
         });
 
         for (const session of sessions) {
-          session.participants = session.participants.filter(p => p.socketId !== socket.id);
-          await session.save();
-          
-          io.to(`session-${session._id}`).emit('participant-left', {
-            participants: session.participants,
-            participantCount: session.participants.length
-          });
+          const participant = session.participants.find(p => p.socketId === socket.id);
+          if (participant && participant.username !== 'Host') {
+            // Clear socketId but keep participant data
+            participant.socketId = null;
+            await session.save();
+            
+            io.to(`session-${session._id}`).emit('participant-left', {
+              participants: session.participants,
+              participantCount: session.participants.length
+            });
+          }
         }
       } catch (error) {
         console.error('Error handling disconnect:', error);

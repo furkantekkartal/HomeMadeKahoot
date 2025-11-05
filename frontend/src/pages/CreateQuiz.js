@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { quizAPI } from '../services/api';
+import { QUIZ_CATEGORIES, QUIZ_DIFFICULTIES, formatCategory, formatDifficulty } from '../constants/quizConstants';
 import './QuizForm.css';
 
 const CreateQuiz = () => {
@@ -124,10 +125,12 @@ const CreateQuiz = () => {
                 value={formData.category}
                 onChange={(e) => setFormData({ ...formData, category: e.target.value })}
               >
-                <option value="vocabulary">Vocabulary</option>
-                <option value="grammar">Grammar</option>
-                <option value="reading">Reading Comprehension</option>
-                <option value="listening">Listening</option>
+                {QUIZ_CATEGORIES.map(cat => (
+                  <option key={cat} value={cat}>
+                    {formatCategory(cat)}
+                    {cat === 'reading' ? ' Comprehension' : ''}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -138,9 +141,11 @@ const CreateQuiz = () => {
                 value={formData.difficulty}
                 onChange={(e) => setFormData({ ...formData, difficulty: e.target.value })}
               >
-                <option value="beginner">Beginner</option>
-                <option value="intermediate">Intermediate</option>
-                <option value="advanced">Advanced</option>
+                {QUIZ_DIFFICULTIES.map(diff => (
+                  <option key={diff} value={diff}>
+                    {formatDifficulty(diff)}
+                  </option>
+                ))}
               </select>
             </div>
           </div>

@@ -22,7 +22,7 @@ const PlayQuiz = () => {
   const [quizCompleted, setQuizCompleted] = useState(false);
   const [leaderboard, setLeaderboard] = useState([]);
   const [timeLeft, setTimeLeft] = useState(20);
-  const username = location.state?.username || 'Participant';
+  const [username, setUsername] = useState(location.state?.username || null);
   const studentJoinedRef = useRef(false);
   const initialLoadRef = useRef(false);
 
@@ -132,7 +132,12 @@ const PlayQuiz = () => {
       return;
     }
 
-    const studentUsername = location.state?.username || `User${Math.floor(Math.random() * 1000)}`;
+    const studentUsername = location.state?.username || username || `User${Math.floor(Math.random() * 1000)}`;
+    
+    // Store username in state for later use
+    if (!username) {
+      setUsername(studentUsername);
+    }
     
     const joinSession = () => {
       if (studentJoinedRef.current) return;
@@ -194,11 +199,13 @@ const PlayQuiz = () => {
     setAnswered(true);
 
     if (socket) {
+      const studentUsername = location.state?.username || username || `User${Math.floor(Math.random() * 1000)}`;
       socket.emit('submit-answer', {
         sessionId,
         questionIndex: currentQuestionIndex,
         answer: answerIndex,
-        timeTaken
+        timeTaken,
+        username: studentUsername
       });
     }
   };

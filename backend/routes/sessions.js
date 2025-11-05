@@ -6,9 +6,10 @@ const auth = require('../middleware/auth');
 router.post('/', auth, sessionController.createSession);
 router.get('/pin/:pin', sessionController.getSessionByPIN);
 router.get('/my', auth, sessionController.getMySessions);
-router.get('/:id', sessionController.getSession);
 router.post('/results', auth, sessionController.saveResult);
 router.get('/results/my', auth, sessionController.getMyResults);
+router.get('/analytics', auth, sessionController.getTeacherAnalytics);
+router.get('/:id', sessionController.getSession);
 
 module.exports = router;
 
