@@ -1,0 +1,37 @@
+.join-quiz-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 60vh;
+  color: white;
+}
+
+.join-quiz-card {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 12px;
+  padding: 3rem;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  width: 100%;
+  max-width: 400px;
+  text-align: center;
+}
+
+.join-quiz-card h1 {
+  color: #2d3748;
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.subtitle {
+  color: #4a5568;
+  margin-bottom: 2rem;
+}
+
+.pin-input {
+  font-size: 2rem;
+  text-align: center;
+  letter-spacing: 0.5rem;
+  font-weight: 700;
+  color: #667eea;
+}
+

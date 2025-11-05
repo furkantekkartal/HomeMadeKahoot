@@ -1,0 +1,258 @@
+.play-quiz {
+  color: white;
+}
+
+.play-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.95);
+  padding: 1rem 2rem;
+  border-radius: 12px;
+  margin-bottom: 2rem;
+  font-weight: 600;
+  color: #2d3748;
+}
+
+.score-display-small {
+  color: #667eea;
+  font-size: 1.25rem;
+}
+
+.question-counter {
+  color: #4a5568;
+}
+
+.timer {
+  font-size: 1.5rem;
+  color: #f56565;
+  font-weight: 700;
+}
+
+.waiting-screen {
+  text-align: center;
+}
+
+.waiting-screen h2 {
+  color: #2d3748;
+  margin-bottom: 1rem;
+}
+
+.quiz-info {
+  margin-top: 2rem;
+  padding: 2rem;
+  background: #f7fafc;
+  border-radius: 8px;
+}
+
+.quiz-info h3 {
+  color: #2d3748;
+  margin-bottom: 0.5rem;
+}
+
+.quiz-info p {
+  color: #4a5568;
+  margin: 0.25rem 0;
+}
+
+.question-display {
+  text-align: center;
+}
+
+.question-text {
+  font-size: 2.5rem;
+  color: #2d3748;
+  margin-bottom: 2rem;
+  font-weight: 700;
+}
+
+.options-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.option-button {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 2rem;
+  border-radius: 12px;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: white;
+  text-align: left;
+  min-height: 100px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.option-button:hover:not(:disabled) {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.option-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.option-button:nth-child(1) { background: #667eea; }
+.option-button:nth-child(2) { background: #f093fb; }
+.option-button:nth-child(3) { background: #4facfe; }
+.option-button:nth-child(4) { background: #43e97b; }
+
+.option-button.selected {
+  border: 4px solid white;
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+}
+
+.option-button.correct {
+  background: #48bb78;
+  border: 4px solid #2f855a;
+}
+
+.option-button.incorrect {
+  background: #f56565;
+  opacity: 0.7;
+}
+
+.option-letter {
+  font-size: 2rem;
+  font-weight: 700;
+  width: 50px;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+}
+
+.option-text {
+  flex: 1;
+}
+
+.answer-feedback {
+  margin-top: 2rem;
+  padding: 1.5rem;
+  border-radius: 12px;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.answer-feedback.correct {
+  background: #c6f6d5;
+  color: #22543d;
+}
+
+.answer-feedback.incorrect {
+  background: #fed7d7;
+  color: #991b1b;
+}
+
+.points-earned {
+  margin-top: 0.5rem;
+  font-size: 1.25rem;
+}
+
+.results-screen {
+  text-align: center;
+}
+
+.results-screen h2 {
+  color: #2d3748;
+  font-size: 2.5rem;
+  margin-bottom: 2rem;
+}
+
+.your-score {
+  background: #f7fafc;
+  padding: 2rem;
+  border-radius: 12px;
+  margin-bottom: 2rem;
+}
+
+.your-score h3 {
+  color: #2d3748;
+  margin-bottom: 1rem;
+}
+
+.score-display {
+  font-size: 3rem;
+  font-weight: 700;
+  color: #667eea;
+}
+
+.leaderboard {
+  background: #f7fafc;
+  border-radius: 12px;
+  padding: 2rem;
+  margin: 2rem 0;
+}
+
+.leaderboard h3 {
+  color: #2d3748;
+  margin-bottom: 1.5rem;
+}
+
+.leaderboard ol {
+  list-style: none;
+  padding: 0;
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+.leaderboard li {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  margin-bottom: 0.5rem;
+  background: white;
+  border-radius: 8px;
+  border: 2px solid #e2e8f0;
+}
+
+.leaderboard li.you {
+  border-color: #667eea;
+  background: #edf2f7;
+}
+
+.rank {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #667eea;
+  width: 40px;
+}
+
+.name {
+  flex: 1;
+  text-align: left;
+  color: #2d3748;
+  font-weight: 600;
+}
+
+.score {
+  color: #667eea;
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+@media (max-width: 768px) {
+  .options-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .question-text {
+    font-size: 1.75rem;
+  }
+  
+  .play-header {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+}
+
