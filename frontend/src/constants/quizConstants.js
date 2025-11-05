@@ -21,3 +21,4 @@ export const formatDifficulty = (difficulty) => {
   return difficulty ? difficulty.charAt(0).toUpperCase() + difficulty.slice(1) : '';
 };
 
+

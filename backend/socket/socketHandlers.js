@@ -3,7 +3,6 @@ const StudentResult = require('../models/StudentResult');
 
 const initializeSocketHandlers = (io) => {
   io.on('connection', (socket) => {
-    console.log('User connected:', socket.id);
 
     // Join session
     socket.on('join-session', async ({ pin, userId, username }) => {
@@ -118,7 +117,7 @@ const initializeSocketHandlers = (io) => {
                 ? Math.round((correctCount / totalQuestions) * 100) 
                 : 0;
 
-              const studentResult = await StudentResult.create({
+              await StudentResult.create({
                 username: participant.username,
                 userId: participant.userId || null,
                 sessionId: session._id,
@@ -134,13 +133,6 @@ const initializeSocketHandlers = (io) => {
                 successPercentage: successPercentage,
                 answers: participant.answers || [],
                 completedAt: session.completedAt
-              });
-              
-              console.log('Saved StudentResult:', {
-                username: studentResult.username,
-                hostId: studentResult.hostId,
-                quizName: studentResult.quizName,
-                totalPoints: studentResult.totalPoints
               });
             }
           }
@@ -190,7 +182,7 @@ const initializeSocketHandlers = (io) => {
               ? Math.round((correctCount / totalQuestions) * 100) 
               : 0;
 
-              const studentResult = await StudentResult.create({
+              await StudentResult.create({
                 username: participant.username,
                 userId: participant.userId || null,
                 sessionId: session._id,
@@ -206,13 +198,6 @@ const initializeSocketHandlers = (io) => {
                 successPercentage: successPercentage,
                 answers: participant.answers || [],
                 completedAt: session.completedAt
-              });
-              
-              console.log('Saved StudentResult (auto-complete):', {
-                username: studentResult.username,
-                hostId: studentResult.hostId,
-                quizName: studentResult.quizName,
-                totalPoints: studentResult.totalPoints
               });
             }
           }
@@ -237,13 +222,11 @@ const initializeSocketHandlers = (io) => {
       try {
         const session = await Session.findById(sessionId).populate('quizId');
         if (!session || session.status !== 'active') {
-          console.error('Cannot submit answer: session not found or not active', { sessionId, status: session?.status });
           return;
         }
 
         const question = session.quizId.questions[questionIndex];
         if (!question) {
-          console.error('Question not found', { questionIndex, totalQuestions: session.quizId.questions.length });
           return;
         }
 
@@ -260,7 +243,6 @@ const initializeSocketHandlers = (io) => {
         }
 
         if (!participant) {
-          console.error('Participant not found', { socketId: socket.id, username, participants: session.participants.map(p => ({ username: p.username, socketId: p.socketId })) });
           return;
         }
 
@@ -332,7 +314,6 @@ const initializeSocketHandlers = (io) => {
       } catch (error) {
         console.error('Error handling disconnect:', error);
       }
-      console.log('User disconnected:', socket.id);
     });
   });
 };

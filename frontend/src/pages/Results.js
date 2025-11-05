@@ -54,18 +54,14 @@ const Results = () => {
         return acc;
       }, {});
       
-      console.log('Loading analytics with active filters:', activeFilters);
       const response = await sessionAPI.getTeacherAnalytics(activeFilters);
-      console.log('Analytics response:', response.data);
       setAnalytics(response.data.analytics || []);
       setSummary({
         totalSessions: response.data.totalSessions || 0,
         totalStudents: response.data.totalStudents || 0
       });
-      console.log('Analytics set:', response.data.analytics?.length || 0, 'students');
     } catch (error) {
       console.error('Error loading analytics:', error);
-      console.error('Error details:', error.response?.data || error.message);
     } finally {
       setLoading(false);
     }

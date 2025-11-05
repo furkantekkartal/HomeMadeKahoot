@@ -125,130 +125,73 @@ exports.getTeacherAnalytics = async (req, res) => {
   try {
     const { studentName, quizName, category, difficulty, dateFrom, dateTo } = req.query;
     
-    console.log('Getting analytics for teacher:', req.user.userId);
-    console.log('Teacher userId type:', typeof req.user.userId);
-    console.log('Filters:', { studentName, quizName, category, difficulty, dateFrom, dateTo });
-    
     // Build query for student results - ensure hostId is ObjectId
     // JWT token contains userId as string, but MongoDB stores it as ObjectId
-    // Always convert to ObjectId for proper matching
     const hostIdQuery = mongoose.Types.ObjectId.isValid(req.user.userId) 
       ? new mongoose.Types.ObjectId(req.user.userId)
       : req.user.userId;
     
-    // Start with base query using ObjectId
     const query = {
       hostId: hostIdQuery
     };
-    
-    console.log('Teacher userId from JWT:', req.user.userId, 'Type:', typeof req.user.userId);
-    console.log('Converted hostIdQuery:', hostIdQuery.toString(), 'Type:', hostIdQuery instanceof mongoose.Types.ObjectId ? 'ObjectId' : typeof hostIdQuery);
 
     // Apply filters - only if they have values (not empty strings)
     if (studentName && typeof studentName === 'string' && studentName.trim() !== '') {
       query.username = { $regex: studentName.trim(), $options: 'i' };
-      console.log('Applied studentName filter:', studentName);
     }
     if (category && typeof category === 'string' && category.trim() !== '') {
-      // Ensure lowercase to match enum
       query.category = category.trim().toLowerCase();
-      console.log('Applied category filter:', query.category);
     }
     if (difficulty && typeof difficulty === 'string' && difficulty.trim() !== '') {
-      // Ensure lowercase to match enum
       query.difficulty = difficulty.trim().toLowerCase();
-      console.log('Applied difficulty filter:', query.difficulty);
     }
     if (dateFrom || dateTo) {
       query.completedAt = {};
       if (dateFrom && dateFrom.trim() !== '') {
         query.completedAt.$gte = new Date(dateFrom);
-        console.log('Applied dateFrom filter:', dateFrom);
       }
       if (dateTo && dateTo.trim() !== '') {
         const toDate = new Date(dateTo);
         toDate.setHours(23, 59, 59, 999);
         query.completedAt.$lte = toDate;
-        console.log('Applied dateTo filter:', dateTo);
       }
-    }
-    
-    console.log('Final query with filters:', JSON.stringify(query, null, 2));
-
-    // Debug: Check all results first
-    const allResults = await StudentResult.find({}).limit(5);
-    const totalCount = await StudentResult.countDocuments({});
-    console.log('Total StudentResults in DB:', totalCount);
-    if (allResults.length > 0) {
-      console.log('Sample results from DB:', allResults.map(r => ({
-        username: r.username,
-        quizName: r.quizName,
-        hostId: r.hostId?.toString(),
-        hostIdIsObjectId: r.hostId instanceof mongoose.Types.ObjectId
-      })));
-      console.log('Query hostId:', hostIdQuery?.toString(), 'Type:', typeof hostIdQuery, 'Is ObjectId:', hostIdQuery instanceof mongoose.Types.ObjectId);
     }
 
     // Get all student results for this teacher
     let results = await StudentResult.find(query)
       .sort({ completedAt: -1 });
 
-    console.log('Found', results.length, 'student results for teacher with filters');
-    if (results.length === 0 && totalCount > 0) {
-      console.log('WARNING: Results exist but query returned 0. Checking hostId match...');
-      console.log('All hostIds in DB:', [...new Set(allResults.map(r => r.hostId?.toString()))]);
-      console.log('Query hostId:', hostIdQuery?.toString());
-      
-      // If no results, try alternative query BUT preserve all filters
-      if (typeof req.user.userId === 'string') {
-        // Rebuild query with correct ObjectId but preserve all filters
-        const altQuery = { ...query };
-        altQuery.hostId = new mongoose.Types.ObjectId(req.user.userId);
-        console.log('Trying alternative query with preserved filters:', JSON.stringify(altQuery, null, 2));
-        const altResults = await StudentResult.find(altQuery);
-        if (altResults.length > 0) {
-          console.log('SUCCESS: Found', altResults.length, 'results with alternative query (filters preserved)');
-          results = altResults;
-        } else {
-          console.log('Alternative query also returned 0 results - filters are working correctly, no matching data');
-        }
+    // If no results, try alternative query with preserved filters (fallback for ObjectId issues)
+    if (results.length === 0 && typeof req.user.userId === 'string') {
+      const altQuery = { ...query };
+      altQuery.hostId = new mongoose.Types.ObjectId(req.user.userId);
+      const altResults = await StudentResult.find(altQuery);
+      if (altResults.length > 0) {
+        results = altResults;
       }
     }
+
+    // Verify filters are correctly applied (safety check)
     if (results.length > 0) {
-      console.log('Sample result:', {
-        username: results[0].username,
-        quizName: results[0].quizName,
-        category: results[0].category,
-        difficulty: results[0].difficulty,
-        hostId: results[0].hostId,
-        completedAt: results[0].completedAt
-      });
-      // Verify filters are actually applied
       if (difficulty && difficulty.trim() !== '') {
         const filteredResults = results.filter(r => r.difficulty === difficulty.toLowerCase());
         if (filteredResults.length !== results.length) {
-          console.log('WARNING: Filter mismatch! Expected difficulty:', difficulty.toLowerCase(), 'but found:', results.map(r => r.difficulty));
           results = filteredResults;
-          console.log('Filtered to', results.length, 'matching results');
         }
       }
       if (category && category.trim() !== '') {
         const filteredResults = results.filter(r => r.category === category.toLowerCase());
         if (filteredResults.length !== results.length) {
-          console.log('WARNING: Category filter mismatch! Expected:', category.toLowerCase(), 'but found:', results.map(r => r.category));
           results = filteredResults;
-          console.log('Filtered to', results.length, 'matching results');
         }
       }
     }
 
-    // Filter by quiz name if provided (client-side filter for regex)
+    // Filter by quiz name if provided
     if (quizName && quizName.trim() !== '') {
-      const beforeCount = results.length;
       results = results.filter(r => 
         r.quizName.toLowerCase().includes(quizName.toLowerCase().trim())
       );
-      console.log('After quiz name filter:', results.length, 'results (was', beforeCount, ')');
     }
 
     // Aggregate by student username
@@ -317,13 +260,6 @@ exports.getTeacherAnalytics = async (req, res) => {
 
     // Sort by total quizzes (descending)
     analytics.sort((a, b) => b.totalQuizzes - a.totalQuizzes);
-
-    console.log('Returning analytics for', analytics.length, 'students');
-    console.log('Sample analytics:', analytics.length > 0 ? {
-      studentName: analytics[0].studentName,
-      totalQuizzes: analytics[0].totalQuizzes,
-      totalQuestions: analytics[0].totalQuestions
-    } : 'No analytics');
 
     res.json({
       analytics,
