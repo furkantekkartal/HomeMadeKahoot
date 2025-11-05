@@ -42,9 +42,13 @@ const Dashboard = () => {
     try {
       const response = await sessionAPI.createSession({ quizId });
       const session = response.data;
-      window.open(`/host/${session._id}`, '_blank');
+      // Small delay to ensure session is saved
+      setTimeout(() => {
+        window.open(`/host/${session._id}`, '_blank');
+      }, 100);
     } catch (error) {
-      alert('Error creating session');
+      console.error('Error creating session:', error);
+      alert(`Error creating session: ${error.response?.data?.message || error.message}`);
     }
   };
 

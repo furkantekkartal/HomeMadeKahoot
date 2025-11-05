@@ -18,6 +18,9 @@ const Home = () => {
             <Link to="/register" className="btn btn-primary btn-large">
               Get Started
             </Link>
+            <Link to="/join" className="btn btn-success btn-large">
+              Join Quiz
+            </Link>
             <Link to="/browse" className="btn btn-secondary btn-large">
               Browse Quizzes
             </Link>
@@ -29,6 +32,9 @@ const Home = () => {
           <div className="hero-actions">
             <Link to="/dashboard" className="btn btn-primary btn-large">
               Go to Dashboard
+            </Link>
+            <Link to="/join" className="btn btn-success btn-large">
+              Join Quiz
             </Link>
             <Link to="/browse" className="btn btn-secondary btn-large">
               Browse Quizzes

@@ -21,27 +21,31 @@ const initializeSocketHandlers = (io) => {
 
         // Add participant
         const existingParticipant = session.participants.find(
-          p => p.userId?.toString() === userId || p.socketId === socket.id
+          p => p.socketId === socket.id || (userId && p.userId?.toString() === userId)
         );
 
-        if (!existingParticipant && userId) {
+        if (!existingParticipant) {
           session.participants.push({
-            userId,
+            userId: userId || null,
             username,
             socketId: socket.id,
             score: 0,
             answers: []
           });
-        } else if (existingParticipant) {
+        } else {
           existingParticipant.socketId = socket.id;
+          if (username) existingParticipant.username = username;
         }
 
         await session.save();
 
-        // Notify host
+        // Reload session to get fresh data
+        const updatedSession = await Session.findById(session._id);
+
+        // Notify all in the session room
         io.to(`session-${session._id}`).emit('participant-joined', {
-          participants: session.participants,
-          participantCount: session.participants.length
+          participants: updatedSession.participants,
+          participantCount: updatedSession.participants.length
         });
 
         socket.emit('session-joined', { sessionId: session._id });
@@ -90,11 +94,12 @@ const initializeSocketHandlers = (io) => {
           session.completedAt = new Date();
           await session.save();
 
-          // Sort participants by score
-          session.participants.sort((a, b) => b.score - a.score);
+          // Sort participants by score and filter out Host
+          const students = session.participants.filter(p => p.username !== 'Host');
+          students.sort((a, b) => b.score - a.score);
 
           io.to(`session-${sessionId}`).emit('quiz-completed', {
-            leaderboard: session.participants.map(p => ({
+            leaderboard: students.map(p => ({
               username: p.username,
               score: p.score
             }))
@@ -106,6 +111,34 @@ const initializeSocketHandlers = (io) => {
             question: questions[session.currentQuestionIndex]
           });
         }
+      } catch (error) {
+        socket.emit('error', { message: error.message });
+      }
+    });
+
+    // Host finishes quiz
+    socket.on('finish-quiz', async ({ sessionId }) => {
+      try {
+        const session = await Session.findById(sessionId).populate('quizId');
+        if (!session || session.status !== 'active') {
+          socket.emit('error', { message: 'Cannot finish quiz' });
+          return;
+        }
+
+        session.status = 'completed';
+        session.completedAt = new Date();
+        await session.save();
+
+        // Sort participants by score and filter out Host
+        const students = session.participants.filter(p => p.username !== 'Host');
+        students.sort((a, b) => b.score - a.score);
+
+        io.to(`session-${sessionId}`).emit('quiz-completed', {
+          leaderboard: students.map(p => ({
+            username: p.username,
+            score: p.score
+          }))
+        });
       } catch (error) {
         socket.emit('error', { message: error.message });
       }

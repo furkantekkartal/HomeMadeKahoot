@@ -38,6 +38,11 @@
   margin-bottom: 1rem;
 }
 
+.waiting-screen p {
+  color: #4a5568;
+  margin-bottom: 1rem;
+}
+
 .quiz-info {
   margin-top: 2rem;
   padding: 2rem;
@@ -141,6 +146,11 @@
   border-radius: 12px;
   font-size: 1.5rem;
   font-weight: 700;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
 }
 
 .answer-feedback.correct {

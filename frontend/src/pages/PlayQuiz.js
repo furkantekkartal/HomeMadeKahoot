@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { sessionAPI, quizAPI } from '../services/api';
-import { connectSocket, getSocket } from '../services/socket';
+import { connectSocket } from '../services/socket';
 import './PlayQuiz.css';
 
 const PlayQuiz = () => {
@@ -17,18 +17,41 @@ const PlayQuiz = () => {
   const [score, setScore] = useState(0);
   const [totalScore, setTotalScore] = useState(0);
   const [socket, setSocket] = useState(null);
+  const [socketConnected, setSocketConnected] = useState(false);
   const [quizStarted, setQuizStarted] = useState(false);
   const [quizCompleted, setQuizCompleted] = useState(false);
   const [leaderboard, setLeaderboard] = useState([]);
   const [timeLeft, setTimeLeft] = useState(20);
   const username = location.state?.username || 'Participant';
+  const studentJoinedRef = useRef(false);
+  const initialLoadRef = useRef(false);
 
   useEffect(() => {
     const socketInstance = connectSocket();
     setSocket(socketInstance);
 
+    // Check if already connected
+    if (socketInstance.connected) {
+      setSocketConnected(true);
+    }
+
+    const handleConnect = () => {
+      setSocketConnected(true);
+    };
+
+    const handleDisconnect = () => {
+      setSocketConnected(false);
+    };
+
+    socketInstance.on('connect', handleConnect);
+    socketInstance.on('disconnect', handleDisconnect);
+    
+    socketInstance.on('connect_error', (error) => {
+      console.error('Socket connection error:', error);
+    });
+
     socketInstance.on('session-joined', () => {
-      console.log('Joined session');
+      // Session joined successfully
     });
 
     socketInstance.on('quiz-started', (data) => {
@@ -39,11 +62,15 @@ const PlayQuiz = () => {
     });
 
     socketInstance.on('next-question', (data) => {
-      setCurrentQuestion(data.question);
-      setCurrentQuestionIndex(data.questionIndex);
-      setSelectedAnswer(null);
-      setAnswered(false);
-      setTimeLeft(data.question.timeLimit || 20);
+      // Only update if teacher is ahead or if student hasn't manually navigated
+      if (data.questionIndex >= currentQuestionIndex) {
+        setCurrentQuestion(data.question);
+        setCurrentQuestionIndex(data.questionIndex);
+        setSelectedAnswer(null);
+        setAnswered(false);
+        setTimeLeft(data.question.timeLimit || 20);
+        setScore(0);
+      }
     });
 
     socketInstance.on('quiz-completed', (data) => {
@@ -58,17 +85,22 @@ const PlayQuiz = () => {
     });
 
     socketInstance.on('error', (data) => {
+      console.error('Socket error:', data);
       alert(data.message || 'An error occurred');
     });
 
-    loadSession(socketInstance);
+    // Load session data first (doesn't require socket)
+    loadSession();
 
     return () => {
-      socketInstance.disconnect();
+      socketInstance.off('connect', handleConnect);
+      socketInstance.off('disconnect', handleDisconnect);
+      // Don't disconnect - let the socket service manage it
+      // socketInstance.disconnect();
     };
   }, [sessionId]);
 
-  const loadSession = async (socketInstance) => {
+  const loadSession = async () => {
     try {
       const sessionRes = await sessionAPI.getSession(sessionId);
       const sessionData = sessionRes.data;
@@ -76,32 +108,82 @@ const PlayQuiz = () => {
       setQuizStarted(sessionData.status === 'active');
 
       const quizRes = await quizAPI.getQuiz(sessionData.quizId._id);
-      setQuiz(quizRes.data);
+      const quizData = quizRes.data;
+      setQuiz(quizData);
 
-      // Join session after loading
-      const username = location.state?.username || `User${Math.floor(Math.random() * 1000)}`;
-      socketInstance.emit('join-session', {
-        pin: sessionData.pin,
-        userId: null,
-        username
-      });
+      // If quiz is already active, load the current question
+      if (sessionData.status === 'active' && quizData.questions && quizData.questions.length > 0) {
+        const currentIndex = sessionData.currentQuestionIndex || 0;
+        if (quizData.questions[currentIndex]) {
+          setCurrentQuestion(quizData.questions[currentIndex]);
+          setCurrentQuestionIndex(currentIndex);
+          setTimeLeft(quizData.questions[currentIndex].timeLimit || 20);
+        }
+      }
     } catch (error) {
       console.error('Error loading session:', error);
       alert('Error loading quiz session');
     }
   };
 
+  // Join session when socket is connected and session is loaded
   useEffect(() => {
-    if (timeLeft > 0 && quizStarted && !answered && !quizCompleted) {
+    if (!socket || !session || !session.pin || studentJoinedRef.current) {
+      return;
+    }
+
+    const studentUsername = location.state?.username || `User${Math.floor(Math.random() * 1000)}`;
+    
+    const joinSession = () => {
+      if (studentJoinedRef.current) return;
+      studentJoinedRef.current = true;
+      
+      socket.emit('join-session', {
+        pin: session.pin,
+        userId: null,
+        username: studentUsername
+      });
+    };
+
+    if (socket.connected || socketConnected) {
+      joinSession();
+    } else {
+      const connectHandler = () => joinSession();
+      socket.once('connect', connectHandler);
+      
+      setTimeout(() => {
+        if (!studentJoinedRef.current && socket.connected) {
+          socket.off('connect', connectHandler);
+          joinSession();
+        }
+      }, 1000);
+    }
+  }, [socket, socketConnected, session]);
+
+  // Load current question if quiz is already active (only on initial load)
+  useEffect(() => {
+    if (quizStarted && session && session.status === 'active' && quiz && quiz.questions && !initialLoadRef.current) {
+      const sessionIndex = session.currentQuestionIndex !== undefined ? session.currentQuestionIndex : 0;
+      if (quiz.questions[sessionIndex]) {
+        setCurrentQuestion(quiz.questions[sessionIndex]);
+        setCurrentQuestionIndex(sessionIndex);
+        setTimeLeft(quiz.questions[sessionIndex].timeLimit || 20);
+        initialLoadRef.current = true;
+      }
+    }
+  }, [quizStarted, session?.status, quiz?.questions?.length]);
+
+  useEffect(() => {
+    if (timeLeft > 0 && quizStarted && !answered && !quizCompleted && currentQuestion) {
       const timer = setTimeout(() => {
         setTimeLeft(timeLeft - 1);
       }, 1000);
       return () => clearTimeout(timer);
-    } else if (timeLeft === 0 && !answered) {
+    } else if (timeLeft === 0 && !answered && currentQuestion) {
       // Time's up, auto-submit no answer
       handleSubmitAnswer(null);
     }
-  }, [timeLeft, quizStarted, answered, quizCompleted]);
+  }, [timeLeft, quizStarted, answered, quizCompleted, currentQuestion]);
 
 
   const handleSubmitAnswer = (answerIndex) => {
@@ -153,7 +235,7 @@ const PlayQuiz = () => {
           <div className="leaderboard">
             <h3>Leaderboard</h3>
             <ol>
-              {leaderboard.map((entry, idx) => (
+              {leaderboard.filter(entry => entry.username !== 'Host').map((entry, idx) => (
                 <li key={idx} className={entry.username === username ? 'you' : ''}>
                   <span className="rank">{idx + 1}</span>
                   <span className="name">{entry.username}</span>
@@ -218,6 +300,43 @@ const PlayQuiz = () => {
           <div className={`answer-feedback ${isCorrect ? 'correct' : 'incorrect'}`}>
             {isCorrect ? '✓ Correct!' : '✗ Wrong Answer'}
             {score > 0 && <div className="points-earned">+{score} points</div>}
+            {currentQuestionIndex < quiz.questions.length - 1 ? (
+              <button
+                onClick={() => {
+                  // Move to next question
+                  const nextIndex = currentQuestionIndex + 1;
+                  setCurrentQuestionIndex(nextIndex);
+                  setCurrentQuestion(quiz.questions[nextIndex]);
+                  setSelectedAnswer(null);
+                  setAnswered(false);
+                  setTimeLeft(quiz.questions[nextIndex].timeLimit || 20);
+                  setScore(0); // Reset score for next question
+                }}
+                className="btn btn-primary"
+                style={{ marginTop: '1rem' }}
+              >
+                Next Question →
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  if (window.opener || window.history.length <= 1) {
+                    window.close();
+                    setTimeout(() => {
+                      if (!document.hidden) {
+                        navigate('/');
+                      }
+                    }, 100);
+                  } else {
+                    navigate('/');
+                  }
+                }}
+                className="btn btn-success"
+                style={{ marginTop: '1rem', fontSize: '1.2rem', padding: '1rem 2rem', fontWeight: 'bold' }}
+              >
+                ✓ Finish Quiz
+              </button>
+            )}
           </div>
         )}
       </div>
