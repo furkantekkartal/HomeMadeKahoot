@@ -79,6 +79,21 @@
   font-weight: 700;
 }
 
+.question-image-container {
+  margin: 1.5rem 0;
+  border-radius: 12px;
+  overflow: hidden;
+  max-width: 100%;
+}
+
+.question-image {
+  width: 100%;
+  height: auto;
+  max-height: 400px;
+  object-fit: cover;
+  display: block;
+}
+
 .options-display {
   display: grid;
   grid-template-columns: repeat(2, 1fr);

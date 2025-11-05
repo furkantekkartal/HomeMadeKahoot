@@ -5,6 +5,7 @@ const auth = require('../middleware/auth');
 
 router.get('/', quizController.getAllQuizzes);
 router.get('/my', auth, quizController.getMyQuizzes);
+router.post('/generate-image', auth, quizController.generateQuestionImage);
 router.get('/:id', quizController.getQuiz);
 router.post('/', auth, quizController.createQuiz);
 router.put('/:id', auth, quizController.updateQuiz);

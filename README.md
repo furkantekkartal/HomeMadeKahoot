@@ -6,6 +6,7 @@ A web-based English learning application inspired by Kahoot, designed to make la
 
 - **User Authentication**: Register, login, and secure session management
 - **Quiz Management**: Create, edit, and delete English learning quizzes
+- **Question Images**: AI-powered image generation for quiz questions using Unsplash
 - **Live Quiz Sessions**: Host real-time quiz sessions with unique PIN codes
 - **Participant Interface**: Join quizzes using PIN (no account required)
 - **Self-Paced Mode**: Practice quizzes at your own pace
@@ -56,7 +57,14 @@ A web-based English learning application inspired by Kahoot, designed to make la
    # MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/homemadekahoot
    JWT_SECRET=your_secret_jwt_key_here
    NODE_ENV=development
+   UNSPLASH_ACCESS_KEY=your_unsplash_access_key
+   OPENROUTER_API_KEY=your_openrouter_api_key
+   APP_URL=http://localhost:3000
    ```
+   
+   **Note:** For image generation feature:
+   - Get Unsplash API key from [Unsplash Developers](https://unsplash.com/developers)
+   - Get OpenRouter API key from [OpenRouter](https://openrouter.ai)
 
    Create `.env` in `frontend/` (optional):
    ```env

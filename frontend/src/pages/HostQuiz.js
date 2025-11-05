@@ -333,6 +333,11 @@ const HostQuiz = () => {
               <div key={idx} className={`question-card card ${idx === currentQuestionIndex ? 'active-question' : ''}`}>
                 <div className="question-number">Question {idx + 1} of {quiz.questions.length}</div>
                 <h3 className="question-text">{question.questionText}</h3>
+                {question.imageUrl && (
+                  <div className="question-image-container">
+                    <img src={question.imageUrl} alt="Question" className="question-image" />
+                  </div>
+                )}
                 <div className="options-display">
                   {question.options.map((option, optIdx) => (
                     <div key={optIdx} className={`option-box option-${optIdx + 1}`}>

@@ -46,6 +46,10 @@ const quizSchema = new mongoose.Schema({
     timeLimit: {
       type: Number,
       default: 20 // seconds
+    },
+    imageUrl: {
+      type: String,
+      default: null
     }
   }],
   createdAt: {

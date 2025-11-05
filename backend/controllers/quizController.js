@@ -1,4 +1,5 @@
 const Quiz = require('../models/Quiz');
+const { generateQuestionImage } = require('../services/imageService');
 
 // Get all quizzes
 exports.getAllQuizzes = async (req, res) => {
@@ -102,6 +103,25 @@ exports.deleteQuiz = async (req, res) => {
     res.json({ message: 'Quiz deleted' });
   } catch (error) {
     res.status(500).json({ message: error.message });
+  }
+};
+
+// Generate image for a question
+exports.generateQuestionImage = async (req, res) => {
+  try {
+    const { questionText, options } = req.body;
+
+    if (!questionText) {
+      return res.status(400).json({ message: 'Question text is required' });
+    }
+
+    const imageUrl = await generateQuestionImage(questionText, options || []);
+    res.json({ imageUrl });
+  } catch (error) {
+    console.error('Error generating question image:', error);
+    res.status(500).json({ 
+      message: error.message || 'Failed to generate image for question' 
+    });
   }
 };
 

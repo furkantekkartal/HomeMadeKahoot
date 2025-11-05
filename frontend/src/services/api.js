@@ -33,6 +33,7 @@ export const quizAPI = {
   createQuiz: (data) => api.post('/quizzes', data),
   updateQuiz: (id, data) => api.put(`/quizzes/${id}`, data),
   deleteQuiz: (id) => api.delete(`/quizzes/${id}`),
+  generateQuestionImage: (questionText, options) => api.post('/quizzes/generate-image', { questionText, options }),
 };
 
 // Session API

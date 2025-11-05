@@ -277,6 +277,11 @@ const PlayQuiz = () => {
 
       <div className="question-display card">
         <h2 className="question-text">{currentQuestion.questionText}</h2>
+        {currentQuestion.imageUrl && (
+          <div className="question-image-container">
+            <img src={currentQuestion.imageUrl} alt="Question" className="question-image" />
+          </div>
+        )}
         <div className="options-grid">
           {currentQuestion.options.map((option, idx) => {
             let optionClass = 'option-button';
