@@ -19,9 +19,13 @@ connectDB();
 
 const app = express();
 const server = http.createServer(app);
+
+// Normalize FRONTEND_URL - remove trailing slash to avoid CORS issues
+const frontendUrl = (process.env.FRONTEND_URL || "http://localhost:3000").replace(/\/$/, '');
+
 const io = socketIo(server, {
   cors: {
-    origin: process.env.FRONTEND_URL || "http://localhost:3000",
+    origin: frontendUrl,
     methods: ["GET", "POST"],
     credentials: true
   },
@@ -29,8 +33,11 @@ const io = socketIo(server, {
   allowEIO3: true // Support older clients
 });
 
-// Middleware
-app.use(cors());
+// Middleware - configure CORS to match Socket.io
+app.use(cors({
+  origin: frontendUrl,
+  credentials: true
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
