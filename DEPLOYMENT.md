@@ -168,6 +168,94 @@ Before deploying, make sure you have:
 
 ---
 
+## 🔄 Automatic Deployments (Auto-Deploy on Git Push)
+
+**Good news!** If you connected your GitHub repository when creating the services, Render automatically deploys whenever you push changes to your repository.
+
+### How It Works
+
+1. **When you push to GitHub:**
+   ```bash
+   git add .
+   git commit -m "Your changes"
+   git push origin master
+   ```
+
+2. **Render automatically detects the push** and starts a new deployment
+3. Both frontend and backend will redeploy automatically
+4. You'll see the deployment status in your Render dashboard
+
+### Verify Auto-Deploy is Enabled
+
+1. Go to your Render dashboard
+2. Select your backend service (`homemadekahoot-backend`)
+3. Go to **Settings** → **Build & Deploy**
+4. Check **"Auto-Deploy"** section:
+   - Should show: **"Auto-Deploy: Yes"**
+   - **Branch:** Should be `master` (or `main` - your default branch)
+   - If it says "No", click **"Edit"** and enable it
+
+5. Repeat for frontend service (`homemadekahoot-frontend`)
+
+### Configure Branch Selection
+
+By default, Render deploys from your default branch (`master` or `main`). To deploy from a different branch:
+
+1. Go to your service in Render dashboard
+2. **Settings** → **Build & Deploy**
+3. Under **"Auto-Deploy"**, change the branch name
+4. Save changes
+
+### Manual Deployment
+
+If you need to manually trigger a deployment:
+
+1. Go to your service in Render dashboard
+2. Click **"Manual Deploy"** button (top right)
+3. Select:
+   - **"Deploy latest commit"** - deploys latest code from GitHub
+   - Or **"Clear build cache & deploy"** - clean rebuild (if you have caching issues)
+
+### Deployment Status
+
+You can monitor deployments in Render dashboard:
+- **Logs tab** - see real-time build and deployment logs
+- **Events tab** - see deployment history
+- **Metrics tab** - see deployment metrics
+
+### Tips for Automatic Deployments
+
+1. **Always test locally first:**
+   ```bash
+   # Backend
+   cd backend && npm run dev
+   
+   # Frontend (in another terminal)
+   cd frontend && npm start
+   ```
+
+2. **Use meaningful commit messages:**
+   ```bash
+   git commit -m "Fix: Fix CORS issue in Socket.io"
+   git commit -m "Feature: Add image generation to quiz questions"
+   ```
+
+3. **Check deployment logs** if something goes wrong:
+   - Go to Render dashboard → Your service → **Logs** tab
+   - Look for errors in build or runtime logs
+
+4. **Deploy only from main branch:**
+   - Keep `master`/`main` branch stable
+   - Use feature branches for development
+   - Merge to `master`/`main` when ready to deploy
+
+5. **Free tier note:**
+   - Render free tier services spin down after 15 minutes of inactivity
+   - First request after spin-down takes 30-60 seconds to start
+   - This is normal and doesn't affect deployment
+
+---
+
 ## 🎯 Option 2: Deploy with Railway
 
 ### Step 1: Deploy Backend
