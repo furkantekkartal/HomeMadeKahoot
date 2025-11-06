@@ -125,7 +125,9 @@ REACT_APP_SOCKET_URL=https://your-backend-url.onrender.com
 
 ## 💡 Tips
 
-- Free tier spins down after 15 min inactivity (first request may take 30-60s)
+- **Free Tier Spin-Down**: Services automatically spin down after 15 minutes of inactivity
+- **Auto-Restart**: Services automatically restart when you make a request (no manual action needed)
+- **Cold Start**: First request after spin-down takes 30-60 seconds (this is normal)
 - Test locally before deploying
 - Check deployment logs if something fails
 - Keep `master`/`main` branch stable for auto-deploy
