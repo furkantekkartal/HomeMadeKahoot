@@ -18,6 +18,29 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// Handle 401 errors (unauthorized) - token expired or invalid
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      // Token is invalid or expired
+      const token = localStorage.getItem('token');
+      if (token) {
+        // Only clear token if it exists (user was logged in)
+        localStorage.removeItem('token');
+        // Redirect to login page if we're not already there
+        if (window.location.pathname !== '/login' && window.location.pathname !== '/register' && window.location.pathname !== '/') {
+          // Use setTimeout to avoid navigation during render
+          setTimeout(() => {
+            window.location.href = '/login';
+          }, 100);
+        }
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 // Auth API
 export const authAPI = {
   register: (data) => api.post('/auth/register', data),
