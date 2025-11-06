@@ -75,14 +75,14 @@ You can deploy both production and development versions simultaneously on Render
 
 **Development (Testing):**
 - Service name: `homemadekahoot-backend-dev` and `homemadekahoot-frontend-dev`
-- Branch: `develop` (or `dev`)
+- Branch: `dev`
 - URL: `homemadekahoot-frontend-dev.onrender.com`
 - Environment: `NODE_ENV=development`
 
 **Steps:**
-1. Create a new branch: `git checkout -b develop`
+1. The `dev` branch is already created in the repository
 2. In Render, create new services (same steps as production)
-3. Set branch to `develop` in Render settings (Settings → Build & Deploy → Branch)
+3. Set branch to `dev` in Render settings (Settings → Build & Deploy → Branch)
 4. Use different MongoDB databases or collections for dev (optional)
 5. Set `NODE_ENV=development` in dev services
 
