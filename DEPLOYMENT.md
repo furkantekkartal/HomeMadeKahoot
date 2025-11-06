@@ -107,13 +107,18 @@ Before deploying, make sure you have:
      - **Plan:** Free
    
    **⚠️ CRITICAL: After creating the site, you MUST configure redirects:**
-   - Go to your static site in Render dashboard
-   - Go to **Settings** → Scroll down to **"Redirects and Rewrites"** section
-   - Add a redirect rule:
-     - **Source:** `/*`
-     - **Destination:** `/index.html`
-     - **Status Code:** `200` (not 301/302!)
-   - OR if Render doesn't have that UI, the `_redirects` file should work after redeploy
+   - The `_redirects` file in `frontend/public/` contains: `/*    /index.html   200`
+   - This tells Render to serve `index.html` for ALL routes (required for React Router)
+   - **Status Code MUST be 200** (rewrite) - NOT 301/302 (redirect)
+   - If you configure in Render dashboard:
+     - Go to **Settings** → **"Redirects and Rewrites"** section
+     - Add a rewrite rule:
+       - **Source:** `/*`
+       - **Destination:** `/index.html`
+       - **Status Code:** `200` (this is a rewrite, not a redirect)
+   - **Why 200?** A 200 rewrite serves index.html but keeps the original URL (e.g., `/host/sessionId`)
+   - A 301/302 redirect changes the URL to `/index.html`, which breaks React Router
+   - The `_redirects` file should work automatically, but verify it's in the `build` folder after deployment
 
 3. **Add Environment Variables:**
    ```
