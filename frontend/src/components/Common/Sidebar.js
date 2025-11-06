@@ -39,18 +39,8 @@ const Sidebar = ({ isOpen, onClose }) => {
     }
   }, [location.pathname, isOpen, onClose]);
 
-  // Don't show sidebar for non-logged-in users or on public/play pages
   if (!user) {
     return null; // Don't show sidebar for non-logged-in users
-  }
-  
-  // Additional safeguard: Don't show on public pages or play pages
-  const publicPages = ['/', '/login', '/register', '/join'];
-  const isPublicPage = publicPages.includes(location.pathname);
-  const isPlayPage = location.pathname.startsWith('/play');
-  
-  if (isPublicPage || isPlayPage) {
-    return null;
   }
 
   // Only show overlay on mobile when sidebar is open

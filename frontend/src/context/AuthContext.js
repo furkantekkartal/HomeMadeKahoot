@@ -25,15 +25,9 @@ export const AuthProvider = ({ children }) => {
           setUser(response.data);
           setToken(storedToken);
         } catch (error) {
-          // Token is invalid or expired
           localStorage.removeItem('token');
           setToken(null);
-          setUser(null);
         }
-      } else {
-        // No token, user is not logged in
-        setUser(null);
-        setToken(null);
       }
       setLoading(false);
     };
