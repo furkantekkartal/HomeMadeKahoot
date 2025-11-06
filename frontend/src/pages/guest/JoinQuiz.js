@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { sessionAPI } from '../services/api';
-import './JoinQuiz.css';
+import { Link, useNavigate } from 'react-router-dom';
+import { sessionAPI } from '../../services/api';
+import '../JoinQuiz.css';
+import '../Home.css';
 
-const LoggedInJoinQuiz = () => {
+const GuestJoinQuiz = () => {
   const [pin, setPin] = useState('');
   const [username, setUsername] = useState('');
   const [error, setError] = useState('');
@@ -38,6 +39,16 @@ const LoggedInJoinQuiz = () => {
 
   return (
     <div className="join-quiz-container">
+      <div className="home-header">
+        <Link to="/" className="home-logo">
+          <span className="brand-icon">🎮</span>
+          HomeMadeKahoot
+        </Link>
+        <div className="home-auth">
+          <Link to="/login" className="home-login-link">Login</Link>
+          <Link to="/register" className="btn btn-primary btn-sm">Sign Up</Link>
+        </div>
+      </div>
       <div className="join-quiz-card">
         <h1>Join Quiz</h1>
         <p className="subtitle">Enter the game PIN and your username to join</p>
@@ -77,5 +88,5 @@ const LoggedInJoinQuiz = () => {
   );
 };
 
-export default LoggedInJoinQuiz;
+export default GuestJoinQuiz;
 

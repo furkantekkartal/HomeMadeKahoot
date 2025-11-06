@@ -42,17 +42,24 @@
   padding: 1.5rem;
   text-align: center;
   margin-bottom: 1rem;
-  margin-top: 80px; /* Space for fixed header when present */
   border-radius: 8px;
+}
+
+/* Guest version has header, needs margin-top */
+.play-quiz .home-header ~ .play-header {
+  margin-top: 80px; /* Space for fixed header when present */
 }
 
 @media (max-width: 768px) {
   .play-header {
     padding: 0.5rem 0.75rem;
     margin-bottom: 0.25rem;
-    margin-top: 70px; /* Smaller margin on mobile */
     border-radius: 0;
     flex-shrink: 0;
+  }
+
+  .play-quiz .home-header ~ .play-header {
+    margin-top: 70px; /* Smaller margin on mobile */
   }
 }
 

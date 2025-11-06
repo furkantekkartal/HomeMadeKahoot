@@ -4,15 +4,25 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import Sidebar from './components/Common/Sidebar';
 import Navbar from './components/Common/Navbar';
 import MobileMenuButton from './components/Common/MobileMenuButton';
-import Home from './pages/Home';
-import Login from './pages/Login';
-import Register from './pages/Register';
+// Guest pages (for non-logged-in users)
+import GuestHome from './pages/guest/Home';
+import GuestLogin from './pages/guest/Login';
+import GuestRegister from './pages/guest/Register';
+import GuestJoinQuiz from './pages/guest/JoinQuiz';
+import GuestPlayQuiz from './pages/guest/PlayQuiz';
+
+// Logged-in pages
+import LoggedInHome from './pages/Home';
+import LoggedInLogin from './pages/Login';
+import LoggedInRegister from './pages/Register';
+import LoggedInJoinQuiz from './pages/JoinQuiz';
+import LoggedInPlayQuiz from './pages/PlayQuiz';
+
+// Logged-in only pages
 import Dashboard from './pages/Dashboard';
 import CreateQuiz from './pages/CreateQuiz';
 import EditQuiz from './pages/EditQuiz';
 import HostQuiz from './pages/HostQuiz';
-import JoinQuiz from './pages/JoinQuiz';
-import PlayQuiz from './pages/PlayQuiz';
 import SelfPacedQuiz from './pages/SelfPacedQuiz';
 import Results from './pages/Results';
 import BrowseQuizzes from './pages/BrowseQuizzes';
@@ -55,8 +65,8 @@ function AppContent() {
   
   return (
     <>
-      {/* Show sidebar for all logged-in users, except on join page and play pages (game screen) */}
-      {user && !isJoinPage && !isPlayPage && (
+      {/* Show sidebar for all logged-in users, except on play pages (game screen) */}
+      {user && !isPlayPage && (
         <>
           {isMobile && <MobileMenuButton onClick={() => setSidebarOpen(true)} />}
           <Sidebar isOpen={shouldShowSidebar} onClose={() => setSidebarOpen(false)} />
@@ -64,17 +74,20 @@ function AppContent() {
       )}
       {/* Show top navbar for public pages when not logged in, but hide it on home, login, register, join, and play pages */}
       {!user && location.pathname !== '/' && location.pathname !== '/login' && location.pathname !== '/register' && location.pathname !== '/join' && !isPlayPage && <Navbar />}
-      <main className={`main-content ${user && !isJoinPage && !isPlayPage ? 'with-sidebar' : isPublicPage || isPlayPage ? 'public-page' : ''}`}>
+      <main className={`main-content ${user && !isPlayPage ? 'with-sidebar' : !user && (isPublicPage || isPlayPage) ? 'public-page' : ''}`}>
         <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
+          {/* Shared routes - different components for guest vs logged-in */}
+          <Route path="/" element={user ? <LoggedInHome /> : <GuestHome />} />
+          <Route path="/login" element={user ? <LoggedInLogin /> : <GuestLogin />} />
+          <Route path="/register" element={user ? <LoggedInRegister /> : <GuestRegister />} />
+          <Route path="/join" element={user ? <LoggedInJoinQuiz /> : <GuestJoinQuiz />} />
+          <Route path="/play/:sessionId" element={user ? <LoggedInPlayQuiz /> : <GuestPlayQuiz />} />
+          
+          {/* Logged-in only routes */}
           <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
           <Route path="/create-quiz" element={<PrivateRoute><CreateQuiz /></PrivateRoute>} />
           <Route path="/edit-quiz/:id" element={<PrivateRoute><EditQuiz /></PrivateRoute>} />
           <Route path="/host/:sessionId" element={<PrivateRoute><HostQuiz /></PrivateRoute>} />
-          <Route path="/join" element={<JoinQuiz />} />
-          <Route path="/play/:sessionId" element={<PlayQuiz />} />
           <Route path="/quiz/:id/self-paced" element={<SelfPacedQuiz />} />
           <Route path="/browse" element={<PrivateRoute><BrowseQuizzes /></PrivateRoute>} />
           <Route path="/results" element={<PrivateRoute><Results /></PrivateRoute>} />

@@ -2,9 +2,8 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import './Auth.css';
-import '../pages/Home.css';
 
-const Login = () => {
+const LoggedInLogin = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -27,22 +26,8 @@ const Login = () => {
     }
   };
 
-  const { user: currentUser } = useAuth();
-
   return (
     <div className="auth-container">
-      {!currentUser && (
-        <div className="home-header">
-          <Link to="/" className="home-logo">
-            <span className="brand-icon">🎮</span>
-            HomeMadeKahoot
-          </Link>
-          <div className="home-auth">
-            <Link to="/login" className="home-login-link">Login</Link>
-            <Link to="/register" className="btn btn-primary btn-sm">Sign Up</Link>
-          </div>
-        </div>
-      )}
       <div className="auth-card">
         <h2 className="auth-title">Login</h2>
         {error && <div className="error-message">{error}</div>}
@@ -79,5 +64,5 @@ const Login = () => {
   );
 };
 
-export default Login;
+export default LoggedInLogin;
 

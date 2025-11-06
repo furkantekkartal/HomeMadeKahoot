@@ -25,11 +25,15 @@
   width: 100%;
   max-width: 400px;
   text-align: center;
+}
+
+/* Guest version has header, needs margin-top */
+.join-quiz-container .home-header ~ .join-quiz-card {
   margin-top: 80px; /* Space for fixed header */
 }
 
 @media (max-width: 768px) {
-  .join-quiz-card {
+  .join-quiz-container .home-header ~ .join-quiz-card {
     margin-top: 70px; /* Smaller margin on mobile */
   }
 }

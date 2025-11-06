@@ -1,10 +1,20 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import './Home.css';
+import '../Home.css';
 
-const LoggedInHome = () => {
+const GuestHome = () => {
   return (
     <div className="home">
+      <div className="home-header">
+        <Link to="/" className="home-logo">
+          <span className="brand-icon">🎮</span>
+          HomeMadeKahoot
+        </Link>
+        <div className="home-auth">
+          <Link to="/login" className="home-login-link">Login</Link>
+          <Link to="/register" className="btn btn-primary btn-sm">Sign Up</Link>
+        </div>
+      </div>
       <div className="hero">
         <h1 className="hero-title">🎓 Learn English the Fun Way!</h1>
         <p className="hero-subtitle">
@@ -43,5 +53,5 @@ const LoggedInHome = () => {
   );
 };
 
-export default LoggedInHome;
+export default GuestHome;
 

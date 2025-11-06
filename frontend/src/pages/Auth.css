@@ -24,11 +24,15 @@
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
   width: 100%;
   max-width: 400px;
+}
+
+/* Guest version has header, needs margin-top */
+.auth-container .home-header ~ .auth-card {
   margin-top: 80px; /* Space for fixed header */
 }
 
 @media (max-width: 768px) {
-  .auth-card {
+  .auth-container .home-header ~ .auth-card {
     margin-top: 70px; /* Smaller margin on mobile */
   }
 }
