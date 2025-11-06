@@ -13,37 +13,11 @@ const Home = () => {
         <p className="hero-subtitle">
           Create interactive quizzes, host live sessions, and improve your English skills through gamification
         </p>
-        {!user ? (
-          <div className="hero-actions">
-            <Link to="/register" className="btn btn-primary btn-large">
-              Get Started
-            </Link>
-            <Link to="/join" className="btn btn-success btn-large">
-              Join Quiz
-            </Link>
-            <Link to="/browse" className="btn btn-secondary btn-large">
-              Browse Quizzes
-            </Link>
-            <Link to="/login" className="btn btn-secondary btn-large">
-              Login
-            </Link>
-          </div>
-        ) : (
-          <div className="hero-actions">
-            <Link to="/dashboard" className="btn btn-primary btn-large">
-              Go to Dashboard
-            </Link>
-            <Link to="/join" className="btn btn-success btn-large">
-              Join Quiz
-            </Link>
-            <Link to="/browse" className="btn btn-secondary btn-large">
-              Browse Quizzes
-            </Link>
-            <Link to="/create-quiz" className="btn btn-secondary btn-large">
-              Create Quiz
-            </Link>
-          </div>
-        )}
+        <div className="hero-actions">
+          <Link to="/join" className="btn btn-success btn-large">
+            Join Quiz
+          </Link>
+        </div>
       </div>
 
       <div className="features">

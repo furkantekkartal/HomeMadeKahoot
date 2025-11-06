@@ -44,7 +44,7 @@ function App() {
               <Route path="/join" element={<JoinQuiz />} />
               <Route path="/play/:sessionId" element={<PlayQuiz />} />
               <Route path="/quiz/:id/self-paced" element={<SelfPacedQuiz />} />
-              <Route path="/browse" element={<BrowseQuizzes />} />
+              <Route path="/browse" element={<PrivateRoute><BrowseQuizzes /></PrivateRoute>} />
               <Route path="/results" element={<PrivateRoute><Results /></PrivateRoute>} />
             </Routes>
           </main>
