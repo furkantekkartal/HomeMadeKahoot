@@ -1,26 +1,33 @@
 .home {
-  color: white;
+  min-height: 100vh;
+  background: #f3f4f6;
+  padding: 2rem;
+  max-width: 100%;
+  margin: 0;
 }
 
 .hero {
   text-align: center;
-  padding: 4rem 0;
+  padding: 4rem 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
 .hero-title {
   font-size: 3.5rem;
   font-weight: 800;
   margin-bottom: 1rem;
-  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+  color: #1e3a8a;
 }
 
 .hero-subtitle {
   font-size: 1.25rem;
   margin-bottom: 2rem;
-  opacity: 0.95;
+  color: #4a5568;
   max-width: 600px;
   margin-left: auto;
   margin-right: auto;
+  line-height: 1.6;
 }
 
 .hero-actions {
@@ -40,6 +47,10 @@
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
   gap: 2rem;
   margin-top: 4rem;
+  max-width: 1200px;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 0 2rem;
 }
 
 .feature-card {
@@ -72,12 +83,56 @@
 }
 
 @media (max-width: 768px) {
+  .home {
+    padding: 1rem;
+  }
+
+  .hero {
+    padding: 2rem 1rem;
+  }
+
   .hero-title {
-    font-size: 2.5rem;
+    font-size: 2rem;
   }
   
   .hero-subtitle {
-    font-size: 1rem;
+    font-size: 0.95rem;
+  }
+
+  .features {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    padding: 0 1rem;
+  }
+
+  .feature-card {
+    padding: 1.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .home {
+    padding: 0.5rem;
+  }
+
+  .hero {
+    padding: 1.5rem 0.5rem;
+  }
+
+  .hero-title {
+    font-size: 1.75rem;
+  }
+
+  .hero-subtitle {
+    font-size: 0.85rem;
+  }
+
+  .feature-card {
+    padding: 1rem;
+  }
+
+  .feature-icon {
+    font-size: 2rem;
   }
 }
 

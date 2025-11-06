@@ -268,20 +268,25 @@ const PlayQuiz = () => {
   return (
     <div className="play-quiz">
       <div className="play-header">
-        <div className="score-display-small">Score: {totalScore}</div>
-        <div className="question-counter">
+        <div className="play-header-content">
+          <div className="score-display-small">Score: {totalScore}</div>
+          <div className="play-header-title">Question</div>
+          <div className="timer">{timeLeft}s</div>
+        </div>
+        <div className="question-counter" style={{ marginTop: '0.5rem', color: 'black' }}>
           Question {currentQuestionIndex + 1} of {quiz.questions.length}
         </div>
-        <div className="timer">{timeLeft}s</div>
       </div>
 
-      <div className="question-display card">
-        <h2 className="question-text">{currentQuestion.questionText}</h2>
-        {currentQuestion.imageUrl && (
+      <div className="question-display">
+        {currentQuestion.imageUrl ? (
           <div className="question-image-container">
             <img src={currentQuestion.imageUrl} alt="Question" className="question-image" />
           </div>
+        ) : (
+          <div className="question-image-container"></div>
         )}
+        <h2 className="question-text">{currentQuestion.questionText}</h2>
         <div className="options-grid">
           {currentQuestion.options.map((option, idx) => {
             let optionClass = 'option-button';
@@ -324,8 +329,7 @@ const PlayQuiz = () => {
                   setTimeLeft(quiz.questions[nextIndex].timeLimit || 20);
                   setScore(0); // Reset score for next question
                 }}
-                className="btn btn-primary"
-                style={{ marginTop: '1rem' }}
+                className="btn btn-primary next-question-btn"
               >
                 Next Question →
               </button>

@@ -1,8 +1,34 @@
 .results-page {
-  max-width: 1400px;
-  margin: 0 auto;
   padding: 2rem;
+  min-height: 100vh;
+  background: #f3f4f6;
   color: #2d3748;
+}
+
+@media (max-width: 768px) {
+  .results-page {
+    padding: 1rem;
+  }
+
+  .results-header h1 {
+    font-size: 1.75rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .results-page {
+    padding: 0.75rem;
+  }
+
+  .results-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .results-header h1 {
+    font-size: 1.5rem;
+  }
 }
 
 .results-header {

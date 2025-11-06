@@ -1,0 +1,127 @@
+import React, { useEffect, useRef } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
+import { 
+  FaPlayCircle,
+  FaHome,
+  FaPlusCircle,
+  FaSearch,
+  FaChartBar,
+  FaCog,
+  FaSignOutAlt,
+  FaUser,
+  FaTimes
+} from 'react-icons/fa';
+import './Sidebar.css';
+
+const Sidebar = ({ isOpen, onClose }) => {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const prevLocationRef = useRef(location.pathname);
+
+  const handleLogout = () => {
+    logout();
+    navigate('/');
+  };
+
+  const isActive = (path) => {
+    return location.pathname === path || location.pathname.startsWith(path + '/');
+  };
+
+  useEffect(() => {
+    // Close sidebar when route changes on mobile (only if pathname actually changed)
+    if (window.innerWidth <= 768 && isOpen && location.pathname !== prevLocationRef.current) {
+      onClose();
+      prevLocationRef.current = location.pathname;
+    } else if (location.pathname !== prevLocationRef.current) {
+      prevLocationRef.current = location.pathname;
+    }
+  }, [location.pathname, isOpen, onClose]);
+
+  if (!user) {
+    return null; // Don't show sidebar for non-logged-in users
+  }
+
+  // Only show overlay on mobile when sidebar is open
+  const showOverlay = isOpen;
+  
+  return (
+    <>
+      {showOverlay && <div className="sidebar-overlay" onClick={onClose}></div>}
+      <aside className={`sidebar ${isOpen ? 'sidebar-open' : ''}`}>
+        <button className="sidebar-close-button" onClick={onClose}>
+          <FaTimes />
+        </button>
+      <div className="sidebar-top">
+        <div className="sidebar-profile">
+          <div className="profile-picture">
+            {user.profilePictureUrl ? (
+              <img 
+                src={user.profilePictureUrl} 
+                alt={user.username} 
+                className="profile-picture-img"
+              />
+            ) : (
+              <FaUser className="profile-picture-icon" />
+            )}
+          </div>
+          <div className="profile-name">{user.username}</div>
+        </div>
+      </div>
+
+      <nav className="sidebar-nav">
+        <Link 
+          to="/join" 
+          className={`nav-item ${isActive('/join') || isActive('/play') ? 'active' : ''}`}
+        >
+          <FaPlayCircle className="nav-icon nav-icon-game" />
+          <span className="nav-text">Game</span>
+        </Link>
+        <Link 
+          to="/dashboard" 
+          className={`nav-item ${isActive('/dashboard') ? 'active' : ''}`}
+        >
+          <FaHome className="nav-icon nav-icon-dashboard" />
+          <span className="nav-text">Dashboard</span>
+        </Link>
+        <Link 
+          to="/create-quiz" 
+          className={`nav-item ${isActive('/create-quiz') ? 'active' : ''}`}
+        >
+          <FaPlusCircle className="nav-icon nav-icon-create" />
+          <span className="nav-text">Create Quiz</span>
+        </Link>
+        <Link 
+          to="/browse" 
+          className={`nav-item ${isActive('/browse') ? 'active' : ''}`}
+        >
+          <FaSearch className="nav-icon nav-icon-browse" />
+          <span className="nav-text">Browse</span>
+        </Link>
+        <Link 
+          to="/results" 
+          className={`nav-item ${isActive('/results') ? 'active' : ''}`}
+        >
+          <FaChartBar className="nav-icon nav-icon-results" />
+          <span className="nav-text">Results</span>
+        </Link>
+      </nav>
+
+      <div className="sidebar-bottom">
+        <Link to="/profile" className="sidebar-bottom-item">
+          <FaCog className="nav-icon" />
+          <span className="nav-text">MY PROFILE</span>
+        </Link>
+        <button onClick={handleLogout} className="sidebar-bottom-item logout-btn">
+          <FaSignOutAlt className="nav-icon" />
+          <span className="nav-text">LOG OUT</span>
+        </button>
+      </div>
+    </aside>
+    </>
+  );
+};
+
+export default Sidebar;
+
