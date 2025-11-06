@@ -34,9 +34,6 @@ function AppContent() {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
   const [isMobile, setIsMobile] = React.useState(false);
-  const isPublicPage = location.pathname === '/' || location.pathname === '/login' || location.pathname === '/register' || location.pathname === '/join';
-  const isJoinPage = location.pathname === '/join';
-  // Note: We don't hide sidebar on /play pages for logged-in users - they should see it
   
   React.useEffect(() => {
     const checkMobile = () => {
@@ -48,23 +45,69 @@ function AppContent() {
     
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  // Navigation visibility rules:
+  // 1. If user is not logged in: Always hide left pane, always show top pane
+  // 2. If user is logged in: Always show left pane, always hide top pane
+  // 3. Mobile: Hide left pane but show icon to open it
   
-  // On desktop, sidebar should always be open (visible)
-  // On mobile, it's controlled by sidebarOpen state
-  const shouldShowSidebar = isMobile ? sidebarOpen : true;
+  /**
+   * Determines if sidebar should be visible
+   * Rules: Only show for logged-in users. On mobile, controlled by sidebarOpen state.
+   */
+  const shouldShowSidebar = () => {
+    if (!user) return false; // Rule 1: Not logged in = hide left pane
+    return isMobile ? sidebarOpen : true; // Rule 3: Mobile = controlled by state, Desktop = always visible
+  };
+
+  /**
+   * Determines if navbar should be visible
+   * Rules: Only show for non-logged-in users
+   */
+  const shouldShowNavbar = () => {
+    return !user; // Rule 1: Not logged in = show top pane
+  };
+
+  /**
+   * Determines if mobile menu button should be visible
+   * Rules: Show on mobile when user is logged in and sidebar is closed
+   */
+  const shouldShowMobileMenuButton = () => {
+    return user && isMobile && !sidebarOpen;
+  };
+
+  /**
+   * Determines main content CSS classes
+   */
+  const getMainContentClasses = () => {
+    const classes = [];
+    if (user && !isMobile) {
+      classes.push('with-sidebar'); // Desktop logged-in: add sidebar margin
+    }
+    if (!user) {
+      classes.push('public-page'); // Not logged in: full width
+    }
+    return classes.join(' ');
+  };
+
+  const showSidebar = shouldShowSidebar();
+  const showNavbar = shouldShowNavbar();
+  const showMobileButton = shouldShowMobileMenuButton();
   
   return (
     <>
-      {/* Show sidebar for all logged-in users, except on join page */}
-      {user && !isJoinPage && (
+      {/* Left Pane (Sidebar) - Rule 2: Always show for logged-in users */}
+      {user && (
         <>
-          {isMobile && <MobileMenuButton onClick={() => setSidebarOpen(true)} />}
-          <Sidebar isOpen={shouldShowSidebar} onClose={() => setSidebarOpen(false)} />
+          {showMobileButton && <MobileMenuButton onClick={() => setSidebarOpen(true)} />}
+          <Sidebar isOpen={showSidebar} onClose={() => setSidebarOpen(false)} />
         </>
       )}
-      {/* Show top navbar for public pages when not logged in, but hide it on home, login, register, and join pages */}
-      {!user && location.pathname !== '/' && location.pathname !== '/login' && location.pathname !== '/register' && location.pathname !== '/join' && <Navbar />}
-      <main className={`main-content ${user && !isJoinPage ? 'with-sidebar' : isPublicPage ? 'public-page' : ''}`}>
+      
+      {/* Top Pane (Navbar) - Rule 1: Always show for non-logged-in users */}
+      {showNavbar && <Navbar />}
+      
+      <main className={`main-content ${getMainContentClasses()}`}>
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
