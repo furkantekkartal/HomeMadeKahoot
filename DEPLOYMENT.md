@@ -72,6 +72,12 @@ Before deploying, make sure you have:
    FRONTEND_URL=https://your-frontend-url.onrender.com
    ```
    
+   **⚠️ CRITICAL - No Trailing Slashes:**
+   - `FRONTEND_URL` and `APP_URL` must NOT have trailing slashes
+   - Use: `https://homemadekahoot-frontend.onrender.com` ✅
+   - NOT: `https://homemadekahoot-frontend.onrender.com/` ❌
+   - Trailing slashes cause CORS errors (the backend code now normalizes this, but it's better to set it correctly)
+   
    **⚠️ Important for MongoDB Atlas:**
    - Before deploying, make sure MongoDB Atlas Network Access allows connections
    - Go to MongoDB Atlas → Network Access → Add IP Address
