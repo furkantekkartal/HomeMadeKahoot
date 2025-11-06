@@ -1,5 +1,6 @@
 const Quiz = require('../models/Quiz');
 const { generateQuestionImage } = require('../services/imageService');
+const { generateQuizTitle, generateQuizDescription, generateQuizQuestions } = require('../services/aiQuizService');
 
 // Get all quizzes
 exports.getAllQuizzes = async (req, res) => {
@@ -115,12 +116,81 @@ exports.generateQuestionImage = async (req, res) => {
       return res.status(400).json({ message: 'Question text is required' });
     }
 
-    const imageUrl = await generateQuestionImage(questionText, options || []);
-    res.json({ imageUrl });
+    const result = await generateQuestionImage(questionText, options || []);
+    res.json({ 
+      imageUrl: result.imageUrl,
+      searchQuery: result.searchQuery // Include search query for debugging
+    });
   } catch (error) {
     console.error('Error generating question image:', error);
     res.status(500).json({ 
-      message: error.message || 'Failed to generate image for question' 
+      message: error.message || 'Failed to generate image for question',
+      searchQuery: error.searchQuery || null // Include search query in error response for debugging
+    });
+  }
+};
+
+// Generate quiz title using AI
+exports.generateQuizTitle = async (req, res) => {
+  try {
+    const { category, difficulty } = req.body;
+
+    if (!category || !difficulty) {
+      return res.status(400).json({ message: 'Category and difficulty are required' });
+    }
+
+    const title = await generateQuizTitle(category, difficulty);
+    res.json({ title });
+  } catch (error) {
+    console.error('Error generating quiz title:', error);
+    res.status(500).json({ 
+      message: error.message || 'Failed to generate quiz title' 
+    });
+  }
+};
+
+// Generate quiz description using AI
+exports.generateQuizDescription = async (req, res) => {
+  try {
+    const { title, category, difficulty } = req.body;
+
+    if (!title || !category || !difficulty) {
+      return res.status(400).json({ message: 'Title, category, and difficulty are required' });
+    }
+
+    const description = await generateQuizDescription(title, category, difficulty);
+    res.json({ description });
+  } catch (error) {
+    console.error('Error generating quiz description:', error);
+    res.status(500).json({ 
+      message: error.message || 'Failed to generate quiz description' 
+    });
+  }
+};
+
+// Generate quiz questions using AI
+exports.generateQuizQuestions = async (req, res) => {
+  try {
+    const { title, description, category, difficulty, questionCount } = req.body;
+
+    if (!title || !category || !difficulty || !questionCount) {
+      return res.status(400).json({ 
+        message: 'Title, category, difficulty, and question count are required' 
+      });
+    }
+
+    if (questionCount < 1 || questionCount > 50) {
+      return res.status(400).json({ 
+        message: 'Question count must be between 1 and 50' 
+      });
+    }
+
+    const questions = await generateQuizQuestions(title, description, category, difficulty, questionCount);
+    res.json({ questions });
+  } catch (error) {
+    console.error('Error generating quiz questions:', error);
+    res.status(500).json({ 
+      message: error.message || 'Failed to generate quiz questions' 
     });
   }
 };

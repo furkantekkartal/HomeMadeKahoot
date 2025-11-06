@@ -18,8 +18,53 @@
 
 .form-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
   gap: 1rem;
+}
+
+.input-with-icon,
+.textarea-with-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-with-icon .form-input,
+.textarea-with-icon .form-input {
+  padding-right: 45px;
+}
+
+.icon-button {
+  position: absolute;
+  right: 8px;
+  background: #667eea;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 1.2rem;
+  transition: all 0.2s;
+  z-index: 1;
+}
+
+.icon-button:hover:not(:disabled) {
+  background: #5568d3;
+  transform: scale(1.1);
+}
+
+.icon-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.textarea-with-icon .icon-button {
+  top: 8px;
+  bottom: auto;
 }
 
 .questions-section {
@@ -128,6 +173,16 @@
     flex-direction: column;
     align-items: flex-start;
     gap: 1rem;
+  }
+}
+
+@media (max-width: 1024px) {
+  .form-row {
+    grid-template-columns: 1fr 1fr;
+  }
+  
+  .form-row .form-group:last-child {
+    grid-column: 1 / -1;
   }
 }
 

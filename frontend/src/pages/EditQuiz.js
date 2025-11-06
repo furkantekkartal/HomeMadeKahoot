@@ -50,7 +50,36 @@ const EditQuiz = () => {
     }
   };
 
+  // Calculate default points based on category and difficulty
+  const calculateDefaultPoints = (category, difficulty) => {
+    const categoryCoefficients = {
+      vocabulary: 1,
+      grammar: 2,
+      reading: 2,
+      listening: 2
+    };
+    const difficultyCoefficients = {
+      beginner: 1,
+      intermediate: 3,
+      advanced: 5
+    };
+    return (categoryCoefficients[category] || 1) * (difficultyCoefficients[difficulty] || 1);
+  };
+
+  // Calculate default time limit based on difficulty
+  const calculateDefaultTimeLimit = (difficulty) => {
+    const timeLimits = {
+      beginner: 20,
+      intermediate: 40,
+      advanced: 60
+    };
+    return timeLimits[difficulty] || 20;
+  };
+
   const addQuestion = () => {
+    const defaultPoints = calculateDefaultPoints(formData.category, formData.difficulty);
+    const defaultTimeLimit = calculateDefaultTimeLimit(formData.difficulty);
+
     setFormData({
       ...formData,
       questions: [
@@ -59,8 +88,8 @@ const EditQuiz = () => {
           questionText: '',
           options: ['', '', '', ''],
           correctAnswer: 0,
-          points: 100,
-          timeLimit: 20,
+          points: defaultPoints,
+          timeLimit: defaultTimeLimit,
           imageUrl: null
         }
       ]

@@ -18,8 +18,41 @@ const CreateQuiz = () => {
   const [generatingImages, setGeneratingImages] = useState({});
   // Store image history for each question: { questionIndex: { history: [], currentIndex: -1 } }
   const [imageHistory, setImageHistory] = useState({});
+  const [questionCount, setQuestionCount] = useState(5);
+  const [generatingTitle, setGeneratingTitle] = useState(false);
+  const [generatingDescription, setGeneratingDescription] = useState(false);
+  const [generatingQuestions, setGeneratingQuestions] = useState(false);
+
+  // Calculate default points based on category and difficulty
+  const calculateDefaultPoints = (category, difficulty) => {
+    const categoryCoefficients = {
+      vocabulary: 1,
+      grammar: 2,
+      reading: 2,
+      listening: 2
+    };
+    const difficultyCoefficients = {
+      beginner: 1,
+      intermediate: 3,
+      advanced: 5
+    };
+    return (categoryCoefficients[category] || 1) * (difficultyCoefficients[difficulty] || 1);
+  };
+
+  // Calculate default time limit based on difficulty
+  const calculateDefaultTimeLimit = (difficulty) => {
+    const timeLimits = {
+      beginner: 20,
+      intermediate: 40,
+      advanced: 60
+    };
+    return timeLimits[difficulty] || 20;
+  };
 
   const addQuestion = () => {
+    const defaultPoints = calculateDefaultPoints(formData.category, formData.difficulty);
+    const defaultTimeLimit = calculateDefaultTimeLimit(formData.difficulty);
+
     setFormData({
       ...formData,
       questions: [
@@ -28,8 +61,8 @@ const CreateQuiz = () => {
           questionText: '',
           options: ['', '', '', ''],
           correctAnswer: 0,
-          points: 100,
-          timeLimit: 20,
+          points: defaultPoints,
+          timeLimit: defaultTimeLimit,
           imageUrl: null
         }
       ]
@@ -142,6 +175,98 @@ const CreateQuiz = () => {
     });
   };
 
+  const generateTitle = async () => {
+    if (!formData.category || !formData.difficulty) {
+      setError('Please select category and difficulty first');
+      return;
+    }
+
+    setGeneratingTitle(true);
+    setError('');
+
+    try {
+      const response = await quizAPI.generateQuizTitle(formData.category, formData.difficulty);
+      setFormData({ ...formData, title: response.data.title });
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to generate title');
+    } finally {
+      setGeneratingTitle(false);
+    }
+  };
+
+  const generateDescription = async () => {
+    if (!formData.title.trim()) {
+      setError('Please enter or generate a title first');
+      return;
+    }
+
+    if (!formData.category || !formData.difficulty) {
+      setError('Please select category and difficulty first');
+      return;
+    }
+
+    setGeneratingDescription(true);
+    setError('');
+
+    try {
+      const response = await quizAPI.generateQuizDescription(
+        formData.title,
+        formData.category,
+        formData.difficulty
+      );
+      setFormData({ ...formData, description: response.data.description });
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to generate description');
+    } finally {
+      setGeneratingDescription(false);
+    }
+  };
+
+  const generateQuestionsByAI = async () => {
+    if (!formData.title.trim()) {
+      setError('Please enter or generate a title first');
+      return;
+    }
+
+    if (!formData.category || !formData.difficulty) {
+      setError('Please select category and difficulty first');
+      return;
+    }
+
+    if (!questionCount || questionCount < 1 || questionCount > 50) {
+      setError('Please enter a valid question count (1-50)');
+      return;
+    }
+
+    setGeneratingQuestions(true);
+    setError('');
+
+    try {
+      const response = await quizAPI.generateQuizQuestions(
+        formData.title,
+        formData.description || '',
+        formData.category,
+        formData.difficulty,
+        questionCount
+      );
+      
+      const generatedQuestions = response.data.questions;
+      
+      // Initialize image history for all new questions
+      const newImageHistory = {};
+      generatedQuestions.forEach((_, index) => {
+        newImageHistory[index] = { history: [], currentIndex: -1 };
+      });
+      
+      setImageHistory(newImageHistory);
+      setFormData({ ...formData, questions: generatedQuestions });
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to generate questions');
+    } finally {
+      setGeneratingQuestions(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -189,23 +314,45 @@ const CreateQuiz = () => {
         <form onSubmit={handleSubmit}>
           <div className="form-group">
             <label className="form-label">Quiz Title *</label>
-            <input
-              type="text"
-              className="form-input"
-              value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              required
-            />
+            <div className="input-with-icon">
+              <input
+                type="text"
+                className="form-input"
+                value={formData.title}
+                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                required
+              />
+              <button
+                type="button"
+                onClick={generateTitle}
+                className="icon-button"
+                disabled={generatingTitle || !formData.category || !formData.difficulty}
+                title="Generate title with AI"
+              >
+                {generatingTitle ? '⏳' : '✨'}
+              </button>
+            </div>
           </div>
 
           <div className="form-group">
             <label className="form-label">Description</label>
-            <textarea
-              className="form-input"
-              rows="3"
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-            />
+            <div className="textarea-with-icon">
+              <textarea
+                className="form-input"
+                rows="3"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              />
+              <button
+                type="button"
+                onClick={generateDescription}
+                className="icon-button"
+                disabled={generatingDescription || !formData.title.trim() || !formData.category || !formData.difficulty}
+                title="Generate description with AI"
+              >
+                {generatingDescription ? '⏳' : '✨'}
+              </button>
+            </div>
           </div>
 
           <div className="form-row">
@@ -239,6 +386,29 @@ const CreateQuiz = () => {
                 ))}
               </select>
             </div>
+
+            <div className="form-group">
+              <label className="form-label">Question Number</label>
+              <input
+                type="number"
+                className="form-input"
+                min="1"
+                max="50"
+                value={questionCount}
+                onChange={(e) => setQuestionCount(parseInt(e.target.value) || 1)}
+              />
+            </div>
+          </div>
+
+          <div className="form-group">
+            <button
+              type="button"
+              onClick={generateQuestionsByAI}
+              className="btn btn-primary btn-large"
+              disabled={generatingQuestions || !formData.title.trim() || !formData.category || !formData.difficulty}
+            >
+              {generatingQuestions ? '✨ Generating Questions...' : '✨ Generate by AI'}
+            </button>
           </div>
 
           <div className="questions-section">

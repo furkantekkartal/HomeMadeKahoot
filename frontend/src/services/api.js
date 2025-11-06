@@ -34,6 +34,9 @@ export const quizAPI = {
   updateQuiz: (id, data) => api.put(`/quizzes/${id}`, data),
   deleteQuiz: (id) => api.delete(`/quizzes/${id}`),
   generateQuestionImage: (questionText, options) => api.post('/quizzes/generate-image', { questionText, options }),
+  generateQuizTitle: (category, difficulty) => api.post('/quizzes/generate-title', { category, difficulty }),
+  generateQuizDescription: (title, category, difficulty) => api.post('/quizzes/generate-description', { title, category, difficulty }),
+  generateQuizQuestions: (title, description, category, difficulty, questionCount) => api.post('/quizzes/generate-questions', { title, description, category, difficulty, questionCount }),
 };
 
 // Session API
