@@ -35,7 +35,8 @@ function AppContent() {
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
   const [isMobile, setIsMobile] = React.useState(false);
   const isPublicPage = location.pathname === '/' || location.pathname === '/login' || location.pathname === '/register' || location.pathname === '/join';
-  const isGamePage = location.pathname.startsWith('/play'); // Only participant view, not host view
+  const isJoinPage = location.pathname === '/join';
+  // Note: We don't hide sidebar on /play pages for logged-in users - they should see it
   
   React.useEffect(() => {
     const checkMobile = () => {
@@ -54,16 +55,16 @@ function AppContent() {
   
   return (
     <>
-      {/* Show sidebar for all logged-in users, except on play pages (participant view) */}
-      {user && !isGamePage && (
+      {/* Show sidebar for all logged-in users, except on join page */}
+      {user && !isJoinPage && (
         <>
           {isMobile && <MobileMenuButton onClick={() => setSidebarOpen(true)} />}
           <Sidebar isOpen={shouldShowSidebar} onClose={() => setSidebarOpen(false)} />
         </>
       )}
-      {/* Show top navbar for public pages when not logged in, but hide it on home, login, and register pages */}
-      {!user && location.pathname !== '/' && location.pathname !== '/login' && location.pathname !== '/register' && <Navbar />}
-      <main className={`main-content ${user && !isGamePage ? 'with-sidebar' : isPublicPage || isGamePage ? 'public-page' : ''}`}>
+      {/* Show top navbar for public pages when not logged in, but hide it on home, login, register, and join pages */}
+      {!user && location.pathname !== '/' && location.pathname !== '/login' && location.pathname !== '/register' && location.pathname !== '/join' && <Navbar />}
+      <main className={`main-content ${user && !isJoinPage ? 'with-sidebar' : isPublicPage ? 'public-page' : ''}`}>
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
