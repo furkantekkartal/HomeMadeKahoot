@@ -60,8 +60,6 @@ const Dashboard = () => {
         return;
       }
 
-      console.log('[Dashboard] Session created:', session._id);
-      
       // Navigate using React Router (same window)
       // This ensures React Router handles the route properly
       // If user wants new tab, they can right-click and "Open in new tab"

@@ -127,15 +127,11 @@ async function fetchImageFromUnsplash(query, page = null, fallbackQueries = []) 
       const randomIndex = Math.floor(Math.random() * Math.min(results.length, perPage));
       const selectedImage = results[randomIndex];
 
-      if (searchQuery !== query) {
-        console.log(`[DEBUG] Used fallback query: "${searchQuery}"`);
-      }
       return selectedImage.urls.regular;
     } catch (error) {
       // If this is the last query to try, throw the error
       if (queriesToTry.indexOf(searchQuery) === queriesToTry.length - 1) {
         const errorMessage = error.response?.data?.errors?.[0] || error.message || 'Unknown error';
-        console.error(`[DEBUG] Error fetching image from Unsplash. Query: "${searchQuery}", Error:`, errorMessage);
         const unsplashError = new Error(`Failed to fetch image from Unsplash: ${errorMessage}`);
         unsplashError.searchQuery = searchQuery;
         throw unsplashError;
@@ -157,18 +153,15 @@ async function generateQuestionImage(questionText, options = [], page = null) {
   try {
     // Step 1: Generate search query using AI
     searchQuery = await generateSearchQuery(questionText, options);
-    console.log(`[DEBUG] Unsplash search query: "${searchQuery}" for question: "${questionText.substring(0, 50)}..."`);
 
     // Step 2: Generate fallback queries from question text and options
     const fallbackQueries = generateFallbackQueries(questionText, options, searchQuery);
-    console.log(`[DEBUG] Fallback queries: ${fallbackQueries.join(', ')}`);
 
     // Step 3: Fetch image from Unsplash (with random page for variety and fallbacks)
     const imageUrl = await fetchImageFromUnsplash(searchQuery, page, fallbackQueries);
 
     return { imageUrl, searchQuery };
   } catch (error) {
-    console.error(`[DEBUG] Error generating question image. Search query was: "${searchQuery || 'N/A'}"`);
     console.error('Error generating question image:', error);
     // Attach search query to error for debugging
     error.searchQuery = searchQuery;

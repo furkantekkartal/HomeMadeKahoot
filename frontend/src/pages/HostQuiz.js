@@ -23,10 +23,6 @@ const HostQuiz = () => {
   const hostJoinedRef = useRef(false);
 
   useEffect(() => {
-    console.log('[HostQuiz] Component mounted, sessionId:', sessionId);
-    console.log('[HostQuiz] API URL:', process.env.REACT_APP_API_URL);
-    console.log('[HostQuiz] Socket URL:', process.env.REACT_APP_SOCKET_URL);
-
     if (!sessionId) {
       setLoading(false);
       setError('Session ID is missing from URL. Please go back to dashboard and try hosting again.');
@@ -47,11 +43,8 @@ const HostQuiz = () => {
         setError(null);
       }
 
-      console.log('[HostQuiz] Loading session:', sessionId);
-
       sessionAPI.getSession(sessionId)
         .then(sessionRes => {
-          console.log('[HostQuiz] Session loaded:', sessionRes.data);
           const sessionData = sessionRes.data;
           if (!sessionData) {
             throw new Error('Session data is empty');
@@ -71,7 +64,6 @@ const HostQuiz = () => {
           return quizAPI.getQuiz(sessionData.quizId._id);
         })
         .then(quizRes => {
-          console.log('[HostQuiz] Quiz loaded:', quizRes.data);
           if (!quizRes || !quizRes.data) {
             throw new Error('Quiz data is empty');
           }
@@ -82,8 +74,6 @@ const HostQuiz = () => {
         })
         .catch(error => {
           console.error('Error loading session:', error);
-          console.error('Session ID:', sessionId);
-          console.error('API URL:', process.env.REACT_APP_API_URL);
           loadingRef.current = false;
           
           if (!isRefresh) {
