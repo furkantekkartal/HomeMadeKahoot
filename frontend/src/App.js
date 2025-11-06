@@ -35,7 +35,7 @@ function AppContent() {
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
   const [isMobile, setIsMobile] = React.useState(false);
   const isPublicPage = location.pathname === '/' || location.pathname === '/login' || location.pathname === '/register' || location.pathname === '/join';
-  const isGamePage = location.pathname.startsWith('/play') || location.pathname.startsWith('/host');
+  const isGamePage = location.pathname.startsWith('/play'); // Only participant view, not host view
   
   React.useEffect(() => {
     const checkMobile = () => {
@@ -54,14 +54,15 @@ function AppContent() {
   
   return (
     <>
+      {/* Show sidebar for all logged-in users, except on play pages (participant view) */}
       {user && !isGamePage && (
         <>
           {isMobile && <MobileMenuButton onClick={() => setSidebarOpen(true)} />}
           <Sidebar isOpen={shouldShowSidebar} onClose={() => setSidebarOpen(false)} />
         </>
       )}
-      {/* Show top navbar for public pages when not logged in, but hide it on home page */}
-      {!user && location.pathname !== '/' && <Navbar />}
+      {/* Show top navbar for public pages when not logged in, but hide it on home, login, and register pages */}
+      {!user && location.pathname !== '/' && location.pathname !== '/login' && location.pathname !== '/register' && <Navbar />}
       <main className={`main-content ${user && !isGamePage ? 'with-sidebar' : isPublicPage || isGamePage ? 'public-page' : ''}`}>
         <Routes>
           <Route path="/" element={<Home />} />
