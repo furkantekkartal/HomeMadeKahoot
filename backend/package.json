@@ -5,7 +5,10 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "reset-db": "node scripts/resetDatabase.js",
+    "db-status": "node scripts/databaseStatus.js",
+    "db-cleanup": "node scripts/safeCleanup.js"
   },
   "keywords": [
     "quiz",

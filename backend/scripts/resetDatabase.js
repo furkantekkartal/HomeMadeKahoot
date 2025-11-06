@@ -1,4 +1,12 @@
+require('dotenv').config();
 const mongoose = require('mongoose');
+
+// Import all models to register them
+require('../models/User');
+require('../models/Quiz');
+require('../models/Session');
+require('../models/Result');
+require('../models/StudentResult');
 
 /**
  * Get the appropriate database name based on environment
@@ -9,7 +17,6 @@ const getDatabaseURI = (baseURI) => {
   const env = process.env.NODE_ENV || 'development';
   
   // Parse the URI to extract database name
-  // Handle both mongodb:// and mongodb+srv:// formats
   const url = new URL(baseURI);
   const currentDbName = url.pathname.replace('/', '') || 'homemadekahoot';
   
@@ -31,7 +38,7 @@ const getDatabaseURI = (baseURI) => {
     newDbName = currentDbName + dbSuffix;
   }
   
-  // Update the pathname with new database name (preserve query parameters)
+  // Update the pathname with new database name
   url.pathname = '/' + newDbName;
   
   return url.toString();
@@ -53,60 +60,53 @@ const connectDB = async () => {
       mongoURI = getDatabaseURI(baseURI);
     }
     
-    console.log(`Attempting to connect to MongoDB (${env})...`);
-    console.log(`Database: ${mongoURI.split('/').pop()}`);
+    console.log(`Connecting to MongoDB (${env})...`);
+    console.log(`Database: ${mongoURI.split('/').pop().split('?')[0]}`);
     
     const conn = await mongoose.connect(mongoURI, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
     });
-    
     console.log(`MongoDB Connected: ${conn.connection.host}`);
     console.log(`Database: ${conn.connection.name}`);
-    console.log(`Environment: ${env}`);
-    
-    // Handle connection events
-    mongoose.connection.on('error', (err) => {
-      console.error('MongoDB connection error:', err);
-    });
-    
-    mongoose.connection.on('disconnected', () => {
-      console.warn('MongoDB disconnected');
-    });
-    
-    // Validate database structure in development (optional check)
-    if (env === 'development') {
-      // In development, we can optionally check for orphaned collections
-      // This is a soft check and won't block the server
-      setTimeout(async () => {
-        try {
-          const modelsRegistry = require('./modelsRegistry');
-          const db = mongoose.connection.db;
-          const existingCollections = await db.listCollections().toArray();
-          const existingCollectionNames = existingCollections.map(c => c.name.toLowerCase());
-          const expectedCollections = modelsRegistry.getExpectedCollections();
-          
-          const orphanedCollections = existingCollectionNames.filter(
-            name => !expectedCollections.includes(name)
-          );
-          
-          if (orphanedCollections.length > 0) {
-            console.log(`\n⚠️  Warning: Found ${orphanedCollections.length} orphaned collection(s) in ${env} database.`);
-            console.log('   Run "npm run db-status" for details or "npm run db-cleanup" to remove them.\n');
-          }
-        } catch (error) {
-          // Silently fail - this is just a helpful check
-        }
-      }, 2000); // Wait 2 seconds after connection
-    }
-    
     return conn;
   } catch (error) {
-    console.error(`MongoDB Connection Error: ${error.message}`);
-    console.error('Full error:', error);
+    console.error(`Error: ${error.message}`);
     process.exit(1);
   }
 };
 
-module.exports = connectDB;
+const resetDatabase = async () => {
+  try {
+    const env = process.env.NODE_ENV || 'development';
+    console.log(`Resetting ${env} database...`);
+    await connectDB();
+    
+    const db = mongoose.connection.db;
+    
+    // Get all collection names
+    const collections = await db.listCollections().toArray();
+    console.log(`Found ${collections.length} collections`);
+    
+    // Drop all collections
+    for (const collection of collections) {
+      console.log(`Dropping collection: ${collection.name}`);
+      await db.collection(collection.name).drop();
+    }
+    
+    console.log(`All collections dropped successfully from ${env} database!`);
+    console.log('Database will be recreated with correct schemas on next server start.');
+    
+    // Close connection
+    await mongoose.connection.close();
+    console.log('Database connection closed.');
+    process.exit(0);
+  } catch (error) {
+    console.error('Error resetting database:', error);
+    process.exit(1);
+  }
+};
+
+// Run the reset
+resetDatabase();
 
