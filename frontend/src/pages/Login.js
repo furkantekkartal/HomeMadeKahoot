@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import PublicHeader from '../components/Common/PublicHeader';
 import './Auth.css';
 
 const Login = () => {
@@ -28,6 +29,7 @@ const Login = () => {
 
   return (
     <div className="auth-container">
+      <PublicHeader />
       <div className="auth-card">
         <h2 className="auth-title">Login</h2>
         {error && <div className="error-message">{error}</div>}

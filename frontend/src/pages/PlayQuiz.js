@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { sessionAPI, quizAPI } from '../services/api';
 import { connectSocket } from '../services/socket';
+import PublicHeader from '../components/Common/PublicHeader';
 import './PlayQuiz.css';
 
 const PlayQuiz = () => {
@@ -211,12 +212,19 @@ const PlayQuiz = () => {
   };
 
   if (!session || !quiz) {
-    return <div className="loading">Loading...</div>;
+    return (
+      <div>
+        <PublicHeader />
+        <div className="loading">Loading...</div>
+      </div>
+    );
   }
 
   if (!quizStarted && session.status === 'waiting') {
     return (
-      <div className="play-quiz">
+      <div>
+        <PublicHeader />
+        <div className="play-quiz">
         <div className="waiting-screen card">
           <h2>Waiting for quiz to start...</h2>
           <p>You're all set! The host will start the quiz soon.</p>
@@ -227,12 +235,15 @@ const PlayQuiz = () => {
           </div>
         </div>
       </div>
+      </div>
     );
   }
 
   if (quizCompleted) {
     return (
-      <div className="play-quiz">
+      <div>
+        <PublicHeader />
+        <div className="play-quiz">
         <div className="results-screen card">
           <h2>Quiz Completed! 🎉</h2>
           <div className="your-score">
@@ -260,13 +271,20 @@ const PlayQuiz = () => {
   }
 
   if (!currentQuestion) {
-    return <div className="loading">Waiting for question...</div>;
+    return (
+      <div>
+        <PublicHeader />
+        <div className="loading">Waiting for question...</div>
+      </div>
+    );
   }
 
   const isCorrect = selectedAnswer === currentQuestion.correctAnswer;
 
   return (
-    <div className="play-quiz">
+    <div>
+      <PublicHeader />
+      <div className="play-quiz">
       <div className="play-header">
         <div className="play-header-content">
           <div className="score-display-small">Score: {totalScore}</div>
@@ -355,6 +373,7 @@ const PlayQuiz = () => {
             )}
           </div>
         )}
+      </div>
       </div>
     </div>
   );

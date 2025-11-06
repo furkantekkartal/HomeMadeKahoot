@@ -1,0 +1,79 @@
+.public-header {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  padding: 1rem 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+.public-header-logo {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #667eea;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.public-header-logo .brand-icon {
+  font-size: 1.5rem;
+}
+
+.public-header-auth {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.public-header-login-link {
+  color: #667eea;
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.3s;
+  font-size: 0.9rem;
+}
+
+.public-header-login-link:hover {
+  color: #8258ff;
+}
+
+@media (max-width: 768px) {
+  .public-header {
+    padding: 0.75rem 1rem;
+  }
+
+  .public-header-logo {
+    font-size: 1.1rem;
+  }
+
+  .public-header-logo .brand-icon {
+    font-size: 1.25rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .public-header {
+    padding: 0.75rem 1rem;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .public-header-logo {
+    font-size: 1rem;
+  }
+
+  .public-header-auth {
+    gap: 0.5rem;
+  }
+
+  .public-header-login-link {
+    font-size: 0.85rem;
+  }
+}
+

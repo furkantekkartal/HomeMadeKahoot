@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { sessionAPI } from '../services/api';
+import PublicHeader from '../components/Common/PublicHeader';
 import './JoinQuiz.css';
 
 const JoinQuiz = () => {
@@ -38,6 +39,7 @@ const JoinQuiz = () => {
 
   return (
     <div className="join-quiz-container">
+      <PublicHeader />
       <div className="join-quiz-card">
         <h1>Join Quiz</h1>
         <p className="subtitle">Enter the game PIN and your username to join</p>
