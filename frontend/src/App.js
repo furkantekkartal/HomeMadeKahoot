@@ -60,8 +60,8 @@ function AppContent() {
           <Sidebar isOpen={shouldShowSidebar} onClose={() => setSidebarOpen(false)} />
         </>
       )}
-      {/* Show top navbar for all public pages when not logged in (including home) */}
-      {!user && <Navbar />}
+      {/* Show top navbar for public pages when not logged in, but hide it on home page */}
+      {!user && location.pathname !== '/' && <Navbar />}
       <main className={`main-content ${user && !isGamePage ? 'with-sidebar' : isPublicPage || isGamePage ? 'public-page' : ''}`}>
         <Routes>
           <Route path="/" element={<Home />} />

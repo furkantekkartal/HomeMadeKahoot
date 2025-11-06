@@ -1,11 +1,25 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import './Home.css';
 
 const Home = () => {
+  const { user } = useAuth();
 
   return (
     <div className="home">
+      {!user && (
+        <div className="home-header">
+          <Link to="/" className="home-logo">
+            <span className="brand-icon">🎮</span>
+            HomeMadeKahoot
+          </Link>
+          <div className="home-auth">
+            <Link to="/login" className="home-login-link">Login</Link>
+            <Link to="/register" className="btn btn-primary btn-sm">Sign Up</Link>
+          </div>
+        </div>
+      )}
       <div className="hero">
         <h1 className="hero-title">🎓 Learn English the Fun Way!</h1>
         <p className="hero-subtitle">
