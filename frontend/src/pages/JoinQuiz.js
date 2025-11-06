@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { sessionAPI } from '../services/api';
-import PublicHeader from '../components/Common/PublicHeader';
 import './JoinQuiz.css';
+import '../pages/Home.css';
 
 const JoinQuiz = () => {
   const [pin, setPin] = useState('');
@@ -37,9 +38,22 @@ const JoinQuiz = () => {
     }
   };
 
+  const { user } = useAuth();
+
   return (
     <div className="join-quiz-container">
-      <PublicHeader />
+      {!user && (
+        <div className="home-header">
+          <Link to="/" className="home-logo">
+            <span className="brand-icon">🎮</span>
+            HomeMadeKahoot
+          </Link>
+          <div className="home-auth">
+            <Link to="/login" className="home-login-link">Login</Link>
+            <Link to="/register" className="btn btn-primary btn-sm">Sign Up</Link>
+          </div>
+        </div>
+      )}
       <div className="join-quiz-card">
         <h1>Join Quiz</h1>
         <p className="subtitle">Enter the game PIN and your username to join</p>

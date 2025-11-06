@@ -6,11 +6,61 @@
   margin: 0;
 }
 
+.home-header {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  padding: 1rem 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  z-index: 1000;
+  box-sizing: border-box;
+}
+
+.home-logo {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #667eea;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.home-logo .brand-icon {
+  font-size: 1.5rem;
+}
+
+.home-auth {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.home-login-link {
+  color: #667eea;
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.3s;
+  font-size: 0.9rem;
+}
+
+.home-login-link:hover {
+  color: #8258ff;
+}
+
 .hero {
   text-align: center;
   padding: 4rem 2rem;
   max-width: 100%;
   margin: 0 auto 2rem auto;
+  margin-top: 80px; /* Space for fixed header */
   background: linear-gradient(135deg, #6b73ff 0%, #8258ff 50%, #6a49ff 100%);
   color: #ffffff;
 }
@@ -90,8 +140,21 @@
     padding: 1rem;
   }
 
+  .home-header {
+    padding: 0.75rem 1rem;
+  }
+
+  .home-logo {
+    font-size: 1.1rem;
+  }
+
+  .home-logo .brand-icon {
+    font-size: 1.25rem;
+  }
+
   .hero {
     padding: 2rem 1rem;
+    margin-top: 70px; /* Smaller margin on mobile */
   }
 
   .hero-title {
@@ -116,6 +179,24 @@
 @media (max-width: 480px) {
   .home {
     padding: 0.5rem;
+  }
+
+  .home-header {
+    padding: 0.75rem 1rem;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .home-logo {
+    font-size: 1rem;
+  }
+
+  .home-auth {
+    gap: 0.5rem;
+  }
+
+  .home-login-link {
+    font-size: 0.85rem;
   }
 
   .hero {

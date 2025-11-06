@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import PublicHeader from '../components/Common/PublicHeader';
 import './Auth.css';
+import '../pages/Home.css';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -27,9 +27,22 @@ const Login = () => {
     }
   };
 
+  const { user: currentUser } = useAuth();
+
   return (
     <div className="auth-container">
-      <PublicHeader />
+      {!currentUser && (
+        <div className="home-header">
+          <Link to="/" className="home-logo">
+            <span className="brand-icon">🎮</span>
+            HomeMadeKahoot
+          </Link>
+          <div className="home-auth">
+            <Link to="/login" className="home-login-link">Login</Link>
+            <Link to="/register" className="btn btn-primary btn-sm">Sign Up</Link>
+          </div>
+        </div>
+      )}
       <div className="auth-card">
         <h2 className="auth-title">Login</h2>
         {error && <div className="error-message">{error}</div>}

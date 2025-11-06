@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useParams, useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { sessionAPI, quizAPI } from '../services/api';
 import { connectSocket } from '../services/socket';
-import PublicHeader from '../components/Common/PublicHeader';
 import './PlayQuiz.css';
+import '../pages/Home.css';
 
 const PlayQuiz = () => {
   const { sessionId } = useParams();
@@ -26,6 +27,7 @@ const PlayQuiz = () => {
   const [username, setUsername] = useState(location.state?.username || null);
   const studentJoinedRef = useRef(false);
   const initialLoadRef = useRef(false);
+  const { user } = useAuth();
 
   useEffect(() => {
     const socketInstance = connectSocket();
@@ -212,19 +214,24 @@ const PlayQuiz = () => {
   };
 
   if (!session || !quiz) {
-    return (
-      <div>
-        <PublicHeader />
-        <div className="loading">Loading...</div>
-      </div>
-    );
+    return <div className="loading">Loading...</div>;
   }
 
   if (!quizStarted && session.status === 'waiting') {
     return (
-      <div>
-        <PublicHeader />
-        <div className="play-quiz">
+      <div className="play-quiz">
+        {!user && (
+          <div className="home-header">
+            <Link to="/" className="home-logo">
+              <span className="brand-icon">🎮</span>
+              HomeMadeKahoot
+            </Link>
+            <div className="home-auth">
+              <Link to="/login" className="home-login-link">Login</Link>
+              <Link to="/register" className="btn btn-primary btn-sm">Sign Up</Link>
+            </div>
+          </div>
+        )}
         <div className="waiting-screen card">
           <h2>Waiting for quiz to start...</h2>
           <p>You're all set! The host will start the quiz soon.</p>
@@ -235,15 +242,24 @@ const PlayQuiz = () => {
           </div>
         </div>
       </div>
-      </div>
     );
   }
 
   if (quizCompleted) {
     return (
-      <div>
-        <PublicHeader />
-        <div className="play-quiz">
+      <div className="play-quiz">
+        {!user && (
+          <div className="home-header">
+            <Link to="/" className="home-logo">
+              <span className="brand-icon">🎮</span>
+              HomeMadeKahoot
+            </Link>
+            <div className="home-auth">
+              <Link to="/login" className="home-login-link">Login</Link>
+              <Link to="/register" className="btn btn-primary btn-sm">Sign Up</Link>
+            </div>
+          </div>
+        )}
         <div className="results-screen card">
           <h2>Quiz Completed! 🎉</h2>
           <div className="your-score">
@@ -271,20 +287,25 @@ const PlayQuiz = () => {
   }
 
   if (!currentQuestion) {
-    return (
-      <div>
-        <PublicHeader />
-        <div className="loading">Waiting for question...</div>
-      </div>
-    );
+    return <div className="loading">Waiting for question...</div>;
   }
 
   const isCorrect = selectedAnswer === currentQuestion.correctAnswer;
 
   return (
-    <div>
-      <PublicHeader />
-      <div className="play-quiz">
+    <div className="play-quiz">
+      {!user && (
+        <div className="home-header">
+          <Link to="/" className="home-logo">
+            <span className="brand-icon">🎮</span>
+            HomeMadeKahoot
+          </Link>
+          <div className="home-auth">
+            <Link to="/login" className="home-login-link">Login</Link>
+            <Link to="/register" className="btn btn-primary btn-sm">Sign Up</Link>
+          </div>
+        </div>
+      )}
       <div className="play-header">
         <div className="play-header-content">
           <div className="score-display-small">Score: {totalScore}</div>
@@ -373,7 +394,6 @@ const PlayQuiz = () => {
             )}
           </div>
         )}
-      </div>
       </div>
     </div>
   );

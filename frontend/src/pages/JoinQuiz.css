@@ -1,9 +1,20 @@
 .join-quiz-container {
   display: flex;
+  flex-direction: column;
   justify-content: center;
   align-items: center;
-  min-height: 60vh;
+  min-height: 100vh;
   color: white;
+  padding-top: 0;
+}
+
+.join-quiz-container .home-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  z-index: 1000;
 }
 
 .join-quiz-card {
@@ -14,6 +25,13 @@
   width: 100%;
   max-width: 400px;
   text-align: center;
+  margin-top: 80px; /* Space for fixed header */
+}
+
+@media (max-width: 768px) {
+  .join-quiz-card {
+    margin-top: 70px; /* Smaller margin on mobile */
+  }
 }
 
 .join-quiz-card h1 {
