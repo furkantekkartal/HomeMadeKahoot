@@ -62,8 +62,8 @@ function AppContent() {
           <Sidebar isOpen={shouldShowSidebar} onClose={() => setSidebarOpen(false)} />
         </>
       )}
-      {/* Show top navbar for public pages when not logged in, but hide it on home, login, register, join, and play pages */}
-      {!user && location.pathname !== '/' && location.pathname !== '/login' && location.pathname !== '/register' && location.pathname !== '/join' && !isPlayPage && <Navbar />}
+      {/* Show top navbar on all public pages and play pages when not logged in */}
+      {!user && (isPublicPage || isPlayPage) && <Navbar />}
       <main className={`main-content ${user && !isJoinPage && !isPlayPage ? 'with-sidebar' : isPublicPage || isPlayPage ? 'public-page' : ''}`}>
         <Routes>
           <Route path="/" element={<Home />} />
