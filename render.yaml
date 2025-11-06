@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: homemadekahoot-backend
+    env: node
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: NODE_ENV
+        value: production
+    plan: free
+
+  - type: web
+    name: homemadekahoot-frontend
+    env: static
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./build
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    plan: free
+
