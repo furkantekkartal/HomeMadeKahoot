@@ -56,13 +56,13 @@ function AppContent() {
   return (
     <>
       {/* Show sidebar ONLY for logged-in users, and never on join page or play pages (game screen) */}
-      {/* Sidebar is ALWAYS hidden for non-logged-in users */}
-      {user && !isJoinPage && !isPlayPage && (
+      {/* Sidebar is ALWAYS hidden for non-logged-in users - this is critical */}
+      {user && !isJoinPage && !isPlayPage ? (
         <>
           {isMobile && <MobileMenuButton onClick={() => setSidebarOpen(true)} />}
           <Sidebar isOpen={shouldShowSidebar} onClose={() => setSidebarOpen(false)} />
         </>
-      )}
+      ) : null}
       {/* Show top navbar on all public pages and play pages when not logged in */}
       {!user && (isPublicPage || isPlayPage) && <Navbar />}
       <main className={`main-content ${user && !isJoinPage && !isPlayPage ? 'with-sidebar' : isPublicPage || isPlayPage ? 'public-page' : ''}`}>
