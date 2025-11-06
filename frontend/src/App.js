@@ -51,13 +51,25 @@ function AppContent() {
   // 2. If user is logged in: Always show left pane, always hide top pane
   // 3. Mobile: Hide left pane but show icon to open it
   
+  // Pages where sidebar should never show for non-logged-in users
+  const publicPagesWithoutSidebar = ['/', '/login', '/register', '/join'];
+  const isPublicPageWithoutSidebar = publicPagesWithoutSidebar.includes(location.pathname);
+  const isPlayPage = location.pathname.startsWith('/play');
+  
   /**
    * Determines if sidebar should be visible
    * Rules: Only show for logged-in users. On mobile, controlled by sidebarOpen state.
+   * Never show on public pages (/, /login, /register, /join) or /play pages for non-logged-in users.
    */
   const shouldShowSidebar = () => {
-    if (!user) return false; // Rule 1: Not logged in = hide left pane
-    return isMobile ? sidebarOpen : true; // Rule 3: Mobile = controlled by state, Desktop = always visible
+    // Rule 1: Not logged in = hide left pane (especially on public pages and play pages)
+    if (!user) return false;
+    
+    // Additional check: Even if logged in, hide on play pages (game mode)
+    if (isPlayPage) return false;
+    
+    // Rule 3: Mobile = controlled by state, Desktop = always visible
+    return isMobile ? sidebarOpen : true;
   };
 
   /**
@@ -70,10 +82,12 @@ function AppContent() {
 
   /**
    * Determines if mobile menu button should be visible
-   * Rules: Show on mobile when user is logged in and sidebar is closed
+   * Rules: Show on mobile when user is logged in and sidebar is closed, but not on play pages
    */
   const shouldShowMobileMenuButton = () => {
-    return user && isMobile && !sidebarOpen;
+    if (!user) return false; // Not logged in = no button
+    if (isPlayPage) return false; // No button on play pages
+    return isMobile && !sidebarOpen;
   };
 
   /**
@@ -81,11 +95,13 @@ function AppContent() {
    */
   const getMainContentClasses = () => {
     const classes = [];
-    if (user && !isMobile) {
+    // Only add sidebar margin if user is logged in, not on mobile, and not on play pages
+    if (user && !isMobile && !isPlayPage) {
       classes.push('with-sidebar'); // Desktop logged-in: add sidebar margin
     }
-    if (!user) {
-      classes.push('public-page'); // Not logged in: full width
+    // Add public-page class for non-logged-in users or play pages
+    if (!user || isPlayPage || isPublicPageWithoutSidebar) {
+      classes.push('public-page'); // Full width for public pages and play pages
     }
     return classes.join(' ');
   };
@@ -96,8 +112,8 @@ function AppContent() {
   
   return (
     <>
-      {/* Left Pane (Sidebar) - Rule 2: Always show for logged-in users */}
-      {user && (
+      {/* Left Pane (Sidebar) - Rule 2: Always show for logged-in users, except on play pages */}
+      {user && !isPlayPage && (
         <>
           {showMobileButton && <MobileMenuButton onClick={() => setSidebarOpen(true)} />}
           <Sidebar isOpen={showSidebar} onClose={() => setSidebarOpen(false)} />
