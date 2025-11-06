@@ -61,6 +61,51 @@ After getting both URLs, update:
 
 ---
 
+## 🔀 Deploy Both Production and Development Versions
+
+You can deploy both production and development versions simultaneously on Render.
+
+### Option 1: Separate Services (Recommended)
+
+**Production (Main App):**
+- Service name: `homemadekahoot-backend` and `homemadekahoot-frontend`
+- Branch: `master` (or `main`)
+- URL: `homemadekahoot-frontend.onrender.com`
+- Environment: `NODE_ENV=production`
+
+**Development (Testing):**
+- Service name: `homemadekahoot-backend-dev` and `homemadekahoot-frontend-dev`
+- Branch: `develop` (or `dev`)
+- URL: `homemadekahoot-frontend-dev.onrender.com`
+- Environment: `NODE_ENV=development`
+
+**Steps:**
+1. Create a new branch: `git checkout -b develop`
+2. In Render, create new services (same steps as production)
+3. Set branch to `develop` in Render settings (Settings → Build & Deploy → Branch)
+4. Use different MongoDB databases or collections for dev (optional)
+5. Set `NODE_ENV=development` in dev services
+
+### Option 2: Different Platforms
+
+- **Production:** Render (main services)
+- **Development:** Local machine or Railway/Vercel
+
+### Option 3: Environment-Based URLs
+
+Use the same codebase but different environment variables:
+- Production: `FRONTEND_URL=https://homemadekahoot-frontend.onrender.com`
+- Development: `FRONTEND_URL=https://homemadekahoot-dev.onrender.com`
+
+**Benefits:**
+- Test features before deploying to production
+- Keep production stable while developing
+- Use separate databases (optional)
+
+**Note:** Free tier allows multiple services, so you can have both running!
+
+---
+
 ## 🗄️ MongoDB Atlas Setup
 
 1. Create account at [MongoDB Atlas](https://www.mongodb.com/cloud/atlas)
