@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { quizAPI, sessionAPI } from '../services/api';
 import './Dashboard.css';
 
 const Dashboard = () => {
+  const navigate = useNavigate();
   const [myQuizzes, setMyQuizzes] = useState([]);
   const [recentSessions, setRecentSessions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [hostingQuizId, setHostingQuizId] = useState(null);
 
   useEffect(() => {
     loadData();
@@ -38,30 +40,36 @@ const Dashboard = () => {
     }
   };
 
-  const handleHostQuiz = async (quizId) => {
+  const handleHostQuiz = async (quizId, event) => {
+    // If it's a Link click, let React Router handle it
+    // But we need to create the session first
+    if (event && event.defaultPrevented) {
+      return; // Already handled by Link
+    }
+    
+    event?.preventDefault();
+    setHostingQuizId(quizId);
+    
     try {
       const response = await sessionAPI.createSession({ quizId });
       const session = response.data;
       
       if (!session || !session._id) {
         alert('Failed to create session. Please try again.');
+        setHostingQuizId(null);
         return;
       }
 
       console.log('[Dashboard] Session created:', session._id);
       
-      // Use React Router navigation instead of window.open for better SPA routing
-      // Open in new tab using window.location to ensure proper routing
-      const hostUrl = `/host/${session._id}`;
-      console.log('[Dashboard] Navigating to:', hostUrl);
-      
-      // Small delay to ensure session is saved
-      setTimeout(() => {
-        window.open(hostUrl, '_blank');
-      }, 100);
+      // Navigate using React Router (same window)
+      // This ensures React Router handles the route properly
+      // If user wants new tab, they can right-click and "Open in new tab"
+      navigate(`/host/${session._id}`);
     } catch (error) {
       console.error('Error creating session:', error);
       alert(`Error creating session: ${error.response?.data?.message || error.message}`);
+      setHostingQuizId(null);
     }
   };
 
@@ -105,10 +113,11 @@ const Dashboard = () => {
                   </div>
                   <div className="quiz-actions">
                     <button
-                      onClick={() => handleHostQuiz(quiz._id)}
+                      onClick={(e) => handleHostQuiz(quiz._id, e)}
                       className="btn btn-success btn-sm"
+                      disabled={hostingQuizId === quiz._id}
                     >
-                      Host Quiz
+                      {hostingQuizId === quiz._id ? 'Creating...' : 'Host Quiz'}
                     </button>
                     <Link to={`/edit-quiz/${quiz._id}`} className="btn btn-secondary btn-sm">
                       Edit
