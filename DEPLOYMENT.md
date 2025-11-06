@@ -340,6 +340,52 @@ After deployment:
 - Check backend CORS settings include frontend URL
 - Ensure backend is deployed and running
 
+### Empty page when clicking "Host Quiz" (shows header but no content)
+
+**This usually means the API calls are failing silently.**
+
+**✅ Solution:**
+
+1. **Check Environment Variables in Render:**
+   - Go to your frontend static site in Render
+   - Go to **Settings** → **Environment**
+   - Verify these are set correctly:
+     ```
+     REACT_APP_API_URL=https://your-backend-url.onrender.com/api
+     REACT_APP_SOCKET_URL=https://your-backend-url.onrender.com
+     ```
+   - **Important:** Make sure there are no trailing slashes and the URLs are correct
+   - After updating, redeploy the frontend
+
+2. **Check Backend CORS Settings:**
+   - Go to your backend service in Render
+   - Go to **Settings** → **Environment**
+   - Verify `FRONTEND_URL` matches your frontend URL exactly:
+     ```
+     FRONTEND_URL=https://your-frontend-url.onrender.com
+     ```
+   - No trailing slash!
+   - After updating, redeploy the backend
+
+3. **Check Browser Console:**
+   - Open browser DevTools (F12)
+   - Go to Console tab
+   - Look for errors like:
+     - "Failed to fetch"
+     - "CORS error"
+     - "Network error"
+   - Go to Network tab and check if API calls are failing
+
+4. **Test Backend API:**
+   - Visit: `https://your-backend-url.onrender.com/api/health`
+   - Should return: `{"status":"ok","message":"HomeMadeKahoot API is running"}`
+   - If this doesn't work, backend has issues
+
+5. **Verify Session Creation:**
+   - Check browser console when clicking "Host Quiz"
+   - Look for any errors in the Network tab
+   - The session should be created successfully before navigation
+
 ### "Not Found" error on routes like `/host/sessionId` or `/play/sessionId`
 
 **This is a React Router client-side routing issue on static hosting.**

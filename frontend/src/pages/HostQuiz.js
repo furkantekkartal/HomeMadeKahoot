@@ -23,6 +23,16 @@ const HostQuiz = () => {
   const hostJoinedRef = useRef(false);
 
   useEffect(() => {
+    console.log('[HostQuiz] Component mounted, sessionId:', sessionId);
+    console.log('[HostQuiz] API URL:', process.env.REACT_APP_API_URL);
+    console.log('[HostQuiz] Socket URL:', process.env.REACT_APP_SOCKET_URL);
+
+    if (!sessionId) {
+      setLoading(false);
+      setError('Session ID is missing from URL. Please go back to dashboard and try hosting again.');
+      return;
+    }
+
     const socketInstance = connectSocket();
     setSocket(socketInstance);
 
@@ -37,9 +47,15 @@ const HostQuiz = () => {
         setError(null);
       }
 
+      console.log('[HostQuiz] Loading session:', sessionId);
+
       sessionAPI.getSession(sessionId)
         .then(sessionRes => {
+          console.log('[HostQuiz] Session loaded:', sessionRes.data);
           const sessionData = sessionRes.data;
+          if (!sessionData) {
+            throw new Error('Session data is empty');
+          }
           setSession(sessionData);
           if (sessionData.participants && Array.isArray(sessionData.participants)) {
             setParticipants(sessionData.participants);
@@ -48,9 +64,17 @@ const HostQuiz = () => {
           }
           setCurrentQuestionIndex(sessionData.currentQuestionIndex || 0);
 
+          if (!sessionData.quizId || !sessionData.quizId._id) {
+            throw new Error('Quiz ID is missing from session data');
+          }
+
           return quizAPI.getQuiz(sessionData.quizId._id);
         })
         .then(quizRes => {
+          console.log('[HostQuiz] Quiz loaded:', quizRes.data);
+          if (!quizRes || !quizRes.data) {
+            throw new Error('Quiz data is empty');
+          }
           setQuiz(quizRes.data);
           setLoading(false);
           sessionLoadedRef.current = true;
@@ -58,16 +82,19 @@ const HostQuiz = () => {
         })
         .catch(error => {
           console.error('Error loading session:', error);
+          console.error('Session ID:', sessionId);
+          console.error('API URL:', process.env.REACT_APP_API_URL);
           loadingRef.current = false;
           
           if (!isRefresh) {
             setLoading(false);
             if (error.response) {
-              setError(`Server error: ${error.response.data?.message || error.message}`);
+              const errorMsg = error.response.data?.message || error.message || 'Unknown error';
+              setError(`Server error: ${errorMsg} (Status: ${error.response.status})`);
             } else if (error.request) {
-              setError('Cannot connect to server. Please make sure the backend is running on port 5000.');
+              setError(`Cannot connect to backend server. Please check: ${process.env.REACT_APP_API_URL || 'API URL not set'}`);
             } else {
-              setError(`Error: ${error.message}`);
+              setError(`Error: ${error.message || 'Failed to load session'}`);
             }
           }
         });
@@ -246,7 +273,11 @@ const HostQuiz = () => {
   // Removed nextQuestion function - students navigate independently now
 
   if (loading) {
-    return <div className="loading">Loading session...</div>;
+    return (
+      <div className="host-quiz">
+        <div className="loading">Loading session...</div>
+      </div>
+    );
   }
 
   if (error) {
@@ -258,9 +289,9 @@ const HostQuiz = () => {
           <div className="error-help">
             <h3>Please check:</h3>
             <ul>
-              <li>Backend server is running on port 5000</li>
-              <li>Run: <code>cd backend && npm start</code></li>
+              <li>Backend server is running</li>
               <li>Check browser console for more details</li>
+              <li>Verify API URL: {process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}</li>
             </ul>
             <button onClick={() => window.location.reload()} className="btn btn-primary">
               Reload Page
@@ -275,7 +306,16 @@ const HostQuiz = () => {
   }
 
   if (!session || !quiz) {
-    return <div className="loading">Loading session data...</div>;
+    return (
+      <div className="host-quiz">
+        <div className="loading">
+          Loading session data...
+          {sessionId && <p>Session ID: {sessionId}</p>}
+          {!session && <p>Waiting for session data...</p>}
+          {!quiz && session && <p>Loading quiz data...</p>}
+        </div>
+      </div>
+    );
   }
 
   const isWaiting = session.status === 'waiting';
