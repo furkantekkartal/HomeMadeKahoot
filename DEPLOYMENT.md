@@ -86,30 +86,49 @@ Before deploying, make sure you have:
 ### Step 3: Deploy Frontend on Render
 
 1. **First, create a redirects file** (for React Router client-side routing):
-   - Create file: `frontend/public/_redirects`
-   - Add this line: `/*    /index.html   200`
+   - File already exists: `frontend/public/_redirects`
+   - Content: `/*    /index.html   200`
    - This ensures all routes serve `index.html` (required for React Router)
 
-2. In Render dashboard, click **"New +"** → **"Static Site"**
-3. Connect your GitHub repository
-4. Configure:
-   - **Name:** `homemadekahoot-frontend`
-   - **Root Directory:** `frontend`
-   - **Build Command:** `npm install && npm run build`
-   - **Publish Directory:** `build`
-   - **Plan:** Free
+2. **IMPORTANT: Configure Render for SPA Routing:**
+   - In Render dashboard, click **"New +"** → **"Static Site"**
+   - Connect your GitHub repository
+   - Configure:
+     - **Name:** `homemadekahoot-frontend`
+     - **Root Directory:** `frontend`
+     - **Build Command:** `npm install && npm run build`
+     - **Publish Directory:** `build`
+     - **Plan:** Free
+   
+   **⚠️ CRITICAL: After creating the site, you MUST configure redirects:**
+   - Go to your static site in Render dashboard
+   - Go to **Settings** → Scroll down to **"Redirects and Rewrites"** section
+   - Add a redirect rule:
+     - **Source:** `/*`
+     - **Destination:** `/index.html`
+     - **Status Code:** `200` (not 301/302!)
+   - OR if Render doesn't have that UI, the `_redirects` file should work after redeploy
 
-5. **Add Environment Variables:**
+3. **Add Environment Variables:**
    ```
    REACT_APP_API_URL=https://your-backend-url.onrender.com/api
    REACT_APP_SOCKET_URL=https://your-backend-url.onrender.com
    ```
+   
+   **⚠️ CRITICAL:** 
+   - Make sure there are **NO trailing slashes** in the URLs
+   - Use `https://` (not `http://`)
+   - The URLs should match your actual backend URL exactly
 
-6. Click **"Create Static Site"**
-7. Wait for deployment
-8. Copy your frontend URL (e.g., `https://homemadekahoot-frontend.onrender.com`)
+4. Click **"Create Static Site"**
+5. Wait for deployment (can take 5-10 minutes)
+6. Copy your frontend URL (e.g., `https://homemadekahoot-frontend.onrender.com`)
 
-**⚠️ Important:** The `_redirects` file in `frontend/public/` is essential for React Router to work on static hosting. Without it, routes like `/host/sessionId` will return 404 errors.
+**⚠️ Troubleshooting React Router on Render:**
+- If routes like `/host/sessionId` show empty page or redirect to `/index.html`, the redirects aren't configured correctly
+- Try accessing `https://your-frontend-url.onrender.com/host/test` - it should load the React app (even if it errors, it should show the React app, not a blank page)
+- If you see a blank page, check browser console for errors
+- Verify environment variables are set correctly - undefined values can cause routing issues
 
 ### Step 4: Update Backend with Frontend URL
 

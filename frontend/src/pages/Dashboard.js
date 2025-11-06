@@ -42,9 +42,22 @@ const Dashboard = () => {
     try {
       const response = await sessionAPI.createSession({ quizId });
       const session = response.data;
+      
+      if (!session || !session._id) {
+        alert('Failed to create session. Please try again.');
+        return;
+      }
+
+      console.log('[Dashboard] Session created:', session._id);
+      
+      // Use React Router navigation instead of window.open for better SPA routing
+      // Open in new tab using window.location to ensure proper routing
+      const hostUrl = `/host/${session._id}`;
+      console.log('[Dashboard] Navigating to:', hostUrl);
+      
       // Small delay to ensure session is saved
       setTimeout(() => {
-        window.open(`/host/${session._id}`, '_blank');
+        window.open(hostUrl, '_blank');
       }, 100);
     } catch (error) {
       console.error('Error creating session:', error);
