@@ -112,8 +112,8 @@ function AppContent() {
   
   return (
     <>
-      {/* Left Pane (Sidebar) - Rule 2: Always show for logged-in users, except on play pages */}
-      {user && !isPlayPage && (
+      {/* Left Pane (Sidebar) - Rule 2: Always show for logged-in users, except on play pages and public pages */}
+      {user && !isPlayPage && !isPublicPageWithoutSidebar && (
         <>
           {showMobileButton && <MobileMenuButton onClick={() => setSidebarOpen(true)} />}
           <Sidebar isOpen={showSidebar} onClose={() => setSidebarOpen(false)} />
