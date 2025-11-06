@@ -55,7 +55,8 @@ function AppContent() {
   
   return (
     <>
-      {/* Show sidebar for all logged-in users, except on join page and play pages (game screen) */}
+      {/* Show sidebar ONLY for logged-in users, and never on join page or play pages (game screen) */}
+      {/* Sidebar is ALWAYS hidden for non-logged-in users */}
       {user && !isJoinPage && !isPlayPage && (
         <>
           {isMobile && <MobileMenuButton onClick={() => setSidebarOpen(true)} />}
