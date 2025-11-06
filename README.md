@@ -20,6 +20,12 @@ A web-based English learning application inspired by Kahoot, designed to make la
 **Backend:** Node.js, Express.js, Socket.io, MongoDB, Mongoose, JWT  
 **Frontend:** React 18, React Router, Socket.io-client, Axios, CSS3
 
+## 🌐 Deployment
+
+Want to deploy your app so others can use it? Check out the **[Deployment Guide](DEPLOYMENT.md)** for step-by-step instructions on deploying to Render, Railway, or Vercel.
+
+---
+
 ## 🚀 Quick Start
 
 ### Prerequisites
