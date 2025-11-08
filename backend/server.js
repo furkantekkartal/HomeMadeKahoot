@@ -11,6 +11,7 @@ const authRoutes = require('./routes/auth');
 const quizRoutes = require('./routes/quizzes');
 const sessionRoutes = require('./routes/sessions');
 const wordRoutes = require('./routes/words');
+const flashcardRoutes = require('./routes/flashcards');
 
 // Socket handlers
 const initializeSocketHandlers = require('./socket/socketHandlers');
@@ -47,6 +48,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/quizzes', quizRoutes);
 app.use('/api/sessions', sessionRoutes);
 app.use('/api/words', wordRoutes);
+app.use('/api/flashcards', flashcardRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

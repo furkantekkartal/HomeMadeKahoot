@@ -151,6 +151,10 @@
   color: #48bb78;
 }
 
+.nav-icon-flashcards {
+  color: #9f7aea;
+}
+
 /* Active state overrides icon color */
 .nav-item.active .nav-icon {
   color: #1e3a8a;

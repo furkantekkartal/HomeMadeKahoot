@@ -88,5 +88,15 @@ export const wordAPI = {
   }
 };
 
+// Flashcard API
+export const flashcardAPI = {
+  getMyDecks: () => api.get('/flashcards/decks'),
+  getDeck: (id) => api.get(`/flashcards/decks/${id}`),
+  createDeck: (name, wordIds) => api.post('/flashcards/decks', { name, wordIds }),
+  updateDeck: (id, updates) => api.put(`/flashcards/decks/${id}`, updates),
+  deleteDeck: (id) => api.delete(`/flashcards/decks/${id}`),
+  updateLastStudied: (id) => api.patch(`/flashcards/decks/${id}/last-studied`)
+};
+
 export default api;
 

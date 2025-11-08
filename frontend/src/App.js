@@ -28,6 +28,7 @@ import Results from './pages/Results';
 import BrowseQuizzes from './pages/BrowseQuizzes';
 import Profile from './pages/Profile';
 import WordDatabase from './pages/WordDatabase';
+import Flashcards from './pages/Flashcards';
 import './App.css';
 
 const PrivateRoute = ({ children }) => {
@@ -94,6 +95,7 @@ function AppContent() {
           <Route path="/results" element={<PrivateRoute><Results /></PrivateRoute>} />
           <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
           <Route path="/words" element={<PrivateRoute><WordDatabase /></PrivateRoute>} />
+          <Route path="/flashcards" element={<PrivateRoute><Flashcards /></PrivateRoute>} />
         </Routes>
       </main>
     </>
