@@ -63,5 +63,30 @@ export const sessionAPI = {
   getTeacherAnalytics: (filters) => api.get('/sessions/analytics', { params: filters }),
 };
 
+// Word Database API
+export const wordAPI = {
+  getWords: (params) => api.get('/words', { params }),
+  getWord: (id) => api.get(`/words/${id}`),
+  getUserWordStats: () => api.get('/words/user/stats'),
+  getWordsWithStatus: (params) => api.get('/words/user/words', { params }),
+  toggleWordStatus: (wordId, isKnown) => api.post('/words/user/toggle', { wordId, isKnown }),
+  bulkMarkWords: (wordIds, isKnown) => api.post('/words/user/bulk-mark', { wordIds, isKnown }),
+  exportWords: (format = 'csv') => {
+    return api.get('/words/user/export', { 
+      params: { format },
+      responseType: format === 'csv' ? 'blob' : 'json'
+    });
+  },
+  importWords: (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post('/words/user/import', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  }
+};
+
 export default api;
 

@@ -10,6 +10,7 @@ const errorHandler = require('./middleware/errorHandler');
 const authRoutes = require('./routes/auth');
 const quizRoutes = require('./routes/quizzes');
 const sessionRoutes = require('./routes/sessions');
+const wordRoutes = require('./routes/words');
 
 // Socket handlers
 const initializeSocketHandlers = require('./socket/socketHandlers');
@@ -45,6 +46,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use('/api/auth', authRoutes);
 app.use('/api/quizzes', quizRoutes);
 app.use('/api/sessions', sessionRoutes);
+app.use('/api/words', wordRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
