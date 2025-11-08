@@ -27,7 +27,7 @@ const LoggedInRegister = () => {
 
     try {
       await register(username, email, password);
-      navigate('/dashboard');
+      navigate('/quiz');
     } catch (err) {
       setError(err.response?.data?.message || 'Registration failed');
     } finally {

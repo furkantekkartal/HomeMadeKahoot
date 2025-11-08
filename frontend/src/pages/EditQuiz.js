@@ -219,7 +219,7 @@ const EditQuiz = () => {
     setSaving(true);
     try {
       await quizAPI.updateQuiz(id, formData);
-      navigate('/dashboard');
+      navigate('/quiz');
     } catch (err) {
       setError(err.response?.data?.message || 'Error updating quiz');
     } finally {
@@ -456,7 +456,7 @@ const EditQuiz = () => {
             </button>
             <button
               type="button"
-              onClick={() => navigate('/dashboard')}
+              onClick={() => navigate('/quiz')}
               className="btn btn-secondary btn-large"
             >
               Cancel

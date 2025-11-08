@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { quizAPI, sessionAPI } from '../services/api';
-import './Dashboard.css';
+import './Quiz.css';
 
-const Dashboard = () => {
+const Quiz = () => {
   const navigate = useNavigate();
   const [myQuizzes, setMyQuizzes] = useState([]);
   const [recentSessions, setRecentSessions] = useState([]);
@@ -76,16 +76,16 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="dashboard">
-      <div className="dashboard-header">
-        <h1>Dashboard</h1>
+    <div className="quiz">
+      <div className="quiz-header">
+        <h1>Quiz</h1>
         <Link to="/create-quiz" className="btn btn-primary">
           + Create New Quiz
         </Link>
       </div>
 
-      <div className="dashboard-grid">
-        <div className="dashboard-section">
+      <div className="quiz-grid-layout">
+        <div className="quiz-section">
           <h2>My Quizzes ({myQuizzes.length})</h2>
           {myQuizzes.length === 0 ? (
             <div className="empty-state">
@@ -133,7 +133,7 @@ const Dashboard = () => {
           )}
         </div>
 
-        <div className="dashboard-section">
+        <div className="quiz-section">
           <h2>Recent Sessions</h2>
           {recentSessions.length === 0 ? (
             <div className="empty-state">
@@ -143,7 +143,7 @@ const Dashboard = () => {
             <div className="sessions-list">
               {recentSessions.map(session => (
                 <div key={session._id} className="session-item">
-                  <div>
+                  <div className="session-item-content">
                     <strong>{session.quizId?.title || 'Quiz'}</strong>
                     <div className="session-meta">
                       <span>PIN: {session.pin}</span>
@@ -152,6 +152,13 @@ const Dashboard = () => {
                       </span>
                     </div>
                   </div>
+                  <button
+                    onClick={() => navigate(`/host/${session._id}`)}
+                    className="btn btn-success btn-sm"
+                    title="Reopen host page"
+                  >
+                    Rejoin Host
+                  </button>
                 </div>
               ))}
             </div>
@@ -162,5 +169,5 @@ const Dashboard = () => {
   );
 };
 
-export default Dashboard;
+export default Quiz;
 

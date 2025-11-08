@@ -22,7 +22,7 @@ const Navbar = () => {
         <div className="navbar-menu">
           {user ? (
             <>
-              <Link to="/dashboard" className="navbar-link">Dashboard</Link>
+              <Link to="/quiz" className="navbar-link">Quiz</Link>
               <Link to="/create-quiz" className="navbar-link">Create Quiz</Link>
               <Link to="/browse" className="navbar-link">Browse</Link>
               <Link to="/results" className="navbar-link">Results</Link>

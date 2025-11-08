@@ -111,8 +111,8 @@ const Results = () => {
     <div className="results-page">
       <div className="results-header">
         <h1>Student Analytics</h1>
-        <Link to="/dashboard" className="btn btn-secondary">
-          Back to Dashboard
+        <Link to="/quiz" className="btn btn-secondary">
+          Back to Quiz
         </Link>
       </div>
 
@@ -219,8 +219,8 @@ const Results = () => {
       {analytics.length === 0 ? (
         <div className="empty-state card">
           <p>No analytics data available yet. Host some quizzes to see student performance here!</p>
-          <Link to="/dashboard" className="btn btn-primary">
-            Go to Dashboard
+          <Link to="/quiz" className="btn btn-primary">
+            Go to Quiz
           </Link>
         </div>
       ) : (

@@ -1,35 +1,35 @@
-.dashboard {
+.quiz {
   padding: 2rem;
   min-height: 100vh;
   background: #f3f4f6;
 }
 
-.dashboard-header {
+.quiz-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 2rem;
 }
 
-.dashboard-header h1 {
+.quiz-header h1 {
   font-size: 2.5rem;
   font-weight: 700;
 }
 
-.dashboard-grid {
+.quiz-grid-layout {
   display: grid;
   grid-template-columns: 2fr 1fr;
   gap: 2rem;
 }
 
-.dashboard-section {
+.quiz-section {
   background: rgba(255, 255, 255, 0.95);
   border-radius: 12px;
   padding: 2rem;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
-.dashboard-section h2 {
+.quiz-section h2 {
   color: #2d3748;
   font-size: 1.5rem;
   margin-bottom: 1.5rem;
@@ -124,6 +124,14 @@
   padding: 1rem;
   border-radius: 8px;
   border: 2px solid #e2e8f0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.session-item-content {
+  flex: 1;
 }
 
 .session-item strong {
@@ -163,46 +171,55 @@
 }
 
 @media (max-width: 968px) {
-  .dashboard-grid {
+  .quiz-grid-layout {
     grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 768px) {
-  .dashboard {
+  .quiz {
     padding: 1rem;
   }
 
-  .dashboard-header h1 {
+  .quiz-header h1 {
     font-size: 1.75rem;
   }
 
-  .dashboard-section {
+  .quiz-section {
     padding: 1.5rem;
   }
 
-  .dashboard-section h2 {
+  .quiz-section h2 {
     font-size: 1.25rem;
   }
 }
 
 @media (max-width: 480px) {
-  .dashboard {
+  .quiz {
     padding: 0.75rem;
   }
 
-  .dashboard-header {
+  .quiz-header {
     flex-direction: column;
     align-items: flex-start;
     gap: 1rem;
   }
 
-  .dashboard-header h1 {
+  .quiz-header h1 {
     font-size: 1.5rem;
   }
 
-  .dashboard-section {
+  .quiz-section {
     padding: 1rem;
+  }
+
+  .session-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .session-item .btn {
+    width: 100%;
   }
 }
 

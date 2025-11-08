@@ -4,7 +4,6 @@ import { useAuth } from '../../context/AuthContext';
 import { 
   FaPlayCircle,
   FaHome,
-  FaPlusCircle,
   FaSearch,
   FaChartBar,
   FaCog,
@@ -79,18 +78,11 @@ const Sidebar = ({ isOpen, onClose }) => {
           <span className="nav-text">Game</span>
         </Link>
         <Link 
-          to="/dashboard" 
-          className={`nav-item ${isActive('/dashboard') ? 'active' : ''}`}
+          to="/quiz" 
+          className={`nav-item ${isActive('/quiz') ? 'active' : ''}`}
         >
           <FaHome className="nav-icon nav-icon-dashboard" />
-          <span className="nav-text">Dashboard</span>
-        </Link>
-        <Link 
-          to="/create-quiz" 
-          className={`nav-item ${isActive('/create-quiz') ? 'active' : ''}`}
-        >
-          <FaPlusCircle className="nav-icon nav-icon-create" />
-          <span className="nav-text">Create Quiz</span>
+          <span className="nav-text">Quiz</span>
         </Link>
         <Link 
           to="/browse" 

@@ -25,7 +25,7 @@ const HostQuiz = () => {
   useEffect(() => {
     if (!sessionId) {
       setLoading(false);
-      setError('Session ID is missing from URL. Please go back to dashboard and try hosting again.');
+      setError('Session ID is missing from URL. Please go back to quiz page and try hosting again.');
       return;
     }
 
@@ -286,8 +286,8 @@ const HostQuiz = () => {
             <button onClick={() => window.location.reload()} className="btn btn-primary">
               Reload Page
             </button>
-            <button onClick={() => navigate('/dashboard')} className="btn btn-secondary">
-              Back to Dashboard
+            <button onClick={() => navigate('/quiz')} className="btn btn-secondary">
+              Back to Quiz
             </button>
           </div>
         </div>
@@ -452,8 +452,8 @@ const HostQuiz = () => {
               ))}
             </ol>
           </div>
-          <button onClick={() => navigate('/dashboard')} className="btn btn-primary">
-            Back to Dashboard
+          <button onClick={() => navigate('/quiz')} className="btn btn-primary">
+            Back to Quiz
           </button>
         </div>
       )}

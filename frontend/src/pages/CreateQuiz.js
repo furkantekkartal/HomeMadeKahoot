@@ -748,7 +748,7 @@ const CreateQuiz = () => {
     setLoading(true);
     try {
       await quizAPI.createQuiz(formData);
-      navigate('/dashboard');
+      navigate('/quiz');
     } catch (err) {
       setError(err.response?.data?.message || 'Error creating quiz');
     } finally {
@@ -1138,7 +1138,7 @@ const CreateQuiz = () => {
             </button>
             <button
               type="button"
-              onClick={() => navigate('/dashboard')}
+              onClick={() => navigate('/quiz')}
               className="btn btn-secondary btn-large"
             >
               Cancel

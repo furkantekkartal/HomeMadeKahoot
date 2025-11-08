@@ -18,7 +18,7 @@ const LoggedInLogin = () => {
 
     try {
       await login(email, password);
-      navigate('/dashboard');
+      navigate('/quiz');
     } catch (err) {
       setError(err.response?.data?.message || 'Login failed');
     } finally {

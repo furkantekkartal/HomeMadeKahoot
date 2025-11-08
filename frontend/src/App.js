@@ -19,7 +19,7 @@ import LoggedInJoinQuiz from './pages/JoinQuiz';
 import LoggedInPlayQuiz from './pages/PlayQuiz';
 
 // Logged-in only pages
-import Dashboard from './pages/Dashboard';
+import Quiz from './pages/Quiz';
 import CreateQuiz from './pages/CreateQuiz';
 import EditQuiz from './pages/EditQuiz';
 import HostQuiz from './pages/HostQuiz';
@@ -84,7 +84,7 @@ function AppContent() {
           <Route path="/play/:sessionId" element={user ? <LoggedInPlayQuiz /> : <GuestPlayQuiz />} />
           
           {/* Logged-in only routes */}
-          <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+          <Route path="/quiz" element={<PrivateRoute><Quiz /></PrivateRoute>} />
           <Route path="/create-quiz" element={<PrivateRoute><CreateQuiz /></PrivateRoute>} />
           <Route path="/edit-quiz/:id" element={<PrivateRoute><EditQuiz /></PrivateRoute>} />
           <Route path="/host/:sessionId" element={<PrivateRoute><HostQuiz /></PrivateRoute>} />
