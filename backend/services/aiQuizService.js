@@ -54,9 +54,9 @@ async function generateQuizTitle(category, difficulty) {
     throw new Error('OPENROUTER_API_KEY is not set in environment variables');
   }
 
-  const prompt = `Generate a creative and engaging quiz title for an English learning quiz. The quiz is about ${category} at ${difficulty} level. 
+  const prompt = `Generate a simple, concise quiz title for an English learning quiz. The quiz is about ${category} at ${difficulty} level. 
 
-Return only the title, nothing else. Make it concise (3-8 words), educational, and appealing. Examples: "Vocabulary Builder: Everyday Words", "Grammar Master: Present Tenses", "Reading Comprehension: Short Stories"`;
+Return only the title, nothing else. Keep it short (3-6 words max), clear and direct. Examples: "Everyday Vocabulary", "Present Tenses", "Short Stories"`;
 
   try {
     const response = await axios.post(
@@ -113,13 +113,13 @@ async function generateQuizDescription(title, category, difficulty) {
     throw new Error('OPENROUTER_API_KEY is not set in environment variables');
   }
 
-  const prompt = `Generate a brief and engaging description for an English learning quiz. 
+  const prompt = `Generate a simple, brief description for an English learning quiz. 
 
 Title: "${title}"
 Category: ${category}
 Difficulty: ${difficulty}
 
-Write a 2-3 sentence description that explains what students will learn and practice in this quiz. Make it encouraging and educational.`;
+Write 1-2 short sentences only. Keep it simple and to the point.`;
 
   try {
     const response = await axios.post(

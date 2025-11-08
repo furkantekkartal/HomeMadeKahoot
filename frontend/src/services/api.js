@@ -40,6 +40,16 @@ export const quizAPI = {
   generateQuizTitle: (category, difficulty) => api.post('/quizzes/generate-title', { category, difficulty }),
   generateQuizDescription: (title, category, difficulty) => api.post('/quizzes/generate-description', { title, category, difficulty }),
   generateQuizQuestions: (title, description, category, difficulty, questionCount) => api.post('/quizzes/generate-questions', { title, description, category, difficulty, questionCount }),
+  generateQuizFromFile: (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post('/quizzes/generate-from-file', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  },
+  generateQuizFromYouTube: (videoUrl) => api.post('/quizzes/generate-from-youtube', { videoUrl }),
 };
 
 // Session API

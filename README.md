@@ -43,6 +43,7 @@ HomeMadeKahoot is a web-based English learning application that combines the int
 
 ### Quiz Features
 - AI-generated questions and images
+- **Enhanced AI Quiz Maker**: Upload PDF/SRT files or YouTube videos to automatically generate quizzes
 - Multiple categories (vocabulary, grammar, reading, listening)
 - Difficulty levels (beginner, intermediate, advanced)
 - Real-time leaderboard
@@ -80,6 +81,7 @@ NODE_ENV=development
 JWT_SECRET=your_secret_jwt_key
 UNSPLASH_ACCESS_KEY=your_unsplash_key
 OPENROUTER_API_KEY=your_openrouter_key
+GEMINI_API_KEY=your_gemini_api_key
 FRONTEND_URL=http://localhost:3000
 ```
 
