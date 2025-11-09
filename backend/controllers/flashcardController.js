@@ -8,7 +8,7 @@ exports.getMyDecks = async (req, res) => {
     const userId = req.user.userId;
     const decks = await FlashcardDeck.find({ userId })
       .sort({ updatedAt: -1 })
-      .populate('wordIds', 'englishWord turkishMeaning wordType englishLevel category1 sampleSentenceEn sampleSentenceTr');
+      .populate('wordIds', 'englishWord turkishMeaning wordType englishLevel category1 sampleSentenceEn sampleSentenceTr imageUrl');
     
     // Calculate mastered cards for each deck
     const decksWithStats = await Promise.all(decks.map(async (deck) => {
@@ -39,7 +39,7 @@ exports.getDeck = async (req, res) => {
     const deck = await FlashcardDeck.findOne({
       _id: req.params.id,
       userId
-    }).populate('wordIds', 'englishWord turkishMeaning wordType englishLevel category1 sampleSentenceEn sampleSentenceTr');
+    }).populate('wordIds', 'englishWord turkishMeaning wordType englishLevel category1 sampleSentenceEn sampleSentenceTr imageUrl');
     
     if (!deck) {
       return res.status(404).json({ message: 'Deck not found' });

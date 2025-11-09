@@ -11,7 +11,8 @@ import {
   FaUser,
   FaTimes,
   FaBook,
-  FaIdCard
+  FaIdCard,
+  FaPen
 } from 'react-icons/fa';
 import './Sidebar.css';
 
@@ -113,6 +114,13 @@ const Sidebar = ({ isOpen, onClose }) => {
         >
           <FaIdCard className="nav-icon nav-icon-flashcards" />
           <span className="nav-text">Flashcards</span>
+        </Link>
+        <Link 
+          to="/writing" 
+          className={`nav-item ${isActive('/writing') ? 'active' : ''}`}
+        >
+          <FaPen className="nav-icon nav-icon-writing" />
+          <span className="nav-text">Writing</span>
         </Link>
       </nav>
 

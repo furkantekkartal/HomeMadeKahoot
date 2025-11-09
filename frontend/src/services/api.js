@@ -85,7 +85,8 @@ export const wordAPI = {
         'Content-Type': 'multipart/form-data',
       },
     });
-  }
+  },
+  generateWordImage: (wordId) => api.post(`/words/${wordId}/generate-image`)
 };
 
 // Flashcard API
@@ -96,6 +97,15 @@ export const flashcardAPI = {
   updateDeck: (id, updates) => api.put(`/flashcards/decks/${id}`, updates),
   deleteDeck: (id) => api.delete(`/flashcards/decks/${id}`),
   updateLastStudied: (id) => api.patch(`/flashcards/decks/${id}/last-studied`)
+};
+
+// Study Session API (Time Tracking)
+export const studySessionAPI = {
+  start: (module) => api.post('/study-sessions/start', { module }),
+  update: (sessionId, durationMinutes, durationSeconds) => api.put(`/study-sessions/${sessionId}/update`, { durationMinutes, durationSeconds }),
+  end: (sessionId) => api.post(`/study-sessions/${sessionId}/end`),
+  getHistory: (params) => api.get('/study-sessions/history', { params }),
+  getStatistics: (params) => api.get('/study-sessions/statistics', { params })
 };
 
 export default api;

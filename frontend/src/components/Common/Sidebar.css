@@ -155,6 +155,10 @@
   color: #9f7aea;
 }
 
+.nav-icon-writing {
+  color: #f59e0b;
+}
+
 /* Active state overrides icon color */
 .nav-item.active .nav-icon {
   color: #1e3a8a;

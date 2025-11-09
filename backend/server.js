@@ -10,6 +10,7 @@ const errorHandler = require('./middleware/errorHandler');
 const authRoutes = require('./routes/auth');
 const quizRoutes = require('./routes/quizzes');
 const sessionRoutes = require('./routes/sessions');
+const studySessionRoutes = require('./routes/studySessions');
 const wordRoutes = require('./routes/words');
 const flashcardRoutes = require('./routes/flashcards');
 
@@ -47,6 +48,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use('/api/auth', authRoutes);
 app.use('/api/quizzes', quizRoutes);
 app.use('/api/sessions', sessionRoutes);
+app.use('/api/study-sessions', studySessionRoutes);
 app.use('/api/words', wordRoutes);
 app.use('/api/flashcards', flashcardRoutes);
 

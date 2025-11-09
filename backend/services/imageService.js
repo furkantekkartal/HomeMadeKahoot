@@ -205,8 +205,85 @@ function generateFallbackQueries(questionText, options = [], originalQuery = '')
   return fallbacks;
 }
 
+/**
+ * Generate and fetch an image for a word
+ * @param {string} englishWord - The English word
+ * @param {string} wordType - The word type (noun, verb, etc.)
+ * @param {string} sampleSentence - Optional sample sentence for context
+ * @returns {Promise<{imageUrl: string, searchQuery: string}>} - Image URL and search query
+ */
+async function generateWordImage(englishWord, wordType = '', sampleSentence = '') {
+  // Create a simple query from the word itself
+  // For words, we can use the word directly or extract from sample sentence
+  let searchQuery = englishWord.toLowerCase();
+  
+  // If we have a sample sentence, try to extract a more visual noun from it
+  if (sampleSentence && OPENROUTER_API_KEY) {
+    try {
+      // Use AI to generate a better search query for the word
+      const prompt = `Generate a simple, image-search-friendly query (1-2 words) for this English word. Focus on the visual representation of the word.
+
+Word: "${englishWord}"
+Type: ${wordType}
+Context: "${sampleSentence}"
+
+Return ONLY the search query (1-2 words), nothing else. Examples: "apple", "running", "book", "teacher"`;
+
+      const response = await axios.post(
+        'https://openrouter.ai/api/v1/chat/completions',
+        {
+          model: 'openai/gpt-3.5-turbo',
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a helpful assistant that generates concise image search queries. Return only the search query, no explanations.'
+            },
+            {
+              role: 'user',
+              content: prompt
+            }
+          ],
+          temperature: 0.7,
+          max_tokens: 15
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+            'Content-Type': 'application/json',
+            'HTTP-Referer': process.env.APP_URL || 'http://localhost:3000',
+            'X-Title': 'HomeMadeKahoot'
+          }
+        }
+      );
+
+      const aiQuery = response.data.choices[0]?.message?.content?.trim();
+      if (aiQuery) {
+        searchQuery = aiQuery.replace(/^["']|["']$/g, '');
+      }
+    } catch (error) {
+      console.warn('Failed to generate AI search query for word, using word directly:', error.message);
+      // Fallback to using the word directly
+    }
+  }
+
+  // Generate fallback queries
+  const fallbackQueries = [englishWord.toLowerCase()];
+  if (wordType) {
+    fallbackQueries.push(`${englishWord} ${wordType}`);
+  }
+
+  try {
+    const imageUrl = await fetchImageFromUnsplash(searchQuery, null, fallbackQueries);
+    return { imageUrl, searchQuery };
+  } catch (error) {
+    console.error('Error generating word image:', error);
+    throw error;
+  }
+}
+
 module.exports = {
   generateQuestionImage,
+  generateWordImage,
   generateSearchQuery,
   fetchImageFromUnsplash
 };

@@ -8,6 +8,7 @@ const fsPromises = require('fs').promises;
 const path = require('path');
 const os = require('os');
 const { Readable } = require('stream');
+const { generateWordImage } = require('../services/imageService');
 
 // Get all words with pagination and filters
 exports.getWords = async (req, res) => {
@@ -20,6 +21,7 @@ exports.getWords = async (req, res) => {
     const filter = {};
     if (req.query.category1) filter.category1 = req.query.category1;
     if (req.query.category2) filter.category2 = req.query.category2;
+    if (req.query.category3) filter.category3 = req.query.category3;
     if (req.query.englishLevel) filter.englishLevel = req.query.englishLevel;
     if (req.query.wordType) filter.wordType = req.query.wordType;
     if (req.query.search) {
@@ -139,6 +141,7 @@ exports.getWordsWithStatus = async (req, res) => {
     const filter = {};
     if (req.query.category1) filter.category1 = req.query.category1;
     if (req.query.category2) filter.category2 = req.query.category2;
+    if (req.query.category3) filter.category3 = req.query.category3;
     if (req.query.englishLevel) filter.englishLevel = req.query.englishLevel;
     if (req.query.wordType) filter.wordType = req.query.wordType;
     if (req.query.search) {
@@ -545,4 +548,42 @@ exports.importWords = async (req, res) => {
 
 // Multer middleware for file upload
 exports.uploadFile = upload.single('file');
+
+// Generate image for a word
+exports.generateWordImage = async (req, res) => {
+  try {
+    const { wordId } = req.params;
+    
+    if (!wordId) {
+      return res.status(400).json({ message: 'Word ID is required' });
+    }
+
+    const word = await Word.findById(wordId);
+    if (!word) {
+      return res.status(404).json({ message: 'Word not found' });
+    }
+
+    // Generate image using the word's information
+    const result = await generateWordImage(
+      word.englishWord,
+      word.wordType,
+      word.sampleSentenceEn
+    );
+
+    // Update the word with the image URL
+    word.imageUrl = result.imageUrl;
+    await word.save();
+
+    res.json({
+      imageUrl: result.imageUrl,
+      searchQuery: result.searchQuery
+    });
+  } catch (error) {
+    console.error('Error generating word image:', error);
+    res.status(500).json({
+      message: error.message || 'Failed to generate image for word',
+      searchQuery: error.searchQuery || null
+    });
+  }
+};
 
