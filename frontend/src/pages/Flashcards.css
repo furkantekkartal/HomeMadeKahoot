@@ -197,6 +197,51 @@
   border-radius: 0;
   box-sizing: border-box;
   flex-shrink: 0;
+  transition: all 0.3s ease;
+}
+
+.animate-image-known {
+  animation: image-pulse-known 0.6s ease-out;
+}
+
+.animate-image-unknown {
+  animation: image-pulse-unknown 0.6s ease-out;
+}
+
+@keyframes image-pulse-known {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(5, 95, 70, 0.7);
+    filter: brightness(1);
+  }
+  50% {
+    transform: scale(1.02);
+    box-shadow: 0 0 0 15px rgba(5, 95, 70, 0);
+    filter: brightness(1.1);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(5, 95, 70, 0);
+    filter: brightness(1);
+  }
+}
+
+@keyframes image-pulse-unknown {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(30, 64, 175, 0.7);
+    filter: brightness(1);
+  }
+  50% {
+    transform: scale(1.02);
+    box-shadow: 0 0 0 15px rgba(30, 64, 175, 0);
+    filter: brightness(1.1);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(30, 64, 175, 0);
+    filter: brightness(1);
+  }
 }
 
 .image-pane-placeholder {
@@ -468,6 +513,23 @@
   100% {
     transform: scale(1);
   }
+}
+
+/* Animation classes for keyboard triggers */
+.animate-press {
+  animation: button-press 0.3s ease-out;
+}
+
+.animate-pulse-status {
+  animation: pulse-known 0.6s ease-out;
+}
+
+.status-unknown.animate-pulse-status {
+  animation: pulse-unknown 0.6s ease-out;
+}
+
+.animate-sound-wave {
+  animation: sound-wave 0.5s ease-out;
 }
 
 .nav-btn:disabled {
