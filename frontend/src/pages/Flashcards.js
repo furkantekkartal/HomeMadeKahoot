@@ -17,19 +17,9 @@ const Flashcards = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
 
-  // Setup state
-  const [selectedLevel, setSelectedLevel] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('');
-  const [selectedStatus, setSelectedStatus] = useState('unknown'); // unknown, known, all
-  const [loading, setLoading] = useState(true); // Start with loading true to show loading state
+  // Loading and UI state
+  const [loading, setLoading] = useState(true);
   const [generatingImage, setGeneratingImage] = useState(false);
-  const [showAddCardModal, setShowAddCardModal] = useState(false);
-  const [availableWords, setAvailableWords] = useState([]);
-  const [searchWordQuery, setSearchWordQuery] = useState('');
-  const [loadingWords, setLoadingWords] = useState(false);
-  const [categories, setCategories] = useState([]);
-
-  const levels = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
 
   // Study timer
   const [timerActive, setTimerActive] = useState(true);
@@ -47,33 +37,110 @@ const Flashcards = () => {
     }
   }, [currentDeck]);
 
-  // Load categories on initial mount
+  // Keyboard navigation
   useEffect(() => {
-    const loadCategories = async () => {
-      try {
-        const response = await wordAPI.getWordsWithStatus({
-          limit: 1000
-        });
-        const allWords = response.data.words || [];
-        const uniqueCategories = [...new Set(allWords.map(w => w.category1).filter(c => c))].sort();
-        setCategories(uniqueCategories);
-      } catch (error) {
-        console.error('Failed to load categories:', error);
+    const handleKeyDown = async (e) => {
+      // Don't handle keyboard events if user is typing in an input field
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+        return;
+      }
+
+      switch (e.key) {
+        case 'ArrowRight':
+          e.preventDefault();
+          if (cards.length > 0) {
+            setIsFlipped(false);
+            setCurrentIndex((prevIndex) => (prevIndex + 1) % cards.length);
+          }
+          break;
+        case 'ArrowLeft':
+          e.preventDefault();
+          if (cards.length > 0) {
+            setIsFlipped(false);
+            setCurrentIndex((prevIndex) => (prevIndex - 1 + cards.length) % cards.length);
+          }
+          break;
+        case 'ArrowUp':
+          e.preventDefault();
+          if (cards.length > 0 && currentIndex < cards.length) {
+            const card = cards[currentIndex];
+            if (card && card._id) {
+              try {
+                await wordAPI.toggleWordStatus(card._id, true);
+                setCards(prevCards => prevCards.map(c => 
+                  c._id === card._id ? { ...c, isKnown: true } : c
+                ));
+                if (currentDeck) {
+                  await flashcardAPI.updateLastStudied(currentDeck._id);
+                }
+                setTimeout(() => {
+                  setIsFlipped(false);
+                  setCurrentIndex((prevIndex) => (prevIndex + 1) % cards.length);
+                }, 300);
+              } catch (error) {
+                console.error('Failed to update card status:', error);
+              }
+            }
+          }
+          break;
+        case 'ArrowDown':
+          e.preventDefault();
+          if (cards.length > 0 && currentIndex < cards.length) {
+            const card = cards[currentIndex];
+            if (card && card._id) {
+              try {
+                await wordAPI.toggleWordStatus(card._id, false);
+                setCards(prevCards => prevCards.map(c => 
+                  c._id === card._id ? { ...c, isKnown: false } : c
+                ));
+                if (currentDeck) {
+                  await flashcardAPI.updateLastStudied(currentDeck._id);
+                }
+                setTimeout(() => {
+                  setIsFlipped(false);
+                  setCurrentIndex((prevIndex) => (prevIndex + 1) % cards.length);
+                }, 300);
+              } catch (error) {
+                console.error('Failed to update card status:', error);
+              }
+            }
+          }
+          break;
+        case '0':
+          e.preventDefault();
+          if (cards.length > 0 && currentIndex < cards.length) {
+            const card = cards[currentIndex];
+            if (card && card.englishWord) {
+              speakText(card.englishWord);
+            }
+          }
+          break;
+        case '1':
+          e.preventDefault();
+          if (cards.length > 0 && currentIndex < cards.length) {
+            const card = cards[currentIndex];
+            if (card && card.sampleSentenceEn) {
+              speakText(card.sampleSentenceEn);
+            }
+          }
+          break;
+        case ' ':
+          e.preventDefault();
+          if (cards.length > 0) {
+            randomCard();
+          }
+          break;
+        default:
+          break;
       }
     };
-    loadCategories();
-  }, []);
 
-  // Debounce search query
-  useEffect(() => {
-    if (!showAddCardModal) return;
-    
-    const timeoutId = setTimeout(() => {
-      loadAvailableWords(searchWordQuery);
-    }, 500);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [cards, currentIndex, currentDeck]);
 
-    return () => clearTimeout(timeoutId);
-  }, [searchWordQuery, showAddCardModal]);
 
   const loadDecks = async () => {
     try {
@@ -100,32 +167,15 @@ const Flashcards = () => {
   const loadDefaultCards = async () => {
     try {
       setLoading(true);
-      const filters = {};
-      if (selectedLevel) filters.englishLevel = selectedLevel;
-      if (selectedCategory) filters.category1 = selectedCategory;
-
-      // Default to showing unknown words if no status is selected
-      const statusFilter = selectedStatus || 'unknown';
-      
       const response = await wordAPI.getWordsWithStatus({
-        ...filters,
         limit: 1000,
-        showKnown: statusFilter === 'all' || statusFilter === 'known' ? 'true' : 'false',
-        showUnknown: statusFilter === 'all' || statusFilter === 'unknown' ? 'true' : 'false'
+        showKnown: 'false',
+        showUnknown: 'true'
       });
 
       let filtered = response.data.words || [];
-
-      // Apply status filter
-      if (statusFilter === 'unknown') {
-        filtered = filtered.filter(w => w.isKnown !== true);
-      } else if (statusFilter === 'known') {
-        filtered = filtered.filter(w => w.isKnown === true);
-      }
-
-      // Extract unique categories from loaded words
-      const uniqueCategories = [...new Set(filtered.map(w => w.category1).filter(c => c))].sort();
-      setCategories(uniqueCategories);
+      // Filter to show only unknown words
+      filtered = filtered.filter(w => w.isKnown !== true);
 
       // Shuffle cards for variety
       const shuffled = [...filtered].sort(() => Math.random() - 0.5);
@@ -211,70 +261,6 @@ const Flashcards = () => {
     }
   };
 
-  const loadAvailableWords = async (query = '') => {
-    try {
-      setLoadingWords(true);
-      const params = { limit: 100 };
-      if (query && query.length > 0) {
-        params.search = query;
-      }
-      const response = await wordAPI.getWordsWithStatus(params);
-      // Filter out words that are already in the current cards
-      const existingWordIds = new Set(cards.map(c => c._id?.toString()));
-      const filtered = response.data.words.filter(w => !existingWordIds.has(w._id?.toString()));
-      setAvailableWords(filtered);
-    } catch (error) {
-      console.error('Failed to load words:', error);
-    } finally {
-      setLoadingWords(false);
-    }
-  };
-
-  const handleAddCardToDeck = async (word) => {
-    if (!currentDeck) {
-      // If no deck, just add to current cards
-      setCards([...cards, word]);
-      setShowAddCardModal(false);
-      alert('Card added to current cards!');
-      return;
-    }
-
-    try {
-      // Add word to deck
-      const updatedWordIds = [...currentDeck.wordIds.map(w => w._id || w), word._id];
-      await flashcardAPI.updateDeck(currentDeck._id, {
-        wordIds: updatedWordIds
-      });
-      
-      // Reload deck to get updated cards
-      await loadDeckCards();
-      setShowAddCardModal(false);
-      alert('Card added to deck!');
-    } catch (error) {
-      console.error('Failed to add card to deck:', error);
-      alert('Failed to add card: ' + (error.response?.data?.message || error.message));
-    }
-  };
-
-  const handleOpenAddCard = async () => {
-    setShowAddCardModal(true);
-    setSearchWordQuery('');
-    // Load initial words
-    try {
-      setLoadingWords(true);
-      const response = await wordAPI.getWordsWithStatus({
-        limit: 100
-      });
-      // Filter out words that are already in the current cards
-      const existingWordIds = new Set(cards.map(c => c._id?.toString()));
-      const filtered = response.data.words.filter(w => !existingWordIds.has(w._id?.toString()));
-      setAvailableWords(filtered);
-    } catch (error) {
-      console.error('Failed to load words:', error);
-    } finally {
-      setLoadingWords(false);
-    }
-  };
 
   const handleDeckSelect = async (deckId) => {
     if (!deckId) {
@@ -292,53 +278,14 @@ const Flashcards = () => {
     return <div className="loading">Loading cards...</div>;
   }
 
-  if (cards.length === 0 && !currentDeck) {
+  if (cards.length === 0) {
     return (
       <div className="flashcards-container">
-        <div className="flashcards-setup">
+        <div className="flashcards-header">
           <h1>Flashcards</h1>
-          <div className="setup-filters">
-            <select
-              value={selectedLevel}
-              onChange={(e) => setSelectedLevel(e.target.value)}
-              className="filter-select"
-            >
-              <option value="">All Levels</option>
-              {levels.map(l => (
-                <option key={l} value={l}>{l}</option>
-              ))}
-            </select>
-
-            <select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              className="filter-select"
-            >
-              <option value="">All Categories</option>
-              <option value="Grammar">Grammar</option>
-              <option value="General">General</option>
-              <option value="Home">Home</option>
-              <option value="Education">Education</option>
-              <option value="Technology">Technology</option>
-            </select>
-
-            <select
-              value={selectedStatus}
-              onChange={(e) => setSelectedStatus(e.target.value)}
-              className="filter-select"
-            >
-              <option value="all">All Words</option>
-              <option value="unknown">Unknown Only</option>
-              <option value="known">Known Only</option>
-            </select>
-
-            <button onClick={loadDefaultCards} className="btn btn-primary">
-              Load Cards
-            </button>
-          </div>
         </div>
         <div className="empty-state">
-          <p>No flashcards available. Load some cards or create a deck.</p>
+          <p>No flashcards available. Create a deck or wait for cards to load.</p>
         </div>
       </div>
     );
@@ -375,7 +322,7 @@ const Flashcards = () => {
             onClick={() => navigate('/create-deck')}
             className="btn btn-secondary"
           >
-            + New Deck
+            New Deck
           </button>
         </div>
       </div>
@@ -397,33 +344,17 @@ const Flashcards = () => {
             </div>
           </div>
 
-          {/* Image Pane - Separate from card */}
-          <div className="image-pane">
-            {currentCard.imageUrl && currentCard.imageUrl !== '' ? (
-              <img
-                src={currentCard.imageUrl}
-                alt={currentCard.englishWord}
-                className="image-pane-img"
-                onError={(e) => { e.target.style.display = 'none'; }}
-              />
-            ) : (
-              <div className="image-pane-placeholder">
-                <span className="placeholder-icon">🖼️</span>
-                <p className="placeholder-text">No image available</p>
-                <button
-                  onClick={(e) => { 
-                    e.stopPropagation(); 
-                    handleGenerateImage(currentCard._id); 
-                  }}
-                  className="generate-image-btn"
-                  disabled={generatingImage}
-                  title="Generate image for this word"
-                >
-                  {generatingImage ? 'Generating...' : 'Generate Image'}
-                </button>
-              </div>
-            )}
-          </div>
+          {/* Image - Same size as card */}
+          {currentCard && (
+            <img
+              src={currentCard.imageUrl || 'https://img.freepik.com/free-vector/illustration-gallery-icon_53876-27002.jpg?semt=ais_hybrid&w=740&q=80'}
+              alt={currentCard.englishWord || 'Word image'}
+              className="flashcard-image"
+              onError={(e) => { 
+                e.target.src = 'https://img.freepik.com/free-vector/illustration-gallery-icon_53876-27002.jpg?semt=ais_hybrid&w=740&q=80';
+              }}
+            />
+          )}
 
           {/* Flashcard */}
           <div
@@ -567,49 +498,6 @@ const Flashcards = () => {
         </div>
       </div>
 
-      {/* Add Card Modal */}
-      {showAddCardModal && (
-        <div className="modal-overlay" onClick={() => setShowAddCardModal(false)}>
-          <div className="modal-content add-card-modal" onClick={(e) => e.stopPropagation()}>
-            <h2>Add Card to {currentDeck ? currentDeck.name : 'Current Cards'}</h2>
-            <div className="modal-input-group">
-              <label>Search Words</label>
-              <input
-                type="text"
-                value={searchWordQuery}
-                onChange={(e) => setSearchWordQuery(e.target.value)}
-                placeholder="Type to search words..."
-                autoFocus
-              />
-            </div>
-            <div className="available-words-list">
-              {loadingWords ? (
-                <div className="loading">Loading words...</div>
-              ) : availableWords.length === 0 ? (
-                <div className="empty-state">No words found. Try a different search.</div>
-              ) : (
-                <div className="words-list">
-                  {availableWords.slice(0, 20).map(word => (
-                    <div key={word._id} className="word-item" onClick={() => handleAddCardToDeck(word)}>
-                      <div className="word-item-content">
-                        <strong>{word.englishWord}</strong>
-                        <span className="word-type">{word.wordType}</span>
-                        <span className="word-meaning">{word.turkishMeaning}</span>
-                      </div>
-                      <button className="btn btn-sm btn-primary">Add</button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="modal-actions">
-              <button onClick={() => setShowAddCardModal(false)} className="btn btn-secondary">
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

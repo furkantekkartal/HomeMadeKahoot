@@ -3,6 +3,9 @@
   background: #f3f4f6;
   display: flex;
   flex-direction: column;
+  overflow-x: hidden;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .flashcards-header {
@@ -21,6 +24,9 @@
   font-weight: 700;
   color: #2d3748;
   margin: 0;
+  margin-left: 0;
+  padding-left: 0;
+  flex: 0 0 auto;
 }
 
 .header-controls {
@@ -28,6 +34,7 @@
   gap: 0.75rem;
   align-items: center;
   flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .filter-select {
@@ -51,6 +58,16 @@
   align-items: center;
 }
 
+.header-buttons .btn {
+  height: 40px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 1rem;
+  line-height: 1;
+}
+
 .deck-select {
   padding: 0.5rem 1rem;
   border: 2px solid #e2e8f0;
@@ -59,6 +76,10 @@
   background: white;
   cursor: pointer;
   min-width: 200px;
+  height: 40px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
 }
 
 .deck-select:focus {
@@ -104,6 +125,9 @@
   flex: 1;
   display: flex;
   overflow: hidden;
+  overflow-x: hidden;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .flashcard-area {
@@ -111,16 +135,22 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: 2rem;
+  justify-content: flex-start;
+  padding: 1rem;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   min-height: calc(100vh - 200px);
-  gap: 1.5rem;
+  gap: 0.5rem;
+  overflow-y: auto;
+  overflow-x: hidden;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .progress-container {
   width: 100%;
-  max-width: 800px;
+  max-width: 100%;
+  padding: 0 0.5rem;
+  flex-shrink: 0;
 }
 
 .progress-info {
@@ -154,24 +184,19 @@
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
-.image-pane {
-  width: 100%;
-  max-width: 600px;
-  height: 500px;
-  background: rgba(255, 255, 255, 0.95);
-  border-radius: 20px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  margin-bottom: 1rem;
-}
-
-.image-pane-img {
-  width: 100%;
-  height: 100%;
+.flashcard-image {
+  width: 480px;
+  max-width: 480px;
+  min-width: 480px;
+  height: 300px;
+  max-height: 300px;
+  min-height: 300px;
   object-fit: cover;
+  display: block;
+  margin-bottom: 0.75rem;
+  border-radius: 0;
+  box-sizing: border-box;
+  flex-shrink: 0;
 }
 
 .image-pane-placeholder {
@@ -221,12 +246,14 @@
 }
 
 .flashcard {
-  width: 100%;
-  max-width: 600px;
-  height: 500px;
+  width: 480px;
+  max-width: 480px;
+  height: 300px;
   perspective: 1000px;
   cursor: pointer;
-  margin-bottom: 2rem;
+  margin-bottom: 0.75rem;
+  box-sizing: border-box;
+  flex-shrink: 0;
 }
 
 .flashcard-inner {
@@ -253,7 +280,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 2rem;
+  padding: 1.5rem;
   box-sizing: border-box;
 }
 
@@ -278,7 +305,7 @@
 }
 
 .card-word {
-  font-size: 3rem;
+  font-size: 2.5rem;
   font-weight: 700;
   margin: 0;
   text-align: center;
@@ -286,16 +313,16 @@
 }
 
 .card-type {
-  font-size: 1.2rem;
+  font-size: 1rem;
   opacity: 0.9;
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
   text-transform: capitalize;
 }
 
 .card-translation {
-  font-size: 1.5rem;
+  font-size: 1.25rem;
   opacity: 0.9;
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
 }
 
 .card-sentence-container {
@@ -308,12 +335,12 @@
 }
 
 .card-sentence {
-  font-size: 1.1rem;
+  font-size: 0.95rem;
   font-style: italic;
   text-align: center;
   margin: 0;
   opacity: 0.95;
-  line-height: 1.6;
+  line-height: 1.4;
   flex: 1;
 }
 
@@ -333,6 +360,28 @@
   min-width: 40px;
   height: 40px;
   flex-shrink: 0;
+  position: relative;
+  overflow: visible;
+}
+
+.audio-btn-inline::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.4);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  transition: width 0.5s, height 0.5s, opacity 0.5s;
+}
+
+.audio-btn-inline:active::after {
+  width: 60px;
+  height: 60px;
+  opacity: 0;
 }
 
 .audio-btn-inline:hover {
@@ -341,10 +390,26 @@
   transform: translateY(-2px);
 }
 
+.audio-btn-inline:active {
+  animation: sound-wave 0.5s ease-out;
+}
+
+@keyframes sound-wave {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
 .card-hint {
-  font-size: 0.85rem;
+  font-size: 0.75rem;
   opacity: 0.8;
-  margin-top: 1.5rem;
+  margin-top: 0.5rem;
   text-align: center;
 }
 
@@ -355,8 +420,8 @@
   flex-wrap: nowrap !important;
   justify-content: center;
   align-items: center;
-  width: 100%;
-  max-width: 600px;
+  width: 480px;
+  max-width: 480px;
 }
 
 .card-navigation > * {
@@ -368,15 +433,15 @@
   flex: 1;
   min-width: 0;
   width: auto !important;
-  height: 50px;
-  font-size: 1.5rem;
+  height: 45px;
+  font-size: 3.5rem;
   display: flex !important;
   align-items: center;
   justify-content: center;
   padding: 0 !important;
   margin: 0 !important;
-  background: rgba(255, 255, 255, 0.95) !important;
-  border: 2px solid rgba(102, 126, 234, 0.3) !important;
+  background: transparent !important;
+  border: none !important;
   border-radius: 12px;
   color: #667eea;
   transition: all 0.3s;
@@ -385,11 +450,24 @@
 }
 
 .nav-btn:hover:not(:disabled) {
-  background: #667eea;
-  color: white;
-  border-color: #667eea;
+  background: rgba(255, 255, 255, 0.2) !important;
   transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
+}
+
+.nav-btn:active:not(:disabled) {
+  animation: button-press 0.3s ease-out;
+}
+
+@keyframes button-press {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(0.9);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 
 .nav-btn:disabled {
@@ -398,37 +476,37 @@
 }
 
 .nav-btn-emoji {
-  font-size: 1.5rem;
+  font-size: 2.45rem;
 }
 
 .flashcard-sidebar {
-  width: 250px;
+  width: 180px;
   background: white;
   border-left: 2px solid #e2e8f0;
-  padding: 2rem;
+  padding: 1rem;
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 0.75rem;
 }
 
 .flashcard-sidebar h3 {
-  font-size: 1.5rem;
+  font-size: 1.25rem;
   font-weight: 700;
   color: #2d3748;
   margin: 0;
 }
 
 .mark-as-section {
-  margin-bottom: 1.5rem;
-  padding-bottom: 1.5rem;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
   border-bottom: 2px solid #e2e8f0;
 }
 
 .mark-as-title {
-  font-size: 1.25rem;
+  font-size: 1rem;
   font-weight: 700;
   color: #2d3748;
-  margin: 0 0 1rem 0;
+  margin: 0 0 0.75rem 0;
 }
 
 .status-buttons {
@@ -444,7 +522,7 @@
 }
 
 .stat-card {
-  padding: 1.5rem;
+  padding: 1rem;
   border-radius: 12px;
   text-align: center;
 }
@@ -472,7 +550,7 @@
 }
 
 .stat-value {
-  font-size: 2.5rem;
+  font-size: 2rem;
   font-weight: 700;
   margin: 0;
 }
@@ -498,6 +576,26 @@
   cursor: pointer;
   transition: all 0.3s;
   text-align: left;
+  position: relative;
+  overflow: hidden;
+}
+
+.status-btn::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.5);
+  transform: translate(-50%, -50%);
+  transition: width 0.6s, height 0.6s;
+}
+
+.status-btn:active::before {
+  width: 300px;
+  height: 300px;
 }
 
 .status-btn.status-unknown {
@@ -508,6 +606,11 @@
 .status-btn.status-unknown:hover {
   background: #bfdbfe;
   transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(30, 64, 175, 0.3);
+}
+
+.status-btn.status-unknown:active {
+  animation: pulse-unknown 0.6s ease-out;
 }
 
 .status-btn.status-known {
@@ -518,6 +621,41 @@
 .status-btn.status-known:hover {
   background: #a7f3d0;
   transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(5, 95, 70, 0.3);
+}
+
+.status-btn.status-known:active {
+  animation: pulse-known 0.6s ease-out;
+}
+
+@keyframes pulse-known {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(5, 95, 70, 0.7);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 0 10px rgba(5, 95, 70, 0);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(5, 95, 70, 0);
+  }
+}
+
+@keyframes pulse-unknown {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(30, 64, 175, 0.7);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 0 10px rgba(30, 64, 175, 0);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(30, 64, 175, 0);
+  }
 }
 
 .deck-info {
@@ -685,14 +823,164 @@
 }
 
 @media (max-width: 768px) {
-  .image-pane {
+  .flashcards-header {
+    padding: 0.75rem 0.75rem 0.75rem 4rem;
+    gap: 0.5rem;
+    position: relative;
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: nowrap;
+    justify-content: space-between;
+  }
+
+  .flashcards-header h1 {
+    font-size: 1.25rem;
+    margin-left: 0.75rem;
+    padding-left: 0;
+    white-space: nowrap;
+    flex-shrink: 0;
+    margin-right: auto;
+  }
+
+  .header-controls {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: nowrap;
+    flex-shrink: 0;
+    justify-content: flex-end;
+  }
+
+  .header-controls > * {
+    flex-shrink: 0;
+    height: 40px;
+    box-sizing: border-box;
+  }
+
+  .study-timer {
+    height: 40px;
+    padding: 0.5rem 0.75rem;
+    display: flex;
+    align-items: center;
+  }
+
+  .deck-select {
+    font-size: 0.85rem;
+    padding: 0.5rem 0.75rem;
+    min-width: 144px;
+    max-width: 180px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+  }
+
+  .header-buttons {
+    display: flex;
+    flex-direction: row;
+    gap: 0.4rem;
+    flex-shrink: 0;
+  }
+
+  .header-buttons .btn {
+    font-size: 0.85rem;
+    padding: 0.5rem 0.75rem;
+    white-space: nowrap;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    text-align: center;
+  }
+
+  .flashcard-area {
+    padding: 0.5rem;
+    gap: 0.25rem;
+    justify-content: flex-start;
+    overflow-y: auto;
+    min-height: auto;
+  }
+
+  .progress-container {
+    padding: 0.5rem;
+    margin-bottom: 0;
+  }
+
+  .progress-info {
+    font-size: 0.8rem;
+  }
+
+  .progress-bar {
+    height: 6px;
+  }
+
+  .flashcard-image {
+    width: 100%;
     max-width: 100%;
-    height: 350px;
+    min-width: 0;
+    height: auto;
+    aspect-ratio: 480 / 300;
+    max-height: 40vh;
+    margin-bottom: 0.5rem;
+    flex-shrink: 0;
+  }
+
+  .image-pane-placeholder .placeholder-icon {
+    font-size: 2.5rem;
+  }
+
+  .image-pane-placeholder .placeholder-text {
+    font-size: 0.85rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .image-pane-placeholder .generate-image-btn {
+    padding: 0.5rem 1rem;
+    font-size: 0.85rem;
+  }
+
+  .replace-image-btn {
+    width: 35px;
+    height: 35px;
+    font-size: 1rem;
+    top: 0.5rem;
+    right: 0.5rem;
+    padding: 0.5rem;
   }
 
   .flashcard {
+    width: 100%;
     max-width: 100%;
-    height: 400px;
+    min-width: 0;
+    height: auto;
+    aspect-ratio: 480 / 300;
+    max-height: 50vh;
+    margin-bottom: 0.75rem;
+    flex-shrink: 0;
+  }
+
+  .card-word {
+    font-size: 1.75rem;
+  }
+
+  .card-type {
+    font-size: 1rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .card-translation {
+    font-size: 1.25rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .card-sentence {
+    font-size: 0.95rem;
+  }
+
+  .card-hint {
+    font-size: 0.75rem;
+    margin-top: 0.75rem;
   }
 
   .card-navigation {
@@ -702,62 +990,27 @@
     gap: 0.5rem;
     width: 100%;
     max-width: 100%;
-    padding: 0 1rem;
+    padding: 0 0.5rem;
     justify-content: center;
     align-items: center;
+    flex-shrink: 0;
+    margin-top: 0.5rem;
+    margin-bottom: 0;
   }
 
   .nav-btn {
     flex: 1;
     min-width: 0;
-    height: 45px;
-    font-size: 1.25rem;
-  }
-
-  .header-controls {
-    flex-direction: row;
-    align-items: center;
-    width: 100%;
-    gap: 0.5rem;
-  }
-
-  .header-buttons {
-    display: flex;
-    flex-direction: row;
-    gap: 0.5rem;
-    flex: 1;
-  }
-
-  .header-buttons .btn {
-    flex: 1;
-    min-width: 0;
-    font-size: 0.85rem;
-    padding: 0.5rem 0.75rem;
-  }
-
-  .deck-select {
-    flex: 1;
-    min-width: 0;
-    font-size: 0.85rem;
+    height: 40px;
+    font-size: 2.31rem;
   }
 
   .nav-btn-emoji {
     flex: 1;
     min-width: 0;
-    height: 45px;
-    font-size: 1.25rem;
+    height: 40px;
+    font-size: 2.31rem;
     padding: 0;
-  }
-
-  .nav-btn-text {
-    flex: 2;
-    min-width: 0;
-    height: 45px;
-    font-size: 0.75rem;
-    padding: 0.5rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
   }
 }
 
@@ -772,22 +1025,105 @@
     flex-direction: column;
   }
 
+  .flashcard-image {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    height: auto !important;
+    aspect-ratio: 480 / 300 !important;
+    max-height: 40vh !important;
+  }
+
+  .flashcard {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    height: auto !important;
+    aspect-ratio: 480 / 300 !important;
+    max-height: 50vh !important;
+  }
+
+  .card-navigation {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
   .flashcard-sidebar {
     width: 100%;
     border-left: none;
     border-top: 2px solid #e2e8f0;
     flex-direction: row;
     justify-content: space-around;
-    padding: 1rem;
+    padding: 0.75rem;
+    gap: 0.75rem;
+    flex-shrink: 0;
+    overflow-x: auto;
+  }
+
+  .mark-as-section {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+    border-right: 2px solid #e2e8f0;
+    padding-right: 0.75rem;
+    margin-right: 0.75rem;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .mark-as-title {
+    font-size: 1rem;
+    margin-bottom: 0.5rem;
   }
 
   .status-buttons {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .status-btn {
+    padding: 0.75rem;
+    font-size: 0.85rem;
+  }
+
+  .progress-section {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .progress-section h3 {
+    font-size: 1rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .stats-grid {
     flex-direction: row;
+    gap: 0.5rem;
+    overflow-x: auto;
+  }
+
+  .stat-card {
+    flex: 1;
+    min-width: 80px;
+    padding: 0.75rem 0.5rem;
+  }
+
+  .stat-label {
+    font-size: 0.7rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .stat-value {
+    font-size: 1.25rem;
   }
 
   .flashcard {
-    max-width: 100%;
-    height: 400px;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    height: auto !important;
+    aspect-ratio: 480 / 300 !important;
+    max-height: 50vh !important;
   }
 
   .card-word {
@@ -796,26 +1132,58 @@
 }
 
 @media (max-width: 768px) {
-  .flashcards-header {
+  .flashcard-sidebar {
     flex-direction: column;
-    align-items: flex-start;
+    padding: 0.75rem;
+    gap: 0.75rem;
+    max-height: none;
   }
 
-  .header-controls {
+  .mark-as-section {
+    border-right: none;
+    border-bottom: 2px solid #e2e8f0;
+    padding-right: 0;
+    padding-bottom: 0.75rem;
+    margin-right: 0;
+    margin-bottom: 0.75rem;
     width: 100%;
-    flex-direction: column;
   }
 
-  .deck-select {
+  .status-buttons {
+    flex-direction: row;
+    gap: 0.5rem;
+  }
+
+  .status-btn {
+    flex: 1;
+    padding: 0.75rem;
+    font-size: 0.85rem;
+  }
+
+  .progress-section {
     width: 100%;
   }
 
-  .flashcard {
-    height: 350px;
+  .stats-grid {
+    flex-direction: row !important;
+    gap: 0.5rem;
+    display: flex !important;
   }
 
-  .card-word {
-    font-size: 1.75rem;
+  .stat-card {
+    flex: 1 !important;
+    min-width: 0;
+    padding: 0.75rem 0.5rem;
+    width: auto !important;
+  }
+
+  .stat-label {
+    font-size: 0.7rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .stat-value {
+    font-size: 1.25rem;
   }
 
   .card-image {

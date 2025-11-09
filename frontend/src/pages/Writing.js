@@ -375,7 +375,7 @@ const Writing = () => {
             onClick={() => navigate('/create-deck')}
             className="btn btn-secondary"
           >
-            + New Deck
+            New Deck
           </button>
         </div>
       </div>
