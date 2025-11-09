@@ -52,6 +52,30 @@ const Flashcards = () => {
   const [cardStackOffset, setCardStackOffset] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
 
+  // Shared AudioContext for all sounds (mobile-friendly)
+  const audioContextRef = useRef(null);
+  
+  // Initialize and resume AudioContext
+  const getAudioContext = () => {
+    if (!audioContextRef.current) {
+      try {
+        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+      } catch (error) {
+        console.debug('Audio context not available:', error);
+        return null;
+      }
+    }
+    
+    // Resume if suspended (required on mobile)
+    if (audioContextRef.current.state === 'suspended') {
+      audioContextRef.current.resume().catch(err => {
+        console.debug('Failed to resume audio context:', err);
+      });
+    }
+    
+    return audioContextRef.current;
+  };
+
   // Touch gesture state
   const [touchStart, setTouchStart] = useState({ x: null, y: null });
   const [touchEnd, setTouchEnd] = useState({ x: null, y: null });
@@ -295,8 +319,10 @@ const Flashcards = () => {
 
   // Function to play success sound (for known words)
   const playSuccessSound = () => {
+    const audioContext = getAudioContext();
+    if (!audioContext) return;
+    
     try {
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
       const masterGain = audioContext.createGain();
       masterGain.connect(audioContext.destination);
       masterGain.gain.setValueAtTime(0.2, audioContext.currentTime);
@@ -325,15 +351,16 @@ const Flashcards = () => {
         oscillator.stop(startTime + 0.4);
       });
     } catch (error) {
-      // Silently fail if audio context is not available
-      console.debug('Audio context not available:', error);
+      console.debug('Error playing success sound:', error);
     }
   };
 
   // Function to play unknown sound (lower, more neutral tone)
   const playUnknownSound = () => {
+    const audioContext = getAudioContext();
+    if (!audioContext) return;
+    
     try {
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
       const masterGain = audioContext.createGain();
       masterGain.connect(audioContext.destination);
       masterGain.gain.setValueAtTime(0.2, audioContext.currentTime);
@@ -362,15 +389,16 @@ const Flashcards = () => {
         oscillator.stop(startTime + 0.4);
       });
     } catch (error) {
-      // Silently fail if audio context is not available
-      console.debug('Audio context not available:', error);
+      console.debug('Error playing unknown sound:', error);
     }
   };
 
   // Function to play clock tick sound (for next card)
   const playTickSound = () => {
+    const audioContext = getAudioContext();
+    if (!audioContext) return;
+    
     try {
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
       const oscillator = audioContext.createOscillator();
       const gainNode = audioContext.createGain();
       
@@ -388,14 +416,16 @@ const Flashcards = () => {
       oscillator.start(audioContext.currentTime);
       oscillator.stop(audioContext.currentTime + 0.1);
     } catch (error) {
-      console.debug('Audio context not available:', error);
+      console.debug('Error playing tick sound:', error);
     }
   };
 
   // Function to play clock tock sound (for previous card)
   const playTockSound = () => {
+    const audioContext = getAudioContext();
+    if (!audioContext) return;
+    
     try {
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
       const oscillator = audioContext.createOscillator();
       const gainNode = audioContext.createGain();
       
@@ -413,7 +443,7 @@ const Flashcards = () => {
       oscillator.start(audioContext.currentTime);
       oscillator.stop(audioContext.currentTime + 0.15);
     } catch (error) {
-      console.debug('Audio context not available:', error);
+      console.debug('Error playing tock sound:', error);
     }
   };
 
