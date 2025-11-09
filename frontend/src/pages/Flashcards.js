@@ -498,11 +498,15 @@ const Flashcards = () => {
     setTouchStart({ x: touch.clientX, y: touch.clientY });
     setTouchEnd({ x: null, y: null });
     swipeDetectedRef.current = false;
+    // Prevent scrolling when touching the card
+    e.preventDefault();
   };
 
   const handleTouchMove = (e) => {
     const touch = e.targetTouches[0];
     setTouchEnd({ x: touch.clientX, y: touch.clientY });
+    // Prevent scrolling during swipe gesture
+    e.preventDefault();
   };
 
   const handleTouchEnd = async (e) => {

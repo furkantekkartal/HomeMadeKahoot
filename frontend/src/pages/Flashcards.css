@@ -198,6 +198,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  touch-action: pan-x;
 }
 
 .card-stack-wrapper {
@@ -401,6 +402,7 @@
   box-sizing: border-box;
   flex-shrink: 0;
   transition: transform 0.3s ease-out, opacity 0.3s ease-out;
+  touch-action: pan-x;
 }
 
 .flashcard.card-stack-item {
@@ -412,6 +414,7 @@
 
 .flashcard.card-stack-top {
   cursor: pointer;
+  touch-action: pan-x;
 }
 
 .flashcard-inner {
