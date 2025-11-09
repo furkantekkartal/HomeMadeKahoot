@@ -458,11 +458,11 @@ const Flashcards = () => {
     if (isKnown) {
       setShowKnownText(true);
       playSuccessSound();
-      setTimeout(() => setShowKnownText(false), 500);
+      setTimeout(() => setShowKnownText(false), 300);
     } else {
       setShowUnknownText(true);
       playUnknownSound();
-      setTimeout(() => setShowUnknownText(false), 500);
+      setTimeout(() => setShowUnknownText(false), 300);
     }
 
     try {
@@ -767,16 +767,6 @@ const Flashcards = () => {
                   e.target.src = CONSTANTS.DEFAULT_IMAGE_URL;
                 }}
               />
-              {showKnownText && (
-                <div className="known-text-overlay">
-                  Known
-                </div>
-              )}
-              {showUnknownText && (
-                <div className="unknown-text-overlay">
-                  Unknown
-                </div>
-              )}
             </div>
           )}
 
@@ -813,6 +803,17 @@ const Flashcards = () => {
                     onTouchMove={isTopCard ? handleTouchMove : undefined}
                     onTouchEnd={isTopCard ? handleTouchEnd : undefined}
                   >
+                    {/* Known/Unknown text overlay on card */}
+                    {isTopCard && showKnownText && (
+                      <div className="known-text-overlay">
+                        Known
+                      </div>
+                    )}
+                    {isTopCard && showUnknownText && (
+                      <div className="unknown-text-overlay">
+                        Unknown
+                      </div>
+                    )}
                     <div className="flashcard-inner">
                       {/* Front */}
                       <div className="flashcard-front">

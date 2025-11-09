@@ -254,8 +254,8 @@
   font-weight: 700;
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
   pointer-events: none;
-  z-index: 10;
-  animation: known-text-animation 0.5s ease-out forwards;
+  z-index: 100;
+  animation: known-text-animation 0.3s ease-out forwards;
 }
 
 @keyframes known-text-animation {
@@ -283,8 +283,8 @@
   font-weight: 700;
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
   pointer-events: none;
-  z-index: 10;
-  animation: unknown-text-animation 0.5s ease-out forwards;
+  z-index: 100;
+  animation: unknown-text-animation 0.3s ease-out forwards;
 }
 
 @keyframes unknown-text-animation {
@@ -403,6 +403,7 @@
   flex-shrink: 0;
   transition: transform 0.3s ease-out, opacity 0.3s ease-out;
   touch-action: pan-x;
+  position: relative;
 }
 
 .flashcard.card-stack-item {
