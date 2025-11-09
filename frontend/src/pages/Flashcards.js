@@ -1,9 +1,20 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { wordAPI, flashcardAPI } from '../services/api';
 import { useStudyTimer } from '../hooks/useStudyTimer';
 import StudyTimer from '../components/Common/StudyTimer';
 import './Flashcards.css';
+
+// Constants
+const CONSTANTS = {
+  MIN_SWIPE_DISTANCE: 50,
+  AUTO_ADVANCE_DELAY: 300,
+  ANIMATION_DURATION: 600,
+  AUDIO_ANIMATION_DURATION: 500,
+  SWIPE_RESET_DELAY: 100,
+  DEFAULT_IMAGE_URL: 'https://img.freepik.com/free-vector/illustration-gallery-icon_53876-27002.jpg?semt=ais_hybrid&w=740&q=80',
+  WORDS_LIMIT: 1000
+};
 
 const Flashcards = () => {
   const navigate = useNavigate();
@@ -20,6 +31,7 @@ const Flashcards = () => {
   // Loading and UI state
   const [loading, setLoading] = useState(true);
   const [generatingImage, setGeneratingImage] = useState(false);
+  const [showResults, setShowResults] = useState(false);
   
   // Animation state for keyboard triggers
   const [animations, setAnimations] = useState({
@@ -39,18 +51,40 @@ const Flashcards = () => {
 
   // Study timer
   const [timerActive, setTimerActive] = useState(true);
-  const { durationFormatted, isActive, endSession } = useStudyTimer('Flashcards', timerActive);
+  const { durationFormatted, isActive, endSession, resetSession } = useStudyTimer('Flashcards', timerActive);
 
   useEffect(() => {
-    loadDecks();
-    // Load default cards on initial mount
-    loadDefaultCards();
+    const initializeFlashcards = async () => {
+      // First, load decks
+      await loadDecks();
+    };
+    initializeFlashcards();
   }, []);
+
+  // Auto-select first deck when decks are loaded
+  useEffect(() => {
+    if (decks.length > 0 && !currentDeck) {
+      // Automatically select the first deck
+      setCurrentDeck(decks[0]);
+    }
+  }, [decks, currentDeck]);
+
+  // Load default cards if no decks exist
+  useEffect(() => {
+    if (decks.length === 0 && cards.length === 0 && !loading && !currentDeck) {
+      loadDefaultCards();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [decks.length, cards.length, loading, currentDeck]);
 
   useEffect(() => {
     if (currentDeck) {
+      // Reset timer when a new deck is selected and start it
+      resetSession();
+      setTimerActive(true);
       loadDeckCards();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentDeck]);
 
   // Keyboard navigation
@@ -65,65 +99,25 @@ const Flashcards = () => {
         case 'ArrowRight':
           e.preventDefault();
           if (cards.length > 0) {
-            triggerAnimation('navNext');
-            setIsFlipped(false);
-            setCurrentIndex((prevIndex) => (prevIndex + 1) % cards.length);
+            goToNextCard();
           }
           break;
         case 'ArrowLeft':
           e.preventDefault();
           if (cards.length > 0) {
-            triggerAnimation('navPrev');
-            setIsFlipped(false);
-            setCurrentIndex((prevIndex) => (prevIndex - 1 + cards.length) % cards.length);
+            goToPrevCard();
           }
           break;
         case 'ArrowUp':
           e.preventDefault();
           if (cards.length > 0 && currentIndex < cards.length) {
-            const card = cards[currentIndex];
-            if (card && card._id) {
-              triggerAnimation('known');
-              try {
-                await wordAPI.toggleWordStatus(card._id, true);
-                setCards(prevCards => prevCards.map(c => 
-                  c._id === card._id ? { ...c, isKnown: true } : c
-                ));
-                if (currentDeck) {
-                  await flashcardAPI.updateLastStudied(currentDeck._id);
-                }
-                setTimeout(() => {
-                  setIsFlipped(false);
-                  setCurrentIndex((prevIndex) => (prevIndex + 1) % cards.length);
-                }, 300);
-              } catch (error) {
-                console.error('Failed to update card status:', error);
-              }
-            }
+            await handleStatusUpdate(true);
           }
           break;
         case 'ArrowDown':
           e.preventDefault();
           if (cards.length > 0 && currentIndex < cards.length) {
-            const card = cards[currentIndex];
-            if (card && card._id) {
-              triggerAnimation('unknown');
-              try {
-                await wordAPI.toggleWordStatus(card._id, false);
-                setCards(prevCards => prevCards.map(c => 
-                  c._id === card._id ? { ...c, isKnown: false } : c
-                ));
-                if (currentDeck) {
-                  await flashcardAPI.updateLastStudied(currentDeck._id);
-                }
-                setTimeout(() => {
-                  setIsFlipped(false);
-                  setCurrentIndex((prevIndex) => (prevIndex + 1) % cards.length);
-                }, 300);
-              } catch (error) {
-                console.error('Failed to update card status:', error);
-              }
-            }
+            await handleStatusUpdate(false);
           }
           break;
         case '0':
@@ -146,8 +140,9 @@ const Flashcards = () => {
           break;
         case ' ':
           e.preventDefault();
+          // Flip card (same as clicking on the card) - always toggle to the other side
           if (cards.length > 0) {
-            setIsFlipped(!isFlipped);
+            setIsFlipped(prev => !prev);
           }
           break;
         default:
@@ -165,9 +160,12 @@ const Flashcards = () => {
   const loadDecks = async () => {
     try {
       const response = await flashcardAPI.getMyDecks();
-      setDecks(response.data);
+      const loadedDecks = response.data || [];
+      setDecks(loadedDecks);
+      return loadedDecks;
     } catch (error) {
       console.error('Failed to load decks:', error);
+      return [];
     }
   };
 
@@ -175,20 +173,29 @@ const Flashcards = () => {
     if (!currentDeck) return;
     
     try {
+      setLoading(true);
+      setShowResults(false); // Reset results when loading new deck
       const response = await flashcardAPI.getDeck(currentDeck._id);
       setCards(response.data.words || []);
       setCurrentIndex(0);
       setIsFlipped(false);
+      // Ensure timer is active when cards are loaded
+      setTimerActive(true);
     } catch (error) {
       console.error('Failed to load deck cards:', error);
+      setCards([]);
+    } finally {
+      setLoading(false);
     }
   };
 
   const loadDefaultCards = async () => {
     try {
       setLoading(true);
+      // Reset timer when loading default cards
+      resetSession();
       const response = await wordAPI.getWordsWithStatus({
-        limit: 1000,
+        limit: CONSTANTS.WORDS_LIMIT,
         showKnown: 'false',
         showUnknown: 'true'
       });
@@ -204,6 +211,8 @@ const Flashcards = () => {
       setCurrentIndex(0);
       setIsFlipped(false);
       setCurrentDeck(null);
+      // Start timer when default cards are loaded
+      setTimerActive(true);
     } catch (error) {
       console.error('Failed to load cards:', error);
       setCards([]);
@@ -213,14 +222,36 @@ const Flashcards = () => {
   };
 
 
-  const nextCard = () => {
+  // Navigation helpers
+  const goToNextCard = () => {
+    triggerAnimation('navNext');
     setIsFlipped(false);
-    setCurrentIndex((currentIndex + 1) % cards.length);
+    setCurrentIndex((prevIndex) => {
+      // If on last card and trying to go next, show results instead
+      if (prevIndex >= cards.length - 1) {
+        // Show results when trying to go past the last card
+        if (!showResults) {
+          setShowResults(true);
+          setTimerActive(false);
+        }
+        return prevIndex; // Stay on last card
+      }
+      return prevIndex + 1;
+    });
+  };
+
+  const goToPrevCard = () => {
+    triggerAnimation('navPrev');
+    setIsFlipped(false);
+    setCurrentIndex((prevIndex) => (prevIndex - 1 + cards.length) % cards.length);
+  };
+
+  const nextCard = () => {
+    goToNextCard();
   };
 
   const prevCard = () => {
-    setIsFlipped(false);
-    setCurrentIndex((currentIndex - 1 + cards.length) % cards.length);
+    goToPrevCard();
   };
 
   const randomCard = () => {
@@ -229,15 +260,19 @@ const Flashcards = () => {
     setCurrentIndex(randomIndex);
   };
 
-  const updateCardStatus = async (isKnown) => {
-    if (!currentCard) return;
+  // Shared function for status updates (used by keyboard, touch, and buttons)
+  const handleStatusUpdate = async (isKnown, card = null) => {
+    const targetCard = card || cards[currentIndex];
+    if (!targetCard || !targetCard._id) return;
+
+    triggerAnimation(isKnown ? 'known' : 'unknown');
 
     try {
-      await wordAPI.toggleWordStatus(currentCard._id, isKnown);
+      await wordAPI.toggleWordStatus(targetCard._id, isKnown);
       
       // Update local card state
-      setCards(cards.map(c => 
-        c._id === currentCard._id ? { ...c, isKnown } : c
+      setCards(prevCards => prevCards.map(c => 
+        c._id === targetCard._id ? { ...c, isKnown } : c
       ));
 
       // Update last studied if using a deck
@@ -245,11 +280,26 @@ const Flashcards = () => {
         await flashcardAPI.updateLastStudied(currentDeck._id);
       }
 
-      // Auto-advance to next card
-      setTimeout(nextCard, 300);
+      // Auto-advance to next card, or show results if on last card
+      setTimeout(() => {
+        setIsFlipped(false);
+        if (currentIndex >= cards.length - 1) {
+          // On last card, show results when trying to advance
+          if (!showResults) {
+            setShowResults(true);
+            setTimerActive(false);
+          }
+        } else {
+          setCurrentIndex((prevIndex) => prevIndex + 1);
+        }
+      }, CONSTANTS.AUTO_ADVANCE_DELAY);
     } catch (error) {
       console.error('Failed to update card status:', error);
     }
+  };
+
+  const updateCardStatus = async (isKnown) => {
+    await handleStatusUpdate(isKnown);
   };
 
   const speakText = (text, lang = 'en-US', animationType = null) => {
@@ -262,18 +312,18 @@ const Flashcards = () => {
       
       if (animationType) {
         setAnimations(prev => ({ ...prev, [animationType]: true }));
-        setTimeout(() => setAnimations(prev => ({ ...prev, [animationType]: false })), 500);
+        setTimeout(() => setAnimations(prev => ({ ...prev, [animationType]: false })), CONSTANTS.AUDIO_ANIMATION_DURATION);
       }
     }
   };
   
   const triggerAnimation = (key) => {
     setAnimations(prev => ({ ...prev, [key]: true }));
-    setTimeout(() => setAnimations(prev => ({ ...prev, [key]: false })), 600);
+    setTimeout(() => setAnimations(prev => ({ ...prev, [key]: false })), CONSTANTS.ANIMATION_DURATION);
   };
 
   // Touch gesture handlers
-  const minSwipeDistance = 50;
+  const minSwipeDistance = CONSTANTS.MIN_SWIPE_DISTANCE;
 
   const handleTouchStart = (e) => {
     const touch = e.targetTouches[0];
@@ -305,16 +355,12 @@ const Flashcards = () => {
       if (deltaX > 0) {
         // Swipe left - next card
         if (cards.length > 0) {
-          triggerAnimation('navNext');
-          setIsFlipped(false);
-          setCurrentIndex((prevIndex) => (prevIndex + 1) % cards.length);
+          goToNextCard();
         }
       } else {
         // Swipe right - previous card
         if (cards.length > 0) {
-          triggerAnimation('navPrev');
-          setIsFlipped(false);
-          setCurrentIndex((prevIndex) => (prevIndex - 1 + cards.length) % cards.length);
+          goToPrevCard();
         }
       }
     } else if (absDeltaY > absDeltaX && absDeltaY > minSwipeDistance) {
@@ -323,48 +369,12 @@ const Flashcards = () => {
       if (deltaY > 0) {
         // Swipe up - known word
         if (cards.length > 0 && currentIndex < cards.length) {
-          const card = cards[currentIndex];
-          if (card && card._id) {
-            triggerAnimation('known');
-            try {
-              await wordAPI.toggleWordStatus(card._id, true);
-              setCards(prevCards => prevCards.map(c => 
-                c._id === card._id ? { ...c, isKnown: true } : c
-              ));
-              if (currentDeck) {
-                await flashcardAPI.updateLastStudied(currentDeck._id);
-              }
-              setTimeout(() => {
-                setIsFlipped(false);
-                setCurrentIndex((prevIndex) => (prevIndex + 1) % cards.length);
-              }, 300);
-            } catch (error) {
-              console.error('Failed to update card status:', error);
-            }
-          }
+          await handleStatusUpdate(true);
         }
       } else {
         // Swipe down - unknown word
         if (cards.length > 0 && currentIndex < cards.length) {
-          const card = cards[currentIndex];
-          if (card && card._id) {
-            triggerAnimation('unknown');
-            try {
-              await wordAPI.toggleWordStatus(card._id, false);
-              setCards(prevCards => prevCards.map(c => 
-                c._id === card._id ? { ...c, isKnown: false } : c
-              ));
-              if (currentDeck) {
-                await flashcardAPI.updateLastStudied(currentDeck._id);
-              }
-              setTimeout(() => {
-                setIsFlipped(false);
-                setCurrentIndex((prevIndex) => (prevIndex + 1) % cards.length);
-              }, 300);
-            } catch (error) {
-              console.error('Failed to update card status:', error);
-            }
-          }
+          await handleStatusUpdate(false);
         }
       }
     }
@@ -376,7 +386,7 @@ const Flashcards = () => {
     // Reset swipe detection after a short delay to allow click handler to check
     setTimeout(() => {
       swipeDetectedRef.current = false;
-    }, 100);
+    }, CONSTANTS.SWIPE_RESET_DELAY);
   };
 
   const handleGenerateImage = async (wordId) => {
@@ -401,34 +411,35 @@ const Flashcards = () => {
 
   const handleDeckSelect = async (deckId) => {
     if (!deckId) {
+      // Timer will reset in loadDefaultCards
       await loadDefaultCards();
       return;
     }
 
     const deck = decks.find(d => d._id === deckId);
     if (deck) {
+      // Timer will reset in useEffect when currentDeck changes
       setCurrentDeck(deck);
     }
   };
+
+  // Memoized progress stats (must be called before any early returns)
+  const progressStats = useMemo(() => ({
+    known: cards.filter(card => card.isKnown).length,
+    unknown: cards.filter(card => !card.isKnown).length,
+    // Remaining = cards left AFTER current card (so last card shows remaining = 0, but we still show it)
+    remaining: Math.max(0, cards.length - currentIndex - 1)
+  }), [cards, currentIndex]);
+
+  // Check if deck is completed - only show results when user tries to advance past last card
+  // We don't check remaining === 0 here because that would trigger on the last card itself
+  // Instead, we check in goToNextCard and handleStatusUpdate when trying to go past the last card
 
   if (loading) {
     return <div className="loading">Loading cards...</div>;
   }
 
-  if (cards.length === 0) {
-    return (
-      <div className="flashcards-container">
-        <div className="flashcards-header">
-          <h1>Flashcards</h1>
-        </div>
-        <div className="empty-state">
-          <p>No flashcards available. Create a deck or wait for cards to load.</p>
-        </div>
-      </div>
-    );
-  }
-
-  const currentCard = cards[currentIndex];
+  const currentCard = cards.length > 0 && currentIndex < cards.length ? cards[currentIndex] : null;
 
   return (
     <div className="flashcards-container">
@@ -468,30 +479,89 @@ const Flashcards = () => {
       <div className="flashcards-content">
         {/* Center - Card Area */}
         <div className="flashcard-area">
-          {/* Progress Bar */}
-          <div className="progress-container">
-            <div className="progress-info">
-              <span>Card {currentIndex + 1} of {cards.length}</span>
+          {cards.length === 0 ? (
+            <div className="empty-state">
+              <p>No flashcards available. Select a deck from the dropdown above or create a new deck.</p>
             </div>
-            <div className="progress-bar">
-              <div
-                className="progress-fill"
-                style={{ width: `${cards.length > 0 ? ((currentIndex + 1) / cards.length) * 100 : 0}%` }}
-              />
+          ) : showResults ? (
+            <div className="results-page">
+              <div className="results-container">
+                <h2 className="results-title">🎉 Deck Completed!</h2>
+                <div className="results-stats">
+                  <div className="result-stat-card">
+                    <p className="result-stat-label">Total Cards</p>
+                    <p className="result-stat-value">{cards.length}</p>
+                  </div>
+                  <div className="result-stat-card result-stat-known">
+                    <p className="result-stat-label">Known</p>
+                    <p className="result-stat-value">{progressStats.known}</p>
+                  </div>
+                  <div className="result-stat-card result-stat-unknown">
+                    <p className="result-stat-label">Unknown</p>
+                    <p className="result-stat-value">{progressStats.unknown}</p>
+                  </div>
+                  <div className="result-stat-card result-stat-time">
+                    <p className="result-stat-label">Time Spent</p>
+                    <p className="result-stat-value">{durationFormatted}</p>
+                  </div>
+                </div>
+                <div className="results-actions">
+                  <button
+                    onClick={() => {
+                      setShowResults(false);
+                      setCurrentIndex(0);
+                      setIsFlipped(false);
+                      // Reset timer for new study session
+                      resetSession();
+                      setTimerActive(true);
+                    }}
+                    className="btn btn-primary"
+                  >
+                    Study Again
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowResults(false);
+                      setCurrentDeck(null);
+                      setCards([]);
+                      setCurrentIndex(0);
+                      setIsFlipped(false);
+                      setTimerActive(false);
+                      endSession();
+                    }}
+                    className="btn btn-secondary"
+                  >
+                    Select Another Deck
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
+          ) : (
+            <>
+              {/* Progress Bar */}
+              <div className="progress-container">
+                <div className="progress-info">
+                  <span>Card {currentIndex + 1} of {cards.length}</span>
+                </div>
+                <div className="progress-bar">
+                  <div
+                    className="progress-fill"
+                    style={{ width: `${cards.length > 0 ? ((currentIndex + 1) / cards.length) * 100 : 0}%` }}
+                  />
+                </div>
+              </div>
 
           {/* Image - Same size as card */}
           {currentCard && (
             <img
-              src={currentCard.imageUrl || 'https://img.freepik.com/free-vector/illustration-gallery-icon_53876-27002.jpg?semt=ais_hybrid&w=740&q=80'}
+              src={currentCard.imageUrl || CONSTANTS.DEFAULT_IMAGE_URL}
               alt={currentCard.englishWord || 'Word image'}
               className={`flashcard-image ${
                 animations.known ? 'animate-image-known' : 
                 animations.unknown ? 'animate-image-unknown' : ''
               }`}
               onError={(e) => { 
-                e.target.src = 'https://img.freepik.com/free-vector/illustration-gallery-icon_53876-27002.jpg?semt=ais_hybrid&w=740&q=80';
+                e.target.src = CONSTANTS.DEFAULT_IMAGE_URL;
               }}
             />
           )}
@@ -502,7 +572,7 @@ const Flashcards = () => {
             onClick={(e) => {
               // Only flip on click if no swipe was detected
               if (!swipeDetectedRef.current) {
-                setIsFlipped(!isFlipped);
+                setIsFlipped(prev => !prev);
               }
             }}
             onTouchStart={handleTouchStart}
@@ -600,6 +670,8 @@ const Flashcards = () => {
               ➡️
             </button>
           </div>
+            </>
+          )}
         </div>
 
         {/* Right Sidebar - Mark As */}
@@ -629,19 +701,17 @@ const Flashcards = () => {
           <div className="stats-grid">
             <div className="stat-card stat-correct">
               <p className="stat-label">Known</p>
-              <p className="stat-value">{cards.filter(card => card.isKnown).length}</p>
+              <p className="stat-value">{progressStats.known}</p>
             </div>
 
             <div className="stat-card stat-incorrect">
               <p className="stat-label">Unknown</p>
-              <p className="stat-value">{cards.filter(card => !card.isKnown).length}</p>
+              <p className="stat-value">{progressStats.unknown}</p>
             </div>
 
             <div className="stat-card stat-remaining">
               <p className="stat-label">Remaining</p>
-              <p className="stat-value">
-                {Math.max(0, cards.length - (currentIndex + 1))}
-              </p>
+              <p className="stat-value">{progressStats.remaining}</p>
             </div>
           </div>
 

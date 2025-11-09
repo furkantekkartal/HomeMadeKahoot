@@ -77,10 +77,24 @@ export const useStudyTimer = (module, timerActive = true) => {
     if (sessionId) {
       try {
         await studySessionAPI.end(sessionId);
+        setSessionId(null);
+        sessionIdRef.current = null;
+        setDuration(0);
+        durationRef.current = 0;
+        lastSaveRef.current = 0;
       } catch (error) {
         console.error('Failed to end study session:', error);
       }
     }
+  };
+
+  // Reset session (end current and start new one)
+  const resetSession = async () => {
+    await endSession();
+    // Small delay to ensure previous session is ended
+    setTimeout(() => {
+      startSession();
+    }, 100);
   };
 
   // Update activity timestamp
@@ -191,7 +205,8 @@ export const useStudyTimer = (module, timerActive = true) => {
     durationMinutes: Math.floor(duration / 60),
     durationFormatted: formatDuration(duration),
     isActive,
-    endSession
+    endSession,
+    resetSession
   };
 };
 
