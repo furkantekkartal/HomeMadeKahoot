@@ -184,20 +184,121 @@
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
-.flashcard-image {
+/* Card Stack Container */
+.card-stack-container {
+  position: relative;
   width: 480px;
   max-width: 480px;
   min-width: 480px;
   height: 300px;
   max-height: 300px;
   min-height: 300px;
+  margin-bottom: 0.75rem;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.card-stack-wrapper {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.card-stack-item {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+}
+
+.flashcard-image-container {
+  position: relative;
+  width: 480px;
+  max-width: 480px;
+  min-width: 480px;
+  height: 300px;
+  max-height: 300px;
+  min-height: 300px;
+  margin-bottom: 0.75rem;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform-style: preserve-3d;
+  perspective: 1000px;
+}
+
+.flashcard-image {
+  width: 100%;
+  height: 100%;
   object-fit: cover;
   display: block;
-  margin-bottom: 0.75rem;
   border-radius: 0;
   box-sizing: border-box;
-  flex-shrink: 0;
   transition: all 0.3s ease;
+}
+
+.known-text-overlay {
+  position: absolute;
+  top: 10%;
+  left: 50%;
+  transform: translate(-50%, 0);
+  color: #60f0a6;
+  font-size: 3rem;
+  font-weight: 700;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  z-index: 10;
+  animation: known-text-animation 0.5s ease-out forwards;
+}
+
+@keyframes known-text-animation {
+  0% {
+    opacity: 1.00;
+    transform: translate(-50%, 0) scale(1);
+  }
+  20% {
+    opacity: 0.80;
+    transform: translate(-50%, 0) scale(1);
+  }
+  100% {
+    opacity: 0.50;
+    transform: translate(-50%, -100px) scale(1.5);
+  }
+}
+
+.unknown-text-overlay {
+  position: absolute;
+  top: 70%;
+  left: 50%;
+  transform: translate(-50%, 0);
+  color: #60a6f0;
+  font-size: 3rem;
+  font-weight: 700;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  z-index: 10;
+  animation: unknown-text-animation 0.5s ease-out forwards;
+}
+
+@keyframes unknown-text-animation {
+  0% {
+    opacity: 1.00;
+    transform: translate(-50%, 0) scale(1);
+  }
+  20% {
+    opacity: 0.80;
+    transform: translate(-50%, 0) scale(1);
+  }
+  100% {
+    opacity: 0.50;
+    transform: translate(-50%, 100px) scale(1.5);
+  }
 }
 
 .animate-image-known {
@@ -299,6 +400,18 @@
   margin-bottom: 0.75rem;
   box-sizing: border-box;
   flex-shrink: 0;
+  transition: transform 0.3s ease-out, opacity 0.3s ease-out;
+}
+
+.flashcard.card-stack-item {
+  margin-bottom: 0;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.flashcard.card-stack-top {
+  cursor: pointer;
 }
 
 .flashcard-inner {
@@ -977,7 +1090,7 @@
     height: 6px;
   }
 
-  .flashcard-image {
+  .card-stack-container {
     width: 100%;
     max-width: 100%;
     min-width: 0;
@@ -986,6 +1099,23 @@
     max-height: 40vh;
     margin-bottom: 0.5rem;
     flex-shrink: 0;
+  }
+
+  .flashcard-image-container {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    height: 100%;
+  }
+
+  .flashcard-image {
+    width: 100%;
+    height: 100%;
+  }
+
+  .known-text-overlay,
+  .unknown-text-overlay {
+    font-size: 2rem;
   }
 
   .image-pane-placeholder .placeholder-icon {
@@ -1227,13 +1357,30 @@
     flex-direction: column;
   }
 
-  .flashcard-image {
+  .card-stack-container {
     width: 100% !important;
     max-width: 100% !important;
     min-width: 0 !important;
     height: auto !important;
     aspect-ratio: 480 / 300 !important;
     max-height: 40vh !important;
+  }
+
+  .flashcard-image-container {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    height: 100%;
+  }
+
+  .flashcard-image {
+    width: 100%;
+    height: 100%;
+  }
+
+  .known-text-overlay,
+  .unknown-text-overlay {
+    font-size: 2rem;
   }
 
   .flashcard {

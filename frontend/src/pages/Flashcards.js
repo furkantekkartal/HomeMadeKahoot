@@ -44,6 +44,14 @@ const Flashcards = () => {
     navRandom: false
   });
 
+  // State for "Known" and "Unknown" text animation overlays
+  const [showKnownText, setShowKnownText] = useState(false);
+  const [showUnknownText, setShowUnknownText] = useState(false);
+
+  // State for card stack animation
+  const [cardStackOffset, setCardStackOffset] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+
   // Touch gesture state
   const [touchStart, setTouchStart] = useState({ x: null, y: null });
   const [touchEnd, setTouchEnd] = useState({ x: null, y: null });
@@ -226,24 +234,37 @@ const Flashcards = () => {
   const goToNextCard = () => {
     triggerAnimation('navNext');
     setIsFlipped(false);
-    setCurrentIndex((prevIndex) => {
-      // If on last card and trying to go next, show results instead
-      if (prevIndex >= cards.length - 1) {
-        // Show results when trying to go past the last card
-        if (!showResults) {
-          setShowResults(true);
-          setTimerActive(false);
+    setCardStackOffset({ x: -600, y: 0 });
+    playTickSound();
+    
+    setTimeout(() => {
+      setCurrentIndex((prevIndex) => {
+        // If on last card and trying to go next, show results instead
+        if (prevIndex >= cards.length - 1) {
+          // Show results when trying to go past the last card
+          if (!showResults) {
+            setShowResults(true);
+            setTimerActive(false);
+          }
+          setCardStackOffset({ x: 0, y: 0 });
+          return prevIndex; // Stay on last card
         }
-        return prevIndex; // Stay on last card
-      }
-      return prevIndex + 1;
-    });
+        return prevIndex + 1;
+      });
+      setCardStackOffset({ x: 0, y: 0 });
+    }, 300);
   };
 
   const goToPrevCard = () => {
     triggerAnimation('navPrev');
     setIsFlipped(false);
-    setCurrentIndex((prevIndex) => (prevIndex - 1 + cards.length) % cards.length);
+    setCardStackOffset({ x: 600, y: 0 });
+    playTockSound();
+    
+    setTimeout(() => {
+      setCurrentIndex((prevIndex) => (prevIndex - 1 + cards.length) % cards.length);
+      setCardStackOffset({ x: 0, y: 0 });
+    }, 300);
   };
 
   const nextCard = () => {
@@ -256,8 +277,144 @@ const Flashcards = () => {
 
   const randomCard = () => {
     setIsFlipped(false);
-    const randomIndex = Math.floor(Math.random() * cards.length);
-    setCurrentIndex(randomIndex);
+    const direction = Math.random() > 0.5 ? -600 : 600;
+    setCardStackOffset({ x: direction, y: 0 });
+    // Random sound - tick or tock
+    if (direction < 0) {
+      playTickSound();
+    } else {
+      playTockSound();
+    }
+    
+    setTimeout(() => {
+      const randomIndex = Math.floor(Math.random() * cards.length);
+      setCurrentIndex(randomIndex);
+      setCardStackOffset({ x: 0, y: 0 });
+    }, 300);
+  };
+
+  // Function to play success sound (for known words)
+  const playSuccessSound = () => {
+    try {
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const masterGain = audioContext.createGain();
+      masterGain.connect(audioContext.destination);
+      masterGain.gain.setValueAtTime(0.2, audioContext.currentTime);
+      masterGain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.4);
+
+      // Create a pleasant chord (C major: C-E-G)
+      const frequencies = [523.25, 659.25, 783.99]; // C5, E5, G5
+      
+      frequencies.forEach((freq, index) => {
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(masterGain);
+        
+        oscillator.frequency.value = freq;
+        oscillator.type = 'sine';
+        
+        // Stagger the start times slightly for a more natural sound
+        const startTime = audioContext.currentTime + (index * 0.05);
+        gainNode.gain.setValueAtTime(0, startTime);
+        gainNode.gain.linearRampToValueAtTime(0.3, startTime + 0.05);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + 0.4);
+        
+        oscillator.start(startTime);
+        oscillator.stop(startTime + 0.4);
+      });
+    } catch (error) {
+      // Silently fail if audio context is not available
+      console.debug('Audio context not available:', error);
+    }
+  };
+
+  // Function to play unknown sound (lower, more neutral tone)
+  const playUnknownSound = () => {
+    try {
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const masterGain = audioContext.createGain();
+      masterGain.connect(audioContext.destination);
+      masterGain.gain.setValueAtTime(0.2, audioContext.currentTime);
+      masterGain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.4);
+
+      // Create a lower, more neutral chord (A minor: A-C-E)
+      const frequencies = [440.00, 523.25, 659.25]; // A4, C5, E5
+      
+      frequencies.forEach((freq, index) => {
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(masterGain);
+        
+        oscillator.frequency.value = freq;
+        oscillator.type = 'sine';
+        
+        // Stagger the start times slightly for a more natural sound
+        const startTime = audioContext.currentTime + (index * 0.05);
+        gainNode.gain.setValueAtTime(0, startTime);
+        gainNode.gain.linearRampToValueAtTime(0.3, startTime + 0.05);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + 0.4);
+        
+        oscillator.start(startTime);
+        oscillator.stop(startTime + 0.4);
+      });
+    } catch (error) {
+      // Silently fail if audio context is not available
+      console.debug('Audio context not available:', error);
+    }
+  };
+
+  // Function to play clock tick sound (for next card)
+  const playTickSound = () => {
+    try {
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      // Tick sound - higher pitch, short
+      oscillator.type = 'sine';
+      oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+      oscillator.frequency.exponentialRampToValueAtTime(600, audioContext.currentTime + 0.1);
+      
+      gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+      
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.1);
+    } catch (error) {
+      console.debug('Audio context not available:', error);
+    }
+  };
+
+  // Function to play clock tock sound (for previous card)
+  const playTockSound = () => {
+    try {
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      // Tock sound - lower pitch, slightly longer
+      oscillator.type = 'sine';
+      oscillator.frequency.setValueAtTime(500, audioContext.currentTime);
+      oscillator.frequency.exponentialRampToValueAtTime(400, audioContext.currentTime + 0.15);
+      
+      gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.15);
+      
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.15);
+    } catch (error) {
+      console.debug('Audio context not available:', error);
+    }
   };
 
   // Shared function for status updates (used by keyboard, touch, and buttons)
@@ -266,6 +423,17 @@ const Flashcards = () => {
     if (!targetCard || !targetCard._id) return;
 
     triggerAnimation(isKnown ? 'known' : 'unknown');
+
+    // Show text animation overlay
+    if (isKnown) {
+      setShowKnownText(true);
+      playSuccessSound();
+      setTimeout(() => setShowKnownText(false), 500);
+    } else {
+      setShowUnknownText(true);
+      playUnknownSound();
+      setTimeout(() => setShowUnknownText(false), 500);
+    }
 
     try {
       await wordAPI.toggleWordStatus(targetCard._id, isKnown);
@@ -551,91 +719,151 @@ const Flashcards = () => {
                 </div>
               </div>
 
-          {/* Image - Same size as card */}
+          {/* Image - Separate from card stack */}
           {currentCard && (
-            <img
-              src={currentCard.imageUrl || CONSTANTS.DEFAULT_IMAGE_URL}
-              alt={currentCard.englishWord || 'Word image'}
-              className={`flashcard-image ${
-                animations.known ? 'animate-image-known' : 
-                animations.unknown ? 'animate-image-unknown' : ''
-              }`}
-              onError={(e) => { 
-                e.target.src = CONSTANTS.DEFAULT_IMAGE_URL;
-              }}
-            />
+            <div className="flashcard-image-container">
+              <img
+                src={currentCard.imageUrl || CONSTANTS.DEFAULT_IMAGE_URL}
+                alt={currentCard.englishWord || 'Word image'}
+                className={`flashcard-image ${
+                  animations.known ? 'animate-image-known' : 
+                  animations.unknown ? 'animate-image-unknown' : ''
+                }`}
+                onError={(e) => { 
+                  e.target.src = CONSTANTS.DEFAULT_IMAGE_URL;
+                }}
+              />
+              {showKnownText && (
+                <div className="known-text-overlay">
+                  Known
+                </div>
+              )}
+              {showUnknownText && (
+                <div className="unknown-text-overlay">
+                  Unknown
+                </div>
+              )}
+            </div>
           )}
 
-          {/* Flashcard */}
-          <div
-            className={`flashcard ${isFlipped ? 'flipped' : ''}`}
-            onClick={(e) => {
-              // Only flip on click if no swipe was detected
-              if (!swipeDetectedRef.current) {
-                setIsFlipped(prev => !prev);
-              }
-            }}
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleTouchEnd}
-          >
-            <div className="flashcard-inner">
-              {/* Front */}
-              <div className="flashcard-front">
-                <div className="card-word-container">
-                  <h2 className="card-word">{currentCard.englishWord}</h2>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); speakText(currentCard.englishWord); }}
-                    className={`audio-btn-inline ${animations.audioWord ? 'animate-sound-wave' : ''}`}
-                    title="Pronounce word"
+          {/* Card Stack Container - Only flashcards */}
+          <div className="card-stack-container">
+            {/* Show up to 3 cards in the stack */}
+            {cards.slice(currentIndex, currentIndex + 3).map((card, stackIndex) => {
+              const isTopCard = stackIndex === 0;
+              const cardIndex = currentIndex + stackIndex;
+              
+              return (
+                <div key={`${card._id}-${cardIndex}`} className="card-stack-wrapper">
+                  {/* Flashcard */}
+                  <div
+                    className={`flashcard card-stack-item ${isFlipped && isTopCard ? 'flipped' : ''} ${
+                      isTopCard ? 'card-stack-top' : ''
+                    }`}
+                    style={{
+                      transform: isTopCard 
+                        ? `translateX(${cardStackOffset.x}px) translateY(${cardStackOffset.y}px)`
+                        : `translateY(${stackIndex * 8}px) scale(${1 - stackIndex * 0.05})`,
+                      zIndex: 10 - stackIndex,
+                      opacity: 1,
+                      transition: isDragging ? 'none' : 'transform 0.3s ease-out'
+                    }}
+                    onClick={(e) => {
+                      if (!isTopCard) return;
+                      // Only flip on click if no swipe was detected
+                      if (!swipeDetectedRef.current) {
+                        setIsFlipped(prev => !prev);
+                      }
+                    }}
+                    onTouchStart={isTopCard ? handleTouchStart : undefined}
+                    onTouchMove={isTopCard ? handleTouchMove : undefined}
+                    onTouchEnd={isTopCard ? handleTouchEnd : undefined}
                   >
-                    🔊
-                  </button>
-                </div>
-                <p className="card-type">{currentCard.wordType}</p>
-                {currentCard.sampleSentenceEn && (
-                  <div className="card-sentence-container">
-                    <p className="card-sentence">"{currentCard.sampleSentenceEn}"</p>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); speakText(currentCard.sampleSentenceEn); }}
-                      className={`audio-btn-inline ${animations.audioSentence ? 'animate-sound-wave' : ''}`}
-                      title="Pronounce sentence"
-                    >
-                      🔊
-                    </button>
-                  </div>
-                )}
-                <p className="card-hint">Click to flip</p>
-              </div>
+                    <div className="flashcard-inner">
+                      {/* Front */}
+                      <div className="flashcard-front">
+                        <div className="card-word-container">
+                          <h2 className="card-word">{card.englishWord}</h2>
+                          <button
+                            onClick={(e) => { 
+                              if (isTopCard) {
+                                e.stopPropagation(); 
+                                speakText(card.englishWord);
+                              }
+                            }}
+                            className={`audio-btn-inline ${isTopCard && animations.audioWord ? 'animate-sound-wave' : ''}`}
+                            title="Pronounce word"
+                            disabled={!isTopCard}
+                          >
+                            🔊
+                          </button>
+                        </div>
+                        <p className="card-type">{card.wordType}</p>
+                        {card.sampleSentenceEn && (
+                          <div className="card-sentence-container">
+                            <p className="card-sentence">"{card.sampleSentenceEn}"</p>
+                            <button
+                              onClick={(e) => { 
+                                if (isTopCard) {
+                                  e.stopPropagation(); 
+                                  speakText(card.sampleSentenceEn);
+                                }
+                              }}
+                              className={`audio-btn-inline ${isTopCard && animations.audioSentence ? 'animate-sound-wave' : ''}`}
+                              title="Pronounce sentence"
+                              disabled={!isTopCard}
+                            >
+                              🔊
+                            </button>
+                          </div>
+                        )}
+                        <p className="card-hint">Click to flip</p>
+                      </div>
 
-              {/* Back */}
-              <div className="flashcard-back">
-                <div className="card-word-container">
-                  <h2 className="card-word">{currentCard.turkishMeaning}</h2>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); speakText(currentCard.turkishMeaning, 'tr-TR'); }}
-                    className="audio-btn-inline"
-                    title="Kelimeyi telaffuz et"
-                  >
-                    🔊
-                  </button>
-                </div>
-                <p className="card-translation">{currentCard.englishWord}</p>
-                {currentCard.sampleSentenceTr && (
-                  <div className="card-sentence-container">
-                    <p className="card-sentence">"{currentCard.sampleSentenceTr}"</p>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); speakText(currentCard.sampleSentenceTr, 'tr-TR'); }}
-                      className="audio-btn-inline"
-                      title="Cümleyi telaffuz et"
-                    >
-                      🔊
-                    </button>
+                      {/* Back */}
+                      <div className="flashcard-back">
+                        <div className="card-word-container">
+                          <h2 className="card-word">{card.turkishMeaning}</h2>
+                          <button
+                            onClick={(e) => { 
+                              if (isTopCard) {
+                                e.stopPropagation(); 
+                                speakText(card.turkishMeaning, 'tr-TR');
+                              }
+                            }}
+                            className="audio-btn-inline"
+                            title="Kelimeyi telaffuz et"
+                            disabled={!isTopCard}
+                          >
+                            🔊
+                          </button>
+                        </div>
+                        <p className="card-translation">{card.englishWord}</p>
+                        {card.sampleSentenceTr && (
+                          <div className="card-sentence-container">
+                            <p className="card-sentence">"{card.sampleSentenceTr}"</p>
+                            <button
+                              onClick={(e) => { 
+                                if (isTopCard) {
+                                  e.stopPropagation(); 
+                                  speakText(card.sampleSentenceTr, 'tr-TR');
+                                }
+                              }}
+                              className="audio-btn-inline"
+                              title="Cümleyi telaffuz et"
+                              disabled={!isTopCard}
+                            >
+                              🔊
+                            </button>
+                          </div>
+                        )}
+                        <p className="card-hint">Click to flip back</p>
+                      </div>
+                    </div>
                   </div>
-                )}
-                <p className="card-hint">Click to flip back</p>
-              </div>
-            </div>
+                </div>
+              );
+            })}
           </div>
 
           {/* Navigation Controls */}
