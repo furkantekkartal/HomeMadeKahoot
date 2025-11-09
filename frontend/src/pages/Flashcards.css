@@ -137,7 +137,7 @@
   align-items: center;
   justify-content: flex-start;
   padding: 1rem;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #e0e7ff 0%, #ddd6fe 100%);
   min-height: calc(100vh - 200px);
   gap: 0.5rem;
   overflow-y: auto;
@@ -1108,12 +1108,17 @@
     width: 100%;
     max-width: 100%;
     min-width: 0;
-    height: 100%;
+    height: auto;
+    aspect-ratio: 480 / 300;
+    max-height: 40vh;
+    margin-bottom: 0.75rem;
+    flex-shrink: 0;
   }
 
   .flashcard-image {
     width: 100%;
     height: 100%;
+    object-fit: cover;
   }
 
   .known-text-overlay,
@@ -1373,12 +1378,17 @@
     width: 100%;
     max-width: 100%;
     min-width: 0;
-    height: 100%;
+    height: auto;
+    aspect-ratio: 480 / 300;
+    max-height: 40vh;
+    margin-bottom: 0.75rem;
+    flex-shrink: 0;
   }
 
   .flashcard-image {
     width: 100%;
     height: 100%;
+    object-fit: cover;
   }
 
   .known-text-overlay,
