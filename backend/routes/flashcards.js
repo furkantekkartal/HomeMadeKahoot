@@ -10,6 +10,8 @@ router.post('/decks', auth, flashcardController.createDeck);
 router.put('/decks/:id', auth, flashcardController.updateDeck);
 router.delete('/decks/:id', auth, flashcardController.deleteDeck);
 router.patch('/decks/:id/last-studied', auth, flashcardController.updateLastStudied);
+router.post('/generate-title', auth, flashcardController.generateDeckTitle);
+router.post('/generate-description', auth, flashcardController.generateDeckDescription);
 
 module.exports = router;
 

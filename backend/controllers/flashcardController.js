@@ -1,6 +1,7 @@
 const FlashcardDeck = require('../models/FlashcardDeck');
 const Word = require('../models/Word');
 const UserWord = require('../models/UserWord');
+const { generateDeckTitle, generateDeckDescription } = require('../services/aiDeckService');
 
 // Get all decks for user
 exports.getMyDecks = async (req, res) => {
@@ -76,7 +77,7 @@ exports.getDeck = async (req, res) => {
 exports.createDeck = async (req, res) => {
   try {
     const userId = req.user.userId;
-    const { name, wordIds } = req.body;
+    const { name, description, level, skill, task, wordIds } = req.body;
     
     if (!name || !wordIds || !Array.isArray(wordIds) || wordIds.length === 0) {
       return res.status(400).json({ message: 'Deck name and word IDs are required' });
@@ -91,6 +92,10 @@ exports.createDeck = async (req, res) => {
     const deck = await FlashcardDeck.create({
       userId,
       name,
+      description: description || '',
+      level: level || null,
+      skill: skill || null,
+      task: task || null,
       wordIds,
       totalCards: wordIds.length
     });
@@ -105,7 +110,7 @@ exports.createDeck = async (req, res) => {
 exports.updateDeck = async (req, res) => {
   try {
     const userId = req.user.userId;
-    const { name, wordIds } = req.body;
+    const { name, description, level, skill, task, wordIds } = req.body;
     
     const deck = await FlashcardDeck.findOne({
       _id: req.params.id,
@@ -116,7 +121,11 @@ exports.updateDeck = async (req, res) => {
       return res.status(404).json({ message: 'Deck not found' });
     }
     
-    if (name) deck.name = name;
+    if (name !== undefined) deck.name = name;
+    if (description !== undefined) deck.description = description;
+    if (level !== undefined) deck.level = level || null;
+    if (skill !== undefined) deck.skill = skill || null;
+    if (task !== undefined) deck.task = task || null;
     if (wordIds && Array.isArray(wordIds)) {
       // Verify all words exist
       const words = await Word.find({ _id: { $in: wordIds } });
@@ -172,6 +181,44 @@ exports.updateLastStudied = async (req, res) => {
     res.json({ message: 'Last studied updated', lastStudied: deck.lastStudied });
   } catch (error) {
     res.status(500).json({ message: error.message });
+  }
+};
+
+// Generate deck title using AI
+exports.generateDeckTitle = async (req, res) => {
+  try {
+    const { level, skill, task } = req.body;
+
+    if (!level || !skill || !task) {
+      return res.status(400).json({ message: 'Level, skill, and task are required' });
+    }
+
+    const title = await generateDeckTitle(level, skill, task);
+    res.json({ title });
+  } catch (error) {
+    console.error('Error generating deck title:', error);
+    res.status(500).json({ 
+      message: error.message || 'Failed to generate deck title' 
+    });
+  }
+};
+
+// Generate deck description using AI
+exports.generateDeckDescription = async (req, res) => {
+  try {
+    const { title, level, skill, task } = req.body;
+
+    if (!title || !level || !skill || !task) {
+      return res.status(400).json({ message: 'Title, level, skill, and task are required' });
+    }
+
+    const description = await generateDeckDescription(title, level, skill, task);
+    res.json({ description });
+  } catch (error) {
+    console.error('Error generating deck description:', error);
+    res.status(500).json({ 
+      message: error.message || 'Failed to generate deck description' 
+    });
   }
 };
 

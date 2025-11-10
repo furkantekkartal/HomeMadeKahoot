@@ -12,6 +12,26 @@ const flashcardDeckSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+  description: {
+    type: String,
+    trim: true,
+    default: ''
+  },
+  level: {
+    type: String,
+    enum: ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'],
+    default: null
+  },
+  skill: {
+    type: String,
+    enum: ['Speaking', 'Reading', 'Writing', 'Listening'],
+    default: null
+  },
+  task: {
+    type: String,
+    enum: ['Vocabulary', 'Grammar', 'Spelling', 'Essay', 'Repeat', 'Read Aloud'],
+    default: null
+  },
   wordIds: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Word'

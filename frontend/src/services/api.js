@@ -93,10 +93,12 @@ export const wordAPI = {
 export const flashcardAPI = {
   getMyDecks: () => api.get('/flashcards/decks'),
   getDeck: (id) => api.get(`/flashcards/decks/${id}`),
-  createDeck: (name, wordIds) => api.post('/flashcards/decks', { name, wordIds }),
+  createDeck: (name, description, level, skill, task, wordIds) => api.post('/flashcards/decks', { name, description, level, skill, task, wordIds }),
   updateDeck: (id, updates) => api.put(`/flashcards/decks/${id}`, updates),
   deleteDeck: (id) => api.delete(`/flashcards/decks/${id}`),
-  updateLastStudied: (id) => api.patch(`/flashcards/decks/${id}/last-studied`)
+  updateLastStudied: (id) => api.patch(`/flashcards/decks/${id}/last-studied`),
+  generateDeckTitle: (level, skill, task) => api.post('/flashcards/generate-title', { level, skill, task }),
+  generateDeckDescription: (title, level, skill, task) => api.post('/flashcards/generate-description', { title, level, skill, task })
 };
 
 // Study Session API (Time Tracking)
