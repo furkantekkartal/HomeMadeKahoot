@@ -13,6 +13,8 @@ const sessionRoutes = require('./routes/sessions');
 const studySessionRoutes = require('./routes/studySessions');
 const wordRoutes = require('./routes/words');
 const flashcardRoutes = require('./routes/flashcards');
+const pronunciationRoutes = require('./routes/pronunciation');
+const statisticsRoutes = require('./routes/statistics');
 
 // Socket handlers
 const initializeSocketHandlers = require('./socket/socketHandlers');
@@ -51,6 +53,8 @@ app.use('/api/sessions', sessionRoutes);
 app.use('/api/study-sessions', studySessionRoutes);
 app.use('/api/words', wordRoutes);
 app.use('/api/flashcards', flashcardRoutes);
+app.use('/api/pronunciation', pronunciationRoutes);
+app.use('/api/statistics', statisticsRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

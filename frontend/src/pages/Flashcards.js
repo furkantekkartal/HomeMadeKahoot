@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { wordAPI, flashcardAPI } from '../services/api';
+import { wordAPI, flashcardAPI, pronunciationAPI } from '../services/api';
 import { useStudyTimer } from '../hooks/useStudyTimer';
 import StudyTimer from '../components/Common/StudyTimer';
+import { AudioRecorder } from '../utils/audioRecorder';
 import './Flashcards.css';
 
 // Constants
@@ -85,6 +86,22 @@ const Flashcards = () => {
   const [timerActive, setTimerActive] = useState(true);
   const { durationFormatted, isActive, endSession, resetSession } = useStudyTimer('Flashcards', timerActive);
 
+  // Speech evaluation state
+  const [isRecording, setIsRecording] = useState(false);
+  const [isRecordingWord, setIsRecordingWord] = useState(false);
+  const [isRecordingSentence, setIsRecordingSentence] = useState(false);
+  const [audioBlob, setAudioBlob] = useState(null);
+  const [audioBlobWord, setAudioBlobWord] = useState(null);
+  const [audioBlobSentence, setAudioBlobSentence] = useState(null);
+  const [audioUrl, setAudioUrl] = useState(null);
+  const [audioUrlWord, setAudioUrlWord] = useState(null);
+  const [audioUrlSentence, setAudioUrlSentence] = useState(null);
+  const [isEvaluating, setIsEvaluating] = useState(false);
+  const [evaluationResults, setEvaluationResults] = useState(null);
+  const [evaluationType, setEvaluationType] = useState(null); // 'word' or 'sentence'
+  const audioRecorderRef = useRef(null);
+  const recordingTypeRef = useRef(null); // Track which recording type is active
+
   useEffect(() => {
     const initializeFlashcards = async () => {
       // First, load decks
@@ -118,6 +135,37 @@ const Flashcards = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentDeck]);
+
+  // Reset evaluation state and audio recordings when card changes
+  useEffect(() => {
+    setEvaluationResults(null);
+    setEvaluationType(null);
+    // Clear audio recordings when navigating to a new card
+    if (audioUrlWord) {
+      URL.revokeObjectURL(audioUrlWord);
+    }
+    if (audioUrlSentence) {
+      URL.revokeObjectURL(audioUrlSentence);
+    }
+    setAudioBlobWord(null);
+    setAudioBlobSentence(null);
+    setAudioUrlWord(null);
+    setAudioUrlSentence(null);
+    setIsRecordingWord(false);
+    setIsRecordingSentence(false);
+    setIsRecording(false);
+    // Stop any active recording
+    if (audioRecorderRef.current) {
+      try {
+        audioRecorderRef.current.stop();
+      } catch (e) {
+        // Ignore errors if already stopped
+      }
+      audioRecorderRef.current = null;
+      recordingTypeRef.current = null;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentIndex]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -610,6 +658,147 @@ const Flashcards = () => {
     }
   };
 
+  // Speech evaluation handlers
+  const startRecording = async (type) => {
+    try {
+      // Reset previous results
+      setEvaluationResults(null);
+      setEvaluationType(null);
+      
+      // Clear previous audio
+      if (type === 'word') {
+        setAudioBlobWord(null);
+        setAudioUrlWord(null);
+      } else {
+        setAudioBlobSentence(null);
+        setAudioUrlSentence(null);
+      }
+
+      audioRecorderRef.current = new AudioRecorder();
+      await audioRecorderRef.current.start();
+      setIsRecording(true);
+      recordingTypeRef.current = type;
+      
+      if (type === 'word') {
+        setIsRecordingWord(true);
+      } else {
+        setIsRecordingSentence(true);
+      }
+    } catch (err) {
+      console.error('Error accessing microphone:', err);
+      alert('Unable to access microphone. Please ensure microphone permissions are granted.');
+      audioRecorderRef.current = null;
+      setIsRecording(false);
+      setIsRecordingWord(false);
+      setIsRecordingSentence(false);
+    }
+  };
+
+  const stopRecording = () => {
+    if (audioRecorderRef.current && isRecording) {
+      const wavBlob = audioRecorderRef.current.stop();
+      const url = URL.createObjectURL(wavBlob);
+      const type = recordingTypeRef.current;
+      
+      if (type === 'word') {
+        setAudioBlobWord(wavBlob);
+        setAudioUrlWord(url);
+        setIsRecordingWord(false);
+      } else {
+        setAudioBlobSentence(wavBlob);
+        setAudioUrlSentence(url);
+        setIsRecordingSentence(false);
+      }
+      
+      setIsRecording(false);
+      audioRecorderRef.current = null;
+      recordingTypeRef.current = null;
+    }
+  };
+
+  const handleRecordAgain = (type) => {
+    if (type === 'word') {
+      setAudioBlobWord(null);
+      setAudioUrlWord(null);
+    } else {
+      setAudioBlobSentence(null);
+      setAudioUrlSentence(null);
+    }
+    setEvaluationResults(null);
+    setEvaluationType(null);
+  };
+
+  const handleEvaluate = async (type) => {
+    const audioBlob = type === 'word' ? audioBlobWord : audioBlobSentence;
+    const currentCard = cards[currentIndex];
+    
+    if (!audioBlob || !currentCard) {
+      return;
+    }
+
+    const referenceText = type === 'word' 
+      ? currentCard.englishWord 
+      : (currentCard.sampleSentenceEn || currentCard.englishWord);
+
+    if (!referenceText) {
+      alert('No reference text available for evaluation');
+      return;
+    }
+
+    setIsEvaluating(true);
+    setEvaluationType(type);
+    setEvaluationResults(null);
+
+    try {
+      const response = await pronunciationAPI.assessPronunciation(audioBlob, referenceText);
+      setEvaluationResults(response.data);
+    } catch (error) {
+      console.error('Error evaluating pronunciation:', error);
+      alert('Failed to evaluate pronunciation: ' + (error.response?.data?.error || error.message));
+      setEvaluationResults(null);
+      setEvaluationType(null);
+    } finally {
+      setIsEvaluating(false);
+    }
+  };
+
+  // Handle mouse/touch events for press-and-hold
+  const handleMicMouseDown = (e, type) => {
+    e.preventDefault();
+    e.stopPropagation();
+    startRecording(type);
+  };
+
+  const handleMicMouseUp = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (isRecording) {
+      stopRecording();
+    }
+  };
+
+  const handleMicTouchStart = (e, type) => {
+    e.preventDefault();
+    e.stopPropagation();
+    startRecording(type);
+  };
+
+  const handleMicTouchEnd = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (isRecording) {
+      stopRecording();
+    }
+  };
+
+  // Cleanup audio URLs on unmount
+  useEffect(() => {
+    return () => {
+      if (audioUrlWord) URL.revokeObjectURL(audioUrlWord);
+      if (audioUrlSentence) URL.revokeObjectURL(audioUrlSentence);
+    };
+  }, [audioUrlWord, audioUrlSentence]);
+
 
   const handleDeckSelect = async (deckId) => {
     if (!deckId) {
@@ -661,7 +850,7 @@ const Flashcards = () => {
             className="deck-select"
           >
             <option value="">Default (All Cards)</option>
-            {decks.map(deck => (
+            {decks.filter(deck => deck.isVisible !== false).map(deck => (
               <option key={deck._id} value={deck._id}>
                 {deck.name} ({deck.totalCards} cards)
               </option>
@@ -669,10 +858,10 @@ const Flashcards = () => {
           </select>
 
           <button
-            onClick={() => navigate('/create-deck')}
+            onClick={() => navigate('/decks')}
             className="btn btn-secondary"
           >
-            New Deck
+            Decks
           </button>
         </div>
       </div>
@@ -819,37 +1008,185 @@ const Flashcards = () => {
                       <div className="flashcard-front">
                         <div className="card-word-container">
                           <h2 className="card-word">{card.englishWord}</h2>
-                          <button
-                            onClick={(e) => { 
-                              if (isTopCard) {
-                                e.stopPropagation(); 
-                                speakText(card.englishWord);
-                              }
-                            }}
-                            className={`audio-btn-inline ${isTopCard && animations.audioWord ? 'animate-sound-wave' : ''}`}
-                            title="Pronounce word"
-                            disabled={!isTopCard}
-                          >
-                            🔊
-                          </button>
+                          <div className="audio-controls-group">
+                            <button
+                              onClick={(e) => { 
+                                if (isTopCard) {
+                                  e.stopPropagation(); 
+                                  speakText(card.englishWord);
+                                }
+                              }}
+                              className={`audio-btn-inline ${isTopCard && animations.audioWord ? 'animate-sound-wave' : ''}`}
+                              title="Pronounce word"
+                              disabled={!isTopCard}
+                            >
+                              🔊
+                            </button>
+                            {isTopCard && (
+                              <>
+                                {!isRecordingWord && !audioBlobWord && (
+                                  <button
+                                    onMouseDown={(e) => handleMicMouseDown(e, 'word')}
+                                    onMouseUp={handleMicMouseUp}
+                                    onMouseLeave={handleMicMouseUp}
+                                    onTouchStart={(e) => handleMicTouchStart(e, 'word')}
+                                    onTouchEnd={handleMicTouchEnd}
+                                    className="mic-btn-inline"
+                                    title="Hold to record word"
+                                    disabled={isRecording || isEvaluating}
+                                  >
+                                    🎤
+                                  </button>
+                                )}
+                                {isRecordingWord && (
+                                  <button
+                                    onMouseUp={handleMicMouseUp}
+                                    onMouseLeave={handleMicMouseUp}
+                                    onTouchEnd={handleMicTouchEnd}
+                                    className="mic-btn-inline recording"
+                                    title="Recording... Release to stop"
+                                  >
+                                    <span className="recording-pulse"></span>
+                                  </button>
+                                )}
+                                {audioBlobWord && !isRecordingWord && (
+                                  <>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (audioUrlWord) {
+                                          const audio = new Audio(audioUrlWord);
+                                          audio.play();
+                                        }
+                                      }}
+                                      className="play-btn-inline"
+                                      title="Play recording"
+                                    >
+                                      ▶️
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleRecordAgain('word');
+                                      }}
+                                      className="record-again-btn-inline"
+                                      title="Record again"
+                                      disabled={isEvaluating}
+                                    >
+                                      🔄
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleEvaluate('word');
+                                      }}
+                                      className="evaluate-btn-inline"
+                                      title="Send for evaluation"
+                                      disabled={isEvaluating}
+                                    >
+                                      {isEvaluating && evaluationType === 'word' ? (
+                                        <span className="spinner-small"></span>
+                                      ) : (
+                                        '📊'
+                                      )}
+                                    </button>
+                                  </>
+                                )}
+                              </>
+                            )}
+                          </div>
                         </div>
                         <p className="card-type">{card.wordType}</p>
                         {card.sampleSentenceEn && (
                           <div className="card-sentence-container">
                             <p className="card-sentence">"{card.sampleSentenceEn}"</p>
-                            <button
-                              onClick={(e) => { 
-                                if (isTopCard) {
-                                  e.stopPropagation(); 
-                                  speakText(card.sampleSentenceEn);
-                                }
-                              }}
-                              className={`audio-btn-inline ${isTopCard && animations.audioSentence ? 'animate-sound-wave' : ''}`}
-                              title="Pronounce sentence"
-                              disabled={!isTopCard}
-                            >
-                              🔊
-                            </button>
+                            <div className="audio-controls-group">
+                              <button
+                                onClick={(e) => { 
+                                  if (isTopCard) {
+                                    e.stopPropagation(); 
+                                    speakText(card.sampleSentenceEn);
+                                  }
+                                }}
+                                className={`audio-btn-inline ${isTopCard && animations.audioSentence ? 'animate-sound-wave' : ''}`}
+                                title="Pronounce sentence"
+                                disabled={!isTopCard}
+                              >
+                                🔊
+                              </button>
+                              {isTopCard && (
+                                <>
+                                  {!isRecordingSentence && !audioBlobSentence && (
+                                    <button
+                                      onMouseDown={(e) => handleMicMouseDown(e, 'sentence')}
+                                      onMouseUp={handleMicMouseUp}
+                                      onMouseLeave={handleMicMouseUp}
+                                      onTouchStart={(e) => handleMicTouchStart(e, 'sentence')}
+                                      onTouchEnd={handleMicTouchEnd}
+                                      className="mic-btn-inline"
+                                      title="Hold to record sentence"
+                                      disabled={isRecording || isEvaluating}
+                                    >
+                                      🎤
+                                    </button>
+                                  )}
+                                  {isRecordingSentence && (
+                                    <button
+                                      onMouseUp={handleMicMouseUp}
+                                      onMouseLeave={handleMicMouseUp}
+                                      onTouchEnd={handleMicTouchEnd}
+                                      className="mic-btn-inline recording"
+                                      title="Recording... Release to stop"
+                                    >
+                                      <span className="recording-pulse"></span>
+                                    </button>
+                                  )}
+                                  {audioBlobSentence && !isRecordingSentence && (
+                                    <>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          if (audioUrlSentence) {
+                                            const audio = new Audio(audioUrlSentence);
+                                            audio.play();
+                                          }
+                                        }}
+                                        className="play-btn-inline"
+                                        title="Play recording"
+                                      >
+                                        ▶️
+                                      </button>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleRecordAgain('sentence');
+                                        }}
+                                        className="record-again-btn-inline"
+                                        title="Record again"
+                                        disabled={isEvaluating}
+                                      >
+                                        🔄
+                                      </button>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleEvaluate('sentence');
+                                        }}
+                                        className="evaluate-btn-inline"
+                                        title="Send for evaluation"
+                                        disabled={isEvaluating}
+                                      >
+                                        {isEvaluating && evaluationType === 'sentence' ? (
+                                          <span className="spinner-small"></span>
+                                        ) : (
+                                          '📊'
+                                        )}
+                                      </button>
+                                    </>
+                                  )}
+                                </>
+                              )}
+                            </div>
                           </div>
                         )}
                         <p className="card-hint">Click to flip</p>
@@ -900,6 +1237,138 @@ const Flashcards = () => {
               );
             })}
           </div>
+
+          {/* Speech Evaluation Results Pane */}
+          {evaluationResults && evaluationType && (
+            <div className="speech-evaluation-results">
+              <div className="results-header">
+                <h3>Your Results <span className="ai-label">(AI Detection)</span></h3>
+              </div>
+              
+              <div className="results-content">
+                {/* Recognized text with color coding */}
+                <div className="recognized-text-box">
+                  {evaluationResults.words && evaluationResults.words.map((word, index) => {
+                    const getWordClassName = (errorType) => {
+                      switch (errorType) {
+                        case 'None':
+                          return 'word-correct';
+                        case 'Omission':
+                          return 'word-missing';
+                        case 'Mispronunciation':
+                          return 'word-wrong';
+                        default:
+                          return '';
+                      }
+                    };
+                    
+                    return (
+                      <span
+                        key={index}
+                        className={`word ${getWordClassName(word.errorType)}`}
+                        title={`Score: ${Math.round(word.accuracyScore)}`}
+                      >
+                        {word.word}{' '}
+                      </span>
+                    );
+                  })}
+                </div>
+
+                {/* Legend */}
+                <div className="legend">
+                  <span className="legend-item">
+                    <span className="legend-color correct"></span> matched
+                  </span>
+                  <span className="legend-item">
+                    <span className="legend-color missing"></span> missing
+                  </span>
+                  <span className="legend-item">
+                    <span className="legend-color wrong"></span> wrong
+                  </span>
+                </div>
+
+                {/* Audio Player */}
+                {evaluationType === 'word' && audioUrlWord && (
+                  <div className="audio-player-container">
+                    <audio controls src={audioUrlWord}>
+                      Your browser does not support the audio element.
+                    </audio>
+                  </div>
+                )}
+                {evaluationType === 'sentence' && audioUrlSentence && (
+                  <div className="audio-player-container">
+                    <audio controls src={audioUrlSentence}>
+                      Your browser does not support the audio element.
+                    </audio>
+                  </div>
+                )}
+
+                {/* Scores */}
+                <div className="score-card">
+                  <div className="score-header">
+                    <span>Enabling Skills</span>
+                    <span className="score-value">{evaluationResults.pteScore || 0} / 90</span>
+                  </div>
+
+                  <div className="score-metrics">
+                    <div className="metric">
+                      <div className="metric-header">
+                        <span>📝 Content</span>
+                        <span className="metric-score">
+                          {evaluationResults.contentScore || 0} / 90
+                        </span>
+                      </div>
+                      <div className="metric-bar">
+                        <div
+                          className="metric-fill"
+                          style={{
+                            width: `${(evaluationResults.contentScore || 0) * 100 / 90}%`,
+                            backgroundColor: '#667eea'
+                          }}
+                        ></div>
+                      </div>
+                    </div>
+
+                    <div className="metric">
+                      <div className="metric-header">
+                        <span>🗣️ Pronunciation</span>
+                        <span className="metric-score">
+                          {evaluationResults.pronunciationScore || 0} / 90
+                        </span>
+                      </div>
+                      <div className="metric-bar">
+                        <div
+                          className="metric-fill"
+                          style={{
+                            width: `${(evaluationResults.pronunciationScore || 0) * 100 / 90}%`,
+                            backgroundColor: '#667eea'
+                          }}
+                        ></div>
+                      </div>
+                    </div>
+
+                    <div className="metric">
+                      <div className="metric-header">
+                        <span>⚡ Oral Fluency</span>
+                        <span className="metric-score">
+                          {evaluationResults.fluencyScore || 0} / 90
+                        </span>
+                      </div>
+                      <div className="metric-bar">
+                        <div
+                          className="metric-fill"
+                          style={{
+                            width: `${(evaluationResults.fluencyScore || 0) * 100 / 90}%`,
+                            backgroundColor: '#667eea'
+                          }}
+                        ></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Navigation Controls */}
           <div className="card-navigation">

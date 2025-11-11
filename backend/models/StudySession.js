@@ -10,7 +10,7 @@ const studySessionSchema = new mongoose.Schema({
   module: {
     type: String,
     required: true,
-    enum: ['Writing', 'Flashcards', 'Words', 'Quiz'],
+    enum: ['Writing', 'Flashcards', 'Words', 'Quiz', 'Spelling'],
     index: true
   },
   startTime: {

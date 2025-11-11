@@ -1,6 +1,8 @@
 const mongoose = require('mongoose');
 const Word = require('../models/Word');
 const UserWord = require('../models/UserWord');
+const Source = require('../models/Source');
+const SourceWord = require('../models/SourceWord');
 const multer = require('multer');
 const csv = require('csv-parser');
 const fs = require('fs');
@@ -9,6 +11,7 @@ const path = require('path');
 const os = require('os');
 const { Readable } = require('stream');
 const { generateWordImage } = require('../services/imageService');
+const { fillWordColumnsWithAI } = require('../services/aiDeckService');
 
 // Get all words with pagination and filters
 exports.getWords = async (req, res) => {
@@ -151,6 +154,35 @@ exports.getWordsWithStatus = async (req, res) => {
       ];
     }
 
+    // If sourceId is provided, filter words by source
+    if (req.query.sourceId) {
+      // Verify source belongs to user
+      const source = await Source.findOne({ _id: req.query.sourceId, userId });
+      if (!source) {
+        return res.status(404).json({ message: 'Source not found' });
+      }
+
+      // Get all word IDs linked to this source
+      const sourceWords = await SourceWord.find({ sourceId: req.query.sourceId }).lean();
+      const sourceWordIds = sourceWords.map(sw => sw.wordId);
+      
+      // Add source word IDs to filter
+      if (sourceWordIds.length > 0) {
+        filter._id = { $in: sourceWordIds };
+      } else {
+        // No words in this source, return empty result
+        return res.json({
+          words: [],
+          pagination: {
+            page,
+            limit,
+            total: 0,
+            pages: 0
+          }
+        });
+      }
+    }
+
     const words = await Word.find(filter)
       .sort({ wordId: 1 })
       .skip(skip)
@@ -168,10 +200,33 @@ exports.getWordsWithStatus = async (req, res) => {
       userWordMap[uw.wordId.toString()] = uw.isKnown;
     });
 
+    // Get source names for each word
+    const wordIdsForSources = words.map(w => w._id);
+    const userSourceIds = await Source.find({ userId }).distinct('_id');
+    const sourceWords = await SourceWord.find({ 
+      wordId: { $in: wordIdsForSources },
+      sourceId: { $in: userSourceIds }
+    })
+      .populate('sourceId', 'sourceName')
+      .lean();
+
+    // Create a map of wordId -> source names
+    const wordSourceMap = {};
+    sourceWords.forEach(sw => {
+      const wordIdStr = sw.wordId.toString();
+      if (!wordSourceMap[wordIdStr]) {
+        wordSourceMap[wordIdStr] = [];
+      }
+      if (sw.sourceId && sw.sourceId.sourceName) {
+        wordSourceMap[wordIdStr].push(sw.sourceId.sourceName);
+      }
+    });
+
     // Filter based on known/unknown preference
     let filteredWords = words.map(word => ({
       ...word.toObject(),
-      isKnown: userWordMap[word._id.toString()] || null // null means not tracked yet
+      isKnown: userWordMap[word._id.toString()] || null, // null means not tracked yet
+      sources: wordSourceMap[word._id.toString()] || [] // Array of source names
     }));
 
     if (showKnown === false) {
@@ -546,16 +601,682 @@ exports.importWords = async (req, res) => {
   }
 };
 
+// Helper function to validate if a word is valid
+function isValidWord(word) {
+  if (!word || typeof word !== 'string') return false;
+  const trimmed = word.trim();
+  if (trimmed.length === 0) return false;
+  
+  // Check if it's just a single symbol or punctuation
+  if (trimmed.length === 1 && /[^a-zA-Z0-9]/.test(trimmed)) return false;
+  
+  // Check if it contains at least one letter (a-z or A-Z)
+  if (!/[a-zA-Z]/.test(trimmed)) return false;
+  
+  // Check if it's just symbols/punctuation (no letters after removing common punctuation)
+  const withoutPunctuation = trimmed.replace(/[.,!?;:'"()[\]{}]/g, '');
+  if (withoutPunctuation.length === 0) return false;
+  
+  return true;
+}
+
+// Add words from AI extraction (bulk add with duplicate checking and source tracking)
+exports.addWordsFromAI = async (req, res) => {
+  console.log('addWordsFromAI called');
+  try {
+    const { words, sourceName, sourceType, fileSize } = req.body; // Array of word strings, source file name, type, and size
+    const userId = req.user.userId;
+
+    if (!words || !Array.isArray(words) || words.length === 0) {
+      return res.status(400).json({ message: 'Words array is required' });
+    }
+
+    if (!sourceName) {
+      return res.status(400).json({ message: 'Source name is required' });
+    }
+
+    // Determine source type from file extension if not provided
+    let detectedSourceType = sourceType || 'other';
+    if (!sourceType && sourceName) {
+      const ext = sourceName.toLowerCase().split('.').pop();
+      if (ext === 'pdf') detectedSourceType = 'pdf';
+      else if (ext === 'srt') detectedSourceType = 'srt';
+      else if (ext === 'txt') detectedSourceType = 'txt';
+    }
+
+    // Create or find source
+    let source = await Source.findOne({ userId, sourceName });
+    if (!source) {
+      source = await Source.create({
+        userId,
+        sourceName,
+        sourceType: detectedSourceType,
+        fileSize: fileSize || 0,
+        totalWords: 0,
+        newWords: 0,
+        duplicateWords: 0
+      });
+    }
+
+    // Get the highest wordId to start from
+    const maxWord = await Word.findOne().sort({ wordId: -1 });
+    let currentWordId = maxWord ? maxWord.wordId + 1 : 1;
+
+    const results = {
+      total: words.length,
+      added: 0,
+      duplicates: 0,
+      skipped: 0, // Track invalid words skipped
+      errors: [],
+      addedWords: [], // Track which words were actually added
+      sourceId: source._id
+    };
+
+    const wordIdsToLink = []; // Track all word IDs to link to source (both new and duplicates)
+
+    // Process each word
+    for (let i = 0; i < words.length; i++) {
+      const wordText = words[i].trim();
+      
+      // Skip empty strings and invalid words
+      if (!wordText || !isValidWord(wordText)) {
+        results.skipped++;
+        continue;
+      }
+
+      try {
+        // Check if word already exists (case-insensitive)
+        const existingWord = await Word.findOne({ 
+          englishWord: { $regex: new RegExp(`^${wordText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+        });
+
+        let wordId;
+        let isNewWord = false;
+
+        if (existingWord) {
+          // Word exists - use existing word
+          wordId = existingWord._id;
+          results.duplicates++;
+        } else {
+          // Create new word
+          const newWord = await Word.create({
+            wordId: currentWordId++,
+            englishWord: wordText,
+            wordType: null,
+            turkishMeaning: null,
+            category1: null,
+            category2: null,
+            category3: null, // Don't store source name here anymore, use SourceWord relationship
+            englishLevel: null,
+            sampleSentenceEn: null,
+            sampleSentenceTr: null
+          });
+          wordId = newWord._id;
+          results.added++;
+          results.addedWords.push(wordText);
+          isNewWord = true;
+        }
+
+        // Link word to source (whether new or duplicate)
+        wordIdsToLink.push({ wordId, isNew: isNewWord });
+      } catch (error) {
+        results.errors.push({
+          word: wordText,
+          error: error.message
+        });
+      }
+    }
+
+    // Create SourceWord relationships for all words (both new and duplicates)
+    const sourceWordOperations = wordIdsToLink.map(({ wordId, isNew }) => ({
+      sourceId: source._id,
+      wordId: wordId,
+      isNew: isNew
+    }));
+
+    // Use bulk write to insert all relationships efficiently
+    if (sourceWordOperations.length > 0) {
+      await SourceWord.bulkWrite(
+        sourceWordOperations.map(op => ({
+          updateOne: {
+            filter: { sourceId: op.sourceId, wordId: op.wordId },
+            update: op,
+            upsert: true
+          }
+        }))
+      );
+    }
+
+    // Update source statistics
+    source.totalWords = wordIdsToLink.length;
+    source.newWords = results.added;
+    source.duplicateWords = results.duplicates;
+    await source.save();
+
+    res.json({
+      message: `Processed ${results.total} words: ${results.added} added, ${results.duplicates} duplicates skipped, ${results.skipped} invalid words skipped`,
+      results
+    });
+  } catch (error) {
+    console.error('Error adding words from AI:', error);
+    res.status(500).json({ 
+      message: error.message || 'Failed to add words' 
+    });
+  }
+};
+
+// Get all sources for user
+exports.getSources = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const sources = await Source.find({ userId })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    res.json({
+      sources,
+      count: sources.length
+    });
+  } catch (error) {
+    console.error('Error getting sources:', error);
+    res.status(500).json({ 
+      message: error.message || 'Failed to get sources' 
+    });
+  }
+};
+
+// Get words for a specific source
+exports.getSourceWords = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { sourceId } = req.params;
+
+    // Verify source belongs to user
+    const source = await Source.findOne({ _id: sourceId, userId });
+    if (!source) {
+      return res.status(404).json({ message: 'Source not found' });
+    }
+
+    // Get all word IDs linked to this source
+    const sourceWords = await SourceWord.find({ sourceId })
+      .populate('wordId', 'englishWord wordType turkishMeaning category1 category2 category3 englishLevel sampleSentenceEn sampleSentenceTr imageUrl wordId')
+      .lean();
+
+    // Get user's word statuses
+    const wordIds = sourceWords.map(sw => sw.wordId._id);
+    const userWords = await UserWord.find({
+      userId,
+      wordId: { $in: wordIds }
+    }).lean();
+
+    const userWordMap = {};
+    userWords.forEach(uw => {
+      userWordMap[uw.wordId.toString()] = uw.isKnown;
+    });
+
+    // Combine source words with user status
+    const wordsWithStatus = sourceWords.map(sw => ({
+      ...sw.wordId,
+      isKnown: userWordMap[sw.wordId._id.toString()] || null,
+      isNew: sw.isNew,
+      linkedAt: sw.createdAt
+    }));
+
+    res.json({
+      source: source,
+      words: wordsWithStatus,
+      count: wordsWithStatus.length
+    });
+  } catch (error) {
+    console.error('Error getting source words:', error);
+    res.status(500).json({ 
+      message: error.message || 'Failed to get source words' 
+    });
+  }
+};
+
+// Get unique filter values
+exports.getFilterValues = async (req, res) => {
+  try {
+    const [levels, types, categories1, categories2, categories3] = await Promise.all([
+      Word.distinct('englishLevel', { englishLevel: { $exists: true, $ne: null, $ne: '' } }),
+      Word.distinct('wordType', { wordType: { $exists: true, $ne: null, $ne: '' } }),
+      Word.distinct('category1', { category1: { $exists: true, $ne: null, $ne: '' } }),
+      Word.distinct('category2', { category2: { $exists: true, $ne: null, $ne: '' } }),
+      Word.distinct('category3', { category3: { $exists: true, $ne: null, $ne: '' } })
+    ]);
+
+    // Filter out empty strings and null values, then sort
+    const filterEmpty = (arr) => arr.filter(val => val != null && String(val).trim() !== '').sort();
+
+    res.json({
+      levels: filterEmpty(levels),
+      types: filterEmpty(types),
+      categories1: filterEmpty(categories1),
+      categories2: filterEmpty(categories2),
+      categories3: filterEmpty(categories3)
+    });
+  } catch (error) {
+    console.error('Error getting filter values:', error);
+    res.status(500).json({ 
+      message: error.message || 'Failed to get filter values' 
+    });
+  }
+};
+
+// Get words without Turkish meaning
+exports.getWordsWithoutTurkish = async (req, res) => {
+  try {
+    // Find words that don't have Turkish meaning (null or empty)
+    const words = await Word.find({
+      $or: [
+        { turkishMeaning: { $exists: false } },
+        { turkishMeaning: null },
+        { turkishMeaning: '' }
+      ]
+    })
+    .select('englishWord wordType turkishMeaning category1 category2 category3 englishLevel sampleSentenceEn sampleSentenceTr')
+    .limit(100) // Limit to prevent too many words at once
+    .lean();
+
+    res.json({
+      words,
+      count: words.length
+    });
+  } catch (error) {
+    console.error('Error getting words without Turkish:', error);
+    res.status(500).json({ 
+      message: error.message || 'Failed to get words without Turkish meaning' 
+    });
+  }
+};
+
+// Fill word columns using AI
+exports.fillWordColumns = async (req, res) => {
+  console.log('fillWordColumns called');
+  try {
+    // Get words without Turkish meaning from database
+    const wordsWithoutTurkish = await Word.find({
+      $or: [
+        { turkishMeaning: { $exists: false } },
+        { turkishMeaning: null },
+        { turkishMeaning: '' }
+      ]
+    })
+    .select('englishWord')
+    .limit(100) // Limit to prevent too many words at once
+    .lean();
+
+    if (wordsWithoutTurkish.length === 0) {
+      return res.status(400).json({ message: 'No words found without Turkish meaning. All words are already filled.' });
+    }
+
+    // Extract word strings
+    const words = wordsWithoutTurkish.map(w => w.englishWord);
+
+    // Filter out invalid words before processing
+    const validWords = words.filter(word => {
+      const trimmed = word.trim();
+      return trimmed && isValidWord(trimmed);
+    });
+
+    if (validWords.length === 0) {
+      return res.status(400).json({ message: 'No valid words found. All words were filtered out as invalid (symbols, empty strings, etc.).' });
+    }
+
+    // Get 5-10 example words from database with filled columns
+    // Filter out invalid words from examples too
+    const allExampleWords = await Word.find({
+      $and: [
+        { wordType: { $exists: true, $ne: null, $ne: '' } },
+        { turkishMeaning: { $exists: true, $ne: null, $ne: '' } },
+        { englishLevel: { $exists: true, $ne: null, $ne: '' } }
+      ]
+    })
+    .limit(20) // Get more to filter
+    .select('englishWord wordType turkishMeaning category1 category2 category3 englishLevel sampleSentenceEn sampleSentenceTr')
+    .lean();
+
+    // Filter example words to only include valid ones
+    const exampleWords = allExampleWords
+      .filter(word => isValidWord(word.englishWord))
+      .slice(0, 10); // Take up to 10 valid examples
+
+    if (exampleWords.length === 0) {
+      return res.status(400).json({ message: 'No valid example words found in database. Please add some valid words with filled columns first.' });
+    }
+
+    // Call AI to fill columns with only valid words
+    const result = await fillWordColumnsWithAI(validWords, exampleWords);
+    
+    // Parse AI response (should be JSON array)
+    let wordDataArray;
+    try {
+      // Try to extract JSON from response (might have markdown code blocks)
+      let jsonString = result.response.trim();
+      
+      // Remove markdown code blocks if present
+      jsonString = jsonString.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      
+      // Remove any leading text before the first [
+      const firstBracket = jsonString.indexOf('[');
+      if (firstBracket > 0) {
+        jsonString = jsonString.substring(firstBracket);
+      }
+      
+      // Find JSON array - try to find complete array
+      const jsonMatch = jsonString.match(/\[[\s\S]*\]/);
+      if (jsonMatch) {
+        try {
+          wordDataArray = JSON.parse(jsonMatch[0]);
+        } catch (e) {
+          // If parsing fails, try to fix incomplete JSON
+          let fixedJson = jsonMatch[0];
+          // If it doesn't end with ], try to close it
+          if (!fixedJson.trim().endsWith(']')) {
+            // Count open brackets and close them
+            const openBrackets = (fixedJson.match(/\[/g) || []).length;
+            const closeBrackets = (fixedJson.match(/\]/g) || []).length;
+            const missingCloses = openBrackets - closeBrackets;
+            if (missingCloses > 0) {
+              // Try to find the last complete object and close the array
+              const lastCompleteObject = fixedJson.lastIndexOf('}');
+              if (lastCompleteObject > 0) {
+                fixedJson = fixedJson.substring(0, lastCompleteObject + 1) + ']';
+              }
+            }
+          }
+          wordDataArray = JSON.parse(fixedJson);
+        }
+      } else {
+        wordDataArray = JSON.parse(jsonString);
+      }
+    } catch (parseError) {
+      console.error('Error parsing AI response:', parseError);
+      console.error('AI response length:', result.response.length);
+      console.error('AI response first 1000 chars:', result.response.substring(0, 1000));
+      console.error('AI response last 1000 chars:', result.response.substring(Math.max(0, result.response.length - 1000)));
+      
+      // Try to extract partial data if possible
+      try {
+        // Try to find complete JSON objects by matching braces
+        let partialJson = jsonString;
+        let braceCount = 0;
+        let startPos = partialJson.indexOf('[');
+        if (startPos === -1) startPos = 0;
+        
+        // Find the last complete object (accounting for strings)
+        let lastCompletePos = startPos;
+        let inString = false;
+        let escapeNext = false;
+        for (let i = startPos; i < partialJson.length; i++) {
+          const char = partialJson[i];
+          
+          if (escapeNext) {
+            escapeNext = false;
+            continue;
+          }
+          
+          if (char === '\\') {
+            escapeNext = true;
+            continue;
+          }
+          
+          if (char === '"') {
+            inString = !inString;
+            continue;
+          }
+          
+          if (!inString) {
+            if (char === '{') braceCount++;
+            if (char === '}') {
+              braceCount--;
+              if (braceCount === 0) {
+                lastCompletePos = i;
+              }
+            }
+          }
+        }
+        
+        // If we found complete objects, try to extract them
+        if (lastCompletePos > startPos) {
+          let extractedJson = partialJson.substring(startPos, lastCompletePos + 1);
+          // Try to close the array if needed
+          if (!extractedJson.trim().endsWith(']')) {
+            extractedJson += ']';
+          }
+          
+          try {
+            wordDataArray = JSON.parse(extractedJson);
+            console.log(`Successfully parsed ${wordDataArray.length} objects from partial response`);
+          } catch (e) {
+            // If that fails, try to extract individual objects
+            const objects = [];
+            let currentObj = '';
+            braceCount = 0;
+            let inString = false;
+            let escapeNext = false;
+            
+            for (let i = startPos; i < partialJson.length; i++) {
+              const char = partialJson[i];
+              
+              if (escapeNext) {
+                currentObj += char;
+                escapeNext = false;
+                continue;
+              }
+              
+              if (char === '\\') {
+                escapeNext = true;
+                currentObj += char;
+                continue;
+              }
+              
+              if (char === '"' && !escapeNext) {
+                inString = !inString;
+              }
+              
+              if (!inString) {
+                if (char === '{') {
+                  if (braceCount === 0) currentObj = '';
+                  braceCount++;
+                }
+                if (char === '}') {
+                  braceCount--;
+                }
+              }
+              
+              currentObj += char;
+              
+              if (braceCount === 0 && currentObj.trim().startsWith('{')) {
+                try {
+                  const obj = JSON.parse(currentObj.trim());
+                  if (obj.englishWord) {
+                    objects.push(obj);
+                  }
+                } catch (e) {
+                  // Skip invalid objects
+                }
+                currentObj = '';
+              }
+            }
+            
+            if (objects.length > 0) {
+              wordDataArray = objects;
+              console.log(`Successfully extracted ${wordDataArray.length} objects from response`);
+            } else {
+              throw parseError;
+            }
+          }
+        } else {
+          throw parseError;
+        }
+      } catch (recoveryError) {
+        return res.status(500).json({ 
+          message: 'Failed to parse AI response as JSON',
+          error: parseError.message,
+          responsePreview: result.response.substring(0, 1000),
+          responseLength: result.response.length,
+          suggestion: 'The AI response may be too large or incomplete. Try processing fewer words at once.'
+        });
+      }
+    }
+
+    if (!Array.isArray(wordDataArray)) {
+      return res.status(500).json({ message: 'AI response is not a valid array' });
+    }
+
+    const results = {
+      total: words.length,
+      validWords: validWords.length,
+      skipped: words.length - validWords.length,
+      processed: 0,
+      updated: 0,
+      errors: []
+    };
+
+    // Update words in database
+    for (let i = 0; i < wordDataArray.length; i++) {
+      const wordData = wordDataArray[i];
+      
+      if (!wordData.englishWord) {
+        results.errors.push({
+          index: i,
+          error: 'Missing englishWord field'
+        });
+        continue;
+      }
+
+      try {
+        // Find word by englishWord (case-insensitive)
+        const word = await Word.findOne({ 
+          englishWord: { $regex: new RegExp(`^${wordData.englishWord.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+        });
+
+        if (!word) {
+          results.errors.push({
+            word: wordData.englishWord,
+            error: 'Word not found in database'
+          });
+          continue;
+        }
+
+        // Update word with AI-filled data
+        if (wordData.wordType) word.wordType = wordData.wordType;
+        if (wordData.turkishMeaning) word.turkishMeaning = wordData.turkishMeaning;
+        if (wordData.category1) word.category1 = wordData.category1;
+        if (wordData.category2) word.category2 = wordData.category2;
+        if (wordData.category3) word.category3 = wordData.category3;
+        if (wordData.englishLevel) word.englishLevel = wordData.englishLevel;
+        if (wordData.sampleSentenceEn) word.sampleSentenceEn = wordData.sampleSentenceEn;
+        if (wordData.sampleSentenceTr) word.sampleSentenceTr = wordData.sampleSentenceTr;
+
+        await word.save();
+        results.processed++;
+        results.updated++;
+      } catch (error) {
+        results.errors.push({
+          word: wordData.englishWord,
+          error: error.message
+        });
+      }
+    }
+
+    res.json({
+      message: `Processed ${results.processed} words: ${results.updated} updated`,
+      results,
+      prompt: result.prompt,
+      response: result.response
+    });
+  } catch (error) {
+    console.error('Error filling word columns:', error);
+    res.status(500).json({ 
+      message: error.message || 'Failed to fill word columns' 
+    });
+  }
+};
+
 // Multer middleware for file upload
 exports.uploadFile = upload.single('file');
+
+// Update word
+exports.updateWord = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      englishWord,
+      turkishMeaning,
+      wordType,
+      englishLevel,
+      category1,
+      category2,
+      category3,
+      sampleSentenceEn,
+      sampleSentenceTr,
+      imageUrl
+    } = req.body;
+
+    const word = await Word.findById(id);
+    if (!word) {
+      return res.status(404).json({ message: 'Word not found' });
+    }
+
+    // Update fields if provided
+    if (englishWord !== undefined) word.englishWord = englishWord;
+    if (turkishMeaning !== undefined) word.turkishMeaning = turkishMeaning;
+    if (wordType !== undefined) word.wordType = wordType;
+    if (englishLevel !== undefined) word.englishLevel = englishLevel;
+    if (category1 !== undefined) word.category1 = category1;
+    if (category2 !== undefined) word.category2 = category2;
+    if (category3 !== undefined) word.category3 = category3;
+    if (sampleSentenceEn !== undefined) word.sampleSentenceEn = sampleSentenceEn;
+    if (sampleSentenceTr !== undefined) word.sampleSentenceTr = sampleSentenceTr;
+    if (imageUrl !== undefined) word.imageUrl = imageUrl;
+
+    await word.save();
+    res.json(word);
+  } catch (error) {
+    console.error('Error updating word:', error);
+    res.status(500).json({ message: error.message || 'Failed to update word' });
+  }
+};
+
+// Delete a word
+exports.deleteWord = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const word = await Word.findById(id);
+    if (!word) {
+      return res.status(404).json({ message: 'Word not found' });
+    }
+
+    // Also delete associated UserWord records
+    await UserWord.deleteMany({ wordId: id });
+
+    // Delete the word
+    await Word.findByIdAndDelete(id);
+
+    res.json({ message: 'Word deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting word:', error);
+    res.status(500).json({ message: error.message || 'Failed to delete word' });
+  }
+};
 
 // Generate image for a word
 exports.generateWordImage = async (req, res) => {
   try {
     const { wordId } = req.params;
+    const { customKeywords, service = 'google' } = req.body; // Default to 'google' if not specified
     
     if (!wordId) {
       return res.status(400).json({ message: 'Word ID is required' });
+    }
+
+    // Validate service parameter
+    if (service !== 'google' && service !== 'unsplash') {
+      return res.status(400).json({ message: 'Service must be either "google" or "unsplash"' });
     }
 
     const word = await Word.findById(wordId);
@@ -564,11 +1285,17 @@ exports.generateWordImage = async (req, res) => {
     }
 
     // Generate image using the word's information
+    // If custom keywords are provided, use them; otherwise use automatic extraction
     const result = await generateWordImage(
       word.englishWord,
       word.wordType,
-      word.sampleSentenceEn
+      word.sampleSentenceEn,
+      customKeywords,
+      service
     );
+
+    // Log the search query
+    console.log(`Image search for word "${word.englishWord}": "${result.searchQuery}"`);
 
     // Update the word with the image URL
     word.imageUrl = result.imageUrl;

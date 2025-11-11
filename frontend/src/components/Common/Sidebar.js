@@ -12,7 +12,7 @@ import {
   FaTimes,
   FaBook,
   FaIdCard,
-  FaPen
+  FaKeyboard
 } from 'react-icons/fa';
 import './Sidebar.css';
 
@@ -74,6 +74,13 @@ const Sidebar = ({ isOpen, onClose }) => {
 
       <nav className="sidebar-nav">
         <Link 
+          to="/" 
+          className={`nav-item ${isActive('/') && !isActive('/quiz') && !isActive('/join') && !isActive('/play') ? 'active' : ''}`}
+        >
+          <FaHome className="nav-icon nav-icon-dashboard" />
+          <span className="nav-text">Dashboard</span>
+        </Link>
+        <Link 
           to="/join" 
           className={`nav-item ${isActive('/join') || isActive('/play') ? 'active' : ''}`}
         >
@@ -116,11 +123,11 @@ const Sidebar = ({ isOpen, onClose }) => {
           <span className="nav-text">Flashcards</span>
         </Link>
         <Link 
-          to="/writing" 
-          className={`nav-item ${isActive('/writing') ? 'active' : ''}`}
+          to="/spelling" 
+          className={`nav-item ${isActive('/spelling') ? 'active' : ''}`}
         >
-          <FaPen className="nav-icon nav-icon-writing" />
-          <span className="nav-text">Writing</span>
+          <FaKeyboard className="nav-icon nav-icon-spelling" />
+          <span className="nav-text">Spelling</span>
         </Link>
       </nav>
 

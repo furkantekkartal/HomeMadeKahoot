@@ -24,37 +24,83 @@ async function importWords(csvFilePath) {
     const words = [];
     let rowCount = 0;
 
+    // Get the highest wordId to start from (if word_id is not in CSV)
+    const maxWord = await Word.findOne().sort({ wordId: -1 });
+    let currentWordId = maxWord ? maxWord.wordId + 1 : 1;
+
     // Read and parse CSV file
+    let firstRow = true;
     await new Promise((resolve, reject) => {
-      fs.createReadStream(csvFilePath)
+      fs.createReadStream(csvFilePath, { encoding: 'utf8' })
         .pipe(csv())
         .on('data', (row) => {
           rowCount++;
           
-          // Skip rows with missing essential data
-          if (!row.english_word || !row.word_id) {
-            console.warn(`Skipping row ${rowCount}: missing essential data`);
+          // Debug: Show column names from first row
+          if (firstRow && rowCount === 1) {
+            console.log('CSV Column names:', Object.keys(row));
+            firstRow = false;
+          }
+          
+          // Try different possible column name variations
+          const englishWord = row.english_word || row['english_word'] || row['English Word'] || row['English_Word'] || row['EnglishWord'];
+          
+          // Skip rows with missing essential data (english_word is required)
+          if (!englishWord || !englishWord.trim()) {
+            if (rowCount <= 5) {
+              console.log(`Row ${rowCount} sample:`, Object.keys(row).slice(0, 5));
+            }
             return;
           }
 
-          // Parse KnownBetty and KnownFurky columns (these are user-specific, not stored in Word model)
-          // We'll handle user word tracking separately
+          // Use word_id from CSV if available, otherwise auto-generate
+          let wordId;
+          const wordIdValue = row.word_id || row['word_id'] || row['Word ID'] || row['Word_ID'] || row['wordId'];
+          if (wordIdValue && wordIdValue.toString().trim()) {
+            wordId = parseInt(wordIdValue.toString().trim());
+            if (isNaN(wordId)) {
+              // If word_id is not a valid number, auto-generate
+              wordId = currentWordId++;
+            } else {
+              // Update currentWordId to be higher than the highest imported word_id
+              if (wordId >= currentWordId) {
+                currentWordId = wordId + 1;
+              }
+            }
+          } else {
+            // Auto-generate word_id
+            wordId = currentWordId++;
+          }
 
-          const word = {
-            wordId: parseInt(row.word_id),
-            englishWord: row.english_word.trim(),
-            wordType: row.word_type ? row.word_type.trim() : '',
-            turkishMeaning: row.turkish_meaning ? row.turkish_meaning.trim() : '',
-            category1: row.category_1 ? row.category_1.trim() : '',
-            category2: row.category_2 ? row.category_2.trim() : '',
-            category3: row.category_3 ? row.category_3.trim() : '',
-            englishLevel: row.english_level ? row.english_level.trim() : '',
-            sampleSentenceEn: row.sample_sentence_en ? row.sample_sentence_en.trim() : '',
-            sampleSentenceTr: row.sample_sentence_tr ? row.sample_sentence_tr.trim() : ''
+          // Try different possible column name variations
+          const getColumn = (variations) => {
+            for (const key of variations) {
+              if (row[key] !== undefined && row[key] !== null && row[key].toString().trim() !== '') {
+                return row[key].toString().trim();
+              }
+            }
+            return null;
           };
 
-          // Note: KnownBetty and KnownFurky columns are user-specific tracking
-          // These should be imported separately using UserWord model if needed
+          const word = {
+            wordId: wordId,
+            englishWord: englishWord.trim(),
+            wordType: getColumn(['word_type', 'wordType', 'Word Type', 'Word_Type']) || null,
+            turkishMeaning: getColumn(['turkish_meaning', 'turkishMeaning', 'Turkish Meaning', 'Turkish_Meaning']) || null,
+            category1: getColumn(['category_1', 'category1', 'Category 1', 'Category_1']) || null,
+            category2: getColumn(['category_2', 'category2', 'Category 2', 'Category_2']) || null,
+            category3: getColumn(['category_3', 'category3', 'Category 3', 'Category_3']) || null,
+            englishLevel: getColumn(['english_level', 'englishLevel', 'English Level', 'English_Level']) || null,
+            sampleSentenceEn: getColumn(['sample_sentence_en', 'sampleSentenceEn', 'Sample Sentence En', 'Sample_Sentence_En']) || null,
+            sampleSentenceTr: getColumn(['sample_sentence_tr', 'sampleSentenceTr', 'Sample Sentence Tr', 'Sample_Sentence_Tr']) || null
+          };
+
+          // Convert empty strings to null
+          Object.keys(word).forEach(key => {
+            if (word[key] === '') {
+              word[key] = null;
+            }
+          });
 
           words.push(word);
         })
@@ -63,6 +109,10 @@ async function importWords(csvFilePath) {
     });
 
     console.log(`Parsed ${words.length} words from CSV`);
+
+    if (words.length === 0) {
+      throw new Error('No valid words found in file');
+    }
 
     // Clear existing words (optional - comment out if you want to keep existing words)
     // await Word.deleteMany({});
@@ -75,19 +125,35 @@ async function importWords(csvFilePath) {
 
     for (const word of words) {
       try {
-        const result = await Word.findOneAndUpdate(
-          { wordId: word.wordId },
-          word,
-          { upsert: true, new: true }
-        );
-        
-        if (result.isNew) {
-          inserted++;
-        } else {
+        // Check if word already exists by englishWord (case-insensitive)
+        const existingWord = await Word.findOne({
+          englishWord: { $regex: new RegExp(`^${word.englishWord.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+        });
+
+        if (existingWord) {
+          // Update existing word, but keep its original wordId
+          word.wordId = existingWord.wordId;
+          await Word.findOneAndUpdate(
+            { wordId: word.wordId },
+            word,
+            { new: true }
+          );
           updated++;
+        } else {
+          // Check if wordId is already taken
+          const wordIdExists = await Word.findOne({ wordId: word.wordId });
+          if (wordIdExists) {
+            // Find next available wordId
+            const maxWord = await Word.findOne().sort({ wordId: -1 });
+            word.wordId = maxWord ? maxWord.wordId + 1 : 1;
+          }
+          
+          // Insert new word
+          await Word.create(word);
+          inserted++;
         }
       } catch (error) {
-        console.error(`Error processing word ${word.wordId}: ${error.message}`);
+        console.error(`Error processing word "${word.englishWord}" (ID: ${word.wordId}): ${error.message}`);
         skipped++;
       }
     }

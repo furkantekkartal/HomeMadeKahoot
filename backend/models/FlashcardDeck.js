@@ -48,6 +48,10 @@ const flashcardDeckSchema = new mongoose.Schema({
     type: Date,
     default: null
   },
+  isVisible: {
+    type: Boolean,
+    default: true
+  },
   createdAt: {
     type: Date,
     default: Date.now

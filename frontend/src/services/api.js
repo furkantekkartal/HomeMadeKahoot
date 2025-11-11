@@ -67,6 +67,8 @@ export const sessionAPI = {
 export const wordAPI = {
   getWords: (params) => api.get('/words', { params }),
   getWord: (id) => api.get(`/words/${id}`),
+  updateWord: (id, data) => api.put(`/words/${id}`, data),
+  deleteWord: (id) => api.delete(`/words/${id}`),
   getUserWordStats: () => api.get('/words/user/stats'),
   getWordsWithStatus: (params) => api.get('/words/user/words', { params }),
   toggleWordStatus: (wordId, isKnown) => api.post('/words/user/toggle', { wordId, isKnown }),
@@ -86,19 +88,46 @@ export const wordAPI = {
       },
     });
   },
-  generateWordImage: (wordId) => api.post(`/words/${wordId}/generate-image`)
+  generateWordImage: (wordId, customKeywords, service = 'google') => api.post(`/words/${wordId}/generate-image`, { customKeywords, service }),
+  addWordsFromAI: (words, sourceName, sourceType, fileSize) => api.post('/words/add-from-ai', { words, sourceName, sourceType, fileSize }),
+  fillWordColumns: () => api.post('/words/fill-columns', {}),
+  getWordsWithoutTurkish: () => api.get('/words/without-turkish'),
+  getSources: () => api.get('/words/sources'),
+  getSourceWords: (sourceId) => api.get(`/words/sources/${sourceId}/words`),
+  getFilterValues: () => api.get('/words/filter-values')
 };
 
 // Flashcard API
 export const flashcardAPI = {
-  getMyDecks: () => api.get('/flashcards/decks'),
+  getMyDecks: (includeHidden = false) => api.get(`/flashcards/decks${includeHidden ? '?includeHidden=true' : ''}`),
   getDeck: (id) => api.get(`/flashcards/decks/${id}`),
   createDeck: (name, description, level, skill, task, wordIds) => api.post('/flashcards/decks', { name, description, level, skill, task, wordIds }),
   updateDeck: (id, updates) => api.put(`/flashcards/decks/${id}`, updates),
   deleteDeck: (id) => api.delete(`/flashcards/decks/${id}`),
   updateLastStudied: (id) => api.patch(`/flashcards/decks/${id}/last-studied`),
   generateDeckTitle: (level, skill, task) => api.post('/flashcards/generate-title', { level, skill, task }),
-  generateDeckDescription: (title, level, skill, task) => api.post('/flashcards/generate-description', { title, level, skill, task })
+  generateDeckDescription: (title, level, skill, task) => api.post('/flashcards/generate-description', { title, level, skill, task }),
+  enhanceDeckText: (text, type) => api.post('/flashcards/enhance-text', { text, type }),
+  processMarkdownWithAI: (markdownContent, fileType) => api.post('/flashcards/process-markdown', { markdownContent, fileType }),
+  convertPDFToMD: (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post('/flashcards/convert-pdf-to-md', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    });
+  },
+  generateDeckFromFile: (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post('/flashcards/generate-from-file', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    });
+  },
+  toggleDeckVisibility: (id) => api.patch(`/flashcards/decks/${id}/visibility`)
 };
 
 // Study Session API (Time Tracking)
@@ -108,6 +137,26 @@ export const studySessionAPI = {
   end: (sessionId) => api.post(`/study-sessions/${sessionId}/end`),
   getHistory: (params) => api.get('/study-sessions/history', { params }),
   getStatistics: (params) => api.get('/study-sessions/statistics', { params })
+};
+
+// Pronunciation API
+export const pronunciationAPI = {
+  assessPronunciation: (audioBlob, referenceText) => {
+    const formData = new FormData();
+    formData.append('audio', audioBlob, 'recording.wav');
+    formData.append('referenceText', referenceText);
+    return api.post('/pronunciation/assess', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    });
+  }
+};
+
+// Statistics API
+export const statisticsAPI = {
+  getOverview: () => api.get('/statistics/overview'),
+  getBadges: () => api.get('/statistics/badges')
 };
 
 export default api;

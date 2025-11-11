@@ -29,8 +29,10 @@ import BrowseQuizzes from './pages/BrowseQuizzes';
 import Profile from './pages/Profile';
 import WordDatabase from './pages/WordDatabase';
 import Flashcards from './pages/Flashcards';
-import Writing from './pages/Writing';
+import Spelling from './pages/Spelling';
 import CreateDeck from './pages/CreateDeck';
+import EditDeck from './pages/EditDeck';
+import Decks from './pages/Decks';
 import './App.css';
 
 const PrivateRoute = ({ children }) => {
@@ -98,8 +100,10 @@ function AppContent() {
           <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
           <Route path="/words" element={<PrivateRoute><WordDatabase /></PrivateRoute>} />
           <Route path="/flashcards" element={<PrivateRoute><Flashcards /></PrivateRoute>} />
-          <Route path="/writing" element={<PrivateRoute><Writing /></PrivateRoute>} />
+          <Route path="/spelling" element={<PrivateRoute><Spelling /></PrivateRoute>} />
           <Route path="/create-deck" element={<PrivateRoute><CreateDeck /></PrivateRoute>} />
+          <Route path="/edit-deck/:id" element={<PrivateRoute><EditDeck /></PrivateRoute>} />
+          <Route path="/decks" element={<PrivateRoute><Decks /></PrivateRoute>} />
         </Routes>
       </main>
     </>
