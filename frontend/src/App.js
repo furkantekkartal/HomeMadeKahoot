@@ -33,6 +33,7 @@ import Spelling from './pages/Spelling';
 import CreateDeck from './pages/CreateDeck';
 import EditDeck from './pages/EditDeck';
 import Decks from './pages/Decks';
+import New from './pages/New';
 import './App.css';
 
 const PrivateRoute = ({ children }) => {
@@ -101,6 +102,7 @@ function AppContent() {
           <Route path="/words" element={<PrivateRoute><WordDatabase /></PrivateRoute>} />
           <Route path="/flashcards" element={<PrivateRoute><Flashcards /></PrivateRoute>} />
           <Route path="/spelling" element={<PrivateRoute><Spelling /></PrivateRoute>} />
+          <Route path="/new" element={<PrivateRoute><New /></PrivateRoute>} />
           <Route path="/create-deck" element={<PrivateRoute><CreateDeck /></PrivateRoute>} />
           <Route path="/edit-deck/:id" element={<PrivateRoute><EditDeck /></PrivateRoute>} />
           <Route path="/decks" element={<PrivateRoute><Decks /></PrivateRoute>} />

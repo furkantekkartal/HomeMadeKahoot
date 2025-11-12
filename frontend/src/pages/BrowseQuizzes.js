@@ -1,11 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { quizAPI } from '../services/api';
+import { useNavigate } from 'react-router-dom';
+import { quizAPI, sessionAPI } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import './BrowseQuizzes.css';
 
 const BrowseQuizzes = () => {
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const [quizzes, setQuizzes] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [creatingSession, setCreatingSession] = useState(null);
   const [filters, setFilters] = useState({
     category: 'all',
     difficulty: 'all'
@@ -31,6 +35,38 @@ const BrowseQuizzes = () => {
     if (filters.difficulty !== 'all' && quiz.difficulty !== filters.difficulty) return false;
     return true;
   });
+
+  const handleTakeQuiz = async (quizId, event) => {
+    event.preventDefault();
+    setCreatingSession(quizId);
+    
+    try {
+      // Create a session for this quiz
+      const response = await sessionAPI.createSession({ quizId });
+      const session = response.data;
+      
+      if (!session || !session._id) {
+        alert('Failed to create session. Please try again.');
+        setCreatingSession(null);
+        return;
+      }
+
+      // Get username from logged-in user or use a default
+      const username = user?.username || `User${Math.floor(Math.random() * 1000)}`;
+      
+      // Navigate to play page with session ID and username
+      navigate(`/play/${session._id}`, { 
+        state: { 
+          username,
+          autoStart: true // Flag to auto-start the quiz
+        } 
+      });
+    } catch (error) {
+      console.error('Error creating session:', error);
+      alert(`Error creating session: ${error.response?.data?.message || error.message}`);
+      setCreatingSession(null);
+    }
+  };
 
   if (loading) {
     return <div className="loading">Loading...</div>;
@@ -86,12 +122,13 @@ const BrowseQuizzes = () => {
                 <span>👤 {quiz.creatorId?.username || 'Unknown'}</span>
               </div>
               <div className="quiz-actions">
-                <Link
-                  to={`/quiz/${quiz._id}/self-paced`}
+                <button
+                  onClick={(e) => handleTakeQuiz(quiz._id, e)}
                   className="btn btn-primary btn-sm"
+                  disabled={creatingSession === quiz._id}
                 >
-                  Take Quiz
-                </Link>
+                  {creatingSession === quiz._id ? 'Starting...' : 'Take Quiz'}
+                </button>
               </div>
             </div>
           ))}

@@ -23,8 +23,11 @@ const LoggedInPlayQuiz = () => {
   const [leaderboard, setLeaderboard] = useState([]);
   const [timeLeft, setTimeLeft] = useState(20);
   const [username, setUsername] = useState(location.state?.username || null);
+  const autoStart = location.state?.autoStart || false;
+  const [studentJoined, setStudentJoined] = useState(false);
   const studentJoinedRef = useRef(false);
   const initialLoadRef = useRef(false);
+  const autoStartedRef = useRef(false);
 
   useEffect(() => {
     const socketInstance = connectSocket();
@@ -142,6 +145,7 @@ const LoggedInPlayQuiz = () => {
     const joinSession = () => {
       if (studentJoinedRef.current) return;
       studentJoinedRef.current = true;
+      setStudentJoined(true);
       
       socket.emit('join-session', {
         pin: session.pin,
@@ -164,6 +168,20 @@ const LoggedInPlayQuiz = () => {
       }, 1000);
     }
   }, [socket, socketConnected, session]);
+
+  // Auto-start quiz if autoStart flag is set (for self-paced quizzes from browse page)
+  // Wait until student has joined the session before starting
+  useEffect(() => {
+    if (autoStart && socket && socketConnected && session && session.status === 'waiting' && studentJoined && !autoStartedRef.current) {
+      autoStartedRef.current = true;
+      // Auto-start the quiz after a short delay to ensure everything is ready
+      setTimeout(() => {
+        if (socket && socket.connected) {
+          socket.emit('start-quiz', { sessionId });
+        }
+      }, 500);
+    }
+  }, [autoStart, socket, socketConnected, session, sessionId, studentJoined]);
 
   // Load current question if quiz is already active (only on initial load)
   useEffect(() => {
@@ -207,6 +225,16 @@ const LoggedInPlayQuiz = () => {
         timeTaken,
         username: studentUsername
       });
+
+      // Auto-finish quiz if this is the last question and autoStart is enabled
+      if (autoStart && quiz && currentQuestionIndex === quiz.questions.length - 1) {
+        // Wait a moment for the answer to be processed, then finish
+        setTimeout(() => {
+          if (socket) {
+            socket.emit('finish-quiz', { sessionId });
+          }
+        }, 1000);
+      }
     }
   };
 
@@ -336,15 +364,21 @@ const LoggedInPlayQuiz = () => {
             ) : (
               <button
                 onClick={() => {
-                  if (window.opener || window.history.length <= 1) {
-                    window.close();
-                    setTimeout(() => {
-                      if (!document.hidden) {
-                        navigate('/');
-                      }
-                    }, 100);
+                  // Auto-finish quiz when last question is answered
+                  if (socket && autoStart) {
+                    socket.emit('finish-quiz', { sessionId });
                   } else {
-                    navigate('/');
+                    // For regular hosted quizzes, just navigate
+                    if (window.opener || window.history.length <= 1) {
+                      window.close();
+                      setTimeout(() => {
+                        if (!document.hidden) {
+                          navigate('/');
+                        }
+                      }, 100);
+                    } else {
+                      navigate('/');
+                    }
                   }
                 }}
                 className="btn btn-success"

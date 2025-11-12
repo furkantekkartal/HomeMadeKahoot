@@ -12,7 +12,8 @@ import {
   FaTimes,
   FaBook,
   FaIdCard,
-  FaKeyboard
+  FaKeyboard,
+  FaPlus
 } from 'react-icons/fa';
 import './Sidebar.css';
 
@@ -75,10 +76,17 @@ const Sidebar = ({ isOpen, onClose }) => {
       <nav className="sidebar-nav">
         <Link 
           to="/" 
-          className={`nav-item ${isActive('/') && !isActive('/quiz') && !isActive('/join') && !isActive('/play') ? 'active' : ''}`}
+          className={`nav-item ${isActive('/') && !isActive('/quiz') && !isActive('/join') && !isActive('/play') && !isActive('/new') ? 'active' : ''}`}
         >
           <FaHome className="nav-icon nav-icon-dashboard" />
           <span className="nav-text">Dashboard</span>
+        </Link>
+        <Link 
+          to="/new" 
+          className={`nav-item ${isActive('/new') ? 'active' : ''}`}
+        >
+          <FaPlus className="nav-icon nav-icon-create" />
+          <span className="nav-text">New</span>
         </Link>
         <Link 
           to="/join" 
