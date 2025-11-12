@@ -376,11 +376,8 @@
 }
 
 .correct {
-  color: #10b981;
+  color: #000000;
   font-weight: 700;
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
