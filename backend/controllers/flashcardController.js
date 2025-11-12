@@ -9,13 +9,14 @@ const path = require('path');
 const fs = require('fs').promises;
 const os = require('os');
 
-// Get all decks for user
+// Get all decks for all users
 exports.getMyDecks = async (req, res) => {
   try {
     const userId = req.user.userId;
     const { includeHidden } = req.query; // Optional query param to include hidden decks
     
-    const query = { userId };
+    // Allow all logged-in users to see all decks (no userId filter)
+    const query = {};
     // Only filter by visibility if includeHidden is not explicitly 'true'
     // This allows the Decks page to get all decks when needed
     if (includeHidden !== 'true') {
@@ -24,9 +25,10 @@ exports.getMyDecks = async (req, res) => {
     
     const decks = await FlashcardDeck.find(query)
       .sort({ updatedAt: -1 })
-      .populate('wordIds', 'englishWord turkishMeaning wordType englishLevel category1 sampleSentenceEn sampleSentenceTr imageUrl');
+      .populate('wordIds', 'englishWord turkishMeaning wordType englishLevel category1 sampleSentenceEn sampleSentenceTr imageUrl')
+      .populate('userId', 'username'); // Populate creator info
     
-    // Calculate mastered cards for each deck
+    // Calculate mastered cards for each deck (based on current user's progress)
     const decksWithStats = await Promise.all(decks.map(async (deck) => {
       const wordIds = deck.wordIds.map(w => w._id);
       const knownWords = await UserWord.countDocuments({
@@ -48,14 +50,14 @@ exports.getMyDecks = async (req, res) => {
   }
 };
 
-// Get single deck
+// Get single deck (available to all logged-in users)
 exports.getDeck = async (req, res) => {
   try {
     const userId = req.user.userId;
-    const deck = await FlashcardDeck.findOne({
-      _id: req.params.id,
-      userId
-    }).populate('wordIds');
+    // Allow any logged-in user to access any deck (no userId filter)
+    const deck = await FlashcardDeck.findById(req.params.id)
+      .populate('wordIds')
+      .populate('userId', 'username'); // Populate creator info
     
     if (!deck) {
       return res.status(404).json({ message: 'Deck not found' });
@@ -121,16 +123,13 @@ exports.createDeck = async (req, res) => {
   }
 };
 
-// Update deck
+// Update deck (available to all logged-in users)
 exports.updateDeck = async (req, res) => {
   try {
-    const userId = req.user.userId;
+    // Allow any logged-in user to edit any deck (no userId check)
     const { name, description, level, skill, task, wordIds } = req.body;
     
-    const deck = await FlashcardDeck.findOne({
-      _id: req.params.id,
-      userId
-    });
+    const deck = await FlashcardDeck.findById(req.params.id);
     
     if (!deck) {
       return res.status(404).json({ message: 'Deck not found' });
@@ -158,14 +157,11 @@ exports.updateDeck = async (req, res) => {
   }
 };
 
-// Delete deck
+// Delete deck (available to all logged-in users)
 exports.deleteDeck = async (req, res) => {
   try {
-    const userId = req.user.userId;
-    const deck = await FlashcardDeck.findOneAndDelete({
-      _id: req.params.id,
-      userId
-    });
+    // Allow any logged-in user to delete any deck (no userId check)
+    const deck = await FlashcardDeck.findByIdAndDelete(req.params.id);
     
     if (!deck) {
       return res.status(404).json({ message: 'Deck not found' });
