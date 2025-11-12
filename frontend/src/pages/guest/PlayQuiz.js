@@ -26,6 +26,7 @@ const GuestPlayQuiz = () => {
   const [username, setUsername] = useState(location.state?.username || null);
   const studentJoinedRef = useRef(false);
   const initialLoadRef = useRef(false);
+  const [showKnownAnimation, setShowKnownAnimation] = useState(false);
 
   useEffect(() => {
     const socketInstance = connectSocket();
@@ -199,6 +200,13 @@ const GuestPlayQuiz = () => {
     setSelectedAnswer(answerIndex);
     setAnswered(true);
 
+    // Show animation if correct
+    const isCorrectAnswer = answerIndex === currentQuestion.correctAnswer;
+    if (isCorrectAnswer) {
+      setShowKnownAnimation(true);
+      setTimeout(() => setShowKnownAnimation(false), 300);
+    }
+
     if (socket) {
       const studentUsername = location.state?.username || username || `User${Math.floor(Math.random() * 1000)}`;
       socket.emit('submit-answer', {
@@ -208,6 +216,34 @@ const GuestPlayQuiz = () => {
         timeTaken,
         username: studentUsername
       });
+    }
+
+    // Auto-advance to next question after delay
+    if (currentQuestionIndex < quiz.questions.length - 1) {
+      setTimeout(() => {
+        const nextIndex = currentQuestionIndex + 1;
+        setCurrentQuestionIndex(nextIndex);
+        setCurrentQuestion(quiz.questions[nextIndex]);
+        setSelectedAnswer(null);
+        setAnswered(false);
+        setTimeLeft(quiz.questions[nextIndex].timeLimit || 20);
+        setScore(0);
+        setShowKnownAnimation(false);
+      }, 2000); // 2 second delay to show animation and feedback
+    } else {
+      // Last question - finish quiz after delay
+      setTimeout(() => {
+        if (window.opener || window.history.length <= 1) {
+          window.close();
+          setTimeout(() => {
+            if (!document.hidden) {
+              navigate('/');
+            }
+          }, 100);
+        } else {
+          navigate('/');
+        }
+      }, 2000);
     }
   };
 
@@ -311,6 +347,7 @@ const GuestPlayQuiz = () => {
       </div>
 
       <div className="question-display">
+        <h2 className="question-text">{currentQuestion.questionText}</h2>
         {currentQuestion.imageUrl ? (
           <div className="question-image-container">
             <img src={currentQuestion.imageUrl} alt="Question" className="question-image" />
@@ -318,8 +355,10 @@ const GuestPlayQuiz = () => {
         ) : (
           <div className="question-image-container"></div>
         )}
-        <h2 className="question-text">{currentQuestion.questionText}</h2>
         <div className="options-grid">
+          {showKnownAnimation && (
+            <div className="known-text-overlay">Known</div>
+          )}
           {currentQuestion.options.map((option, idx) => {
             let optionClass = 'option-button';
             if (answered) {
@@ -345,46 +384,9 @@ const GuestPlayQuiz = () => {
             );
           })}
         </div>
-        {answered && (
+        {answered && score > 0 && (
           <div className={`answer-feedback ${isCorrect ? 'correct' : 'incorrect'}`}>
-            {isCorrect ? '✓ Correct!' : '✗ Wrong Answer'}
-            {score > 0 && <div className="points-earned">+{score} points</div>}
-            {currentQuestionIndex < quiz.questions.length - 1 ? (
-              <button
-                onClick={() => {
-                  // Move to next question
-                  const nextIndex = currentQuestionIndex + 1;
-                  setCurrentQuestionIndex(nextIndex);
-                  setCurrentQuestion(quiz.questions[nextIndex]);
-                  setSelectedAnswer(null);
-                  setAnswered(false);
-                  setTimeLeft(quiz.questions[nextIndex].timeLimit || 20);
-                  setScore(0); // Reset score for next question
-                }}
-                className="btn btn-primary next-question-btn"
-              >
-                Next Question →
-              </button>
-            ) : (
-              <button
-                onClick={() => {
-                  if (window.opener || window.history.length <= 1) {
-                    window.close();
-                    setTimeout(() => {
-                      if (!document.hidden) {
-                        navigate('/');
-                      }
-                    }, 100);
-                  } else {
-                    navigate('/');
-                  }
-                }}
-                className="btn btn-success"
-                style={{ marginTop: '1rem', fontSize: '1.2rem', padding: '1rem 2rem', fontWeight: 'bold' }}
-              >
-                ✓ Finish Quiz
-              </button>
-            )}
+            <div className="points-earned">+{score} points</div>
           </div>
         )}
       </div>

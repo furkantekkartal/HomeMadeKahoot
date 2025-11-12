@@ -28,6 +28,7 @@ const LoggedInPlayQuiz = () => {
   const studentJoinedRef = useRef(false);
   const initialLoadRef = useRef(false);
   const autoStartedRef = useRef(false);
+  const [showKnownAnimation, setShowKnownAnimation] = useState(false);
 
   useEffect(() => {
     const socketInstance = connectSocket();
@@ -216,6 +217,13 @@ const LoggedInPlayQuiz = () => {
     setSelectedAnswer(answerIndex);
     setAnswered(true);
 
+    // Show animation if correct
+    const isCorrectAnswer = answerIndex === currentQuestion.correctAnswer;
+    if (isCorrectAnswer) {
+      setShowKnownAnimation(true);
+      setTimeout(() => setShowKnownAnimation(false), 300);
+    }
+
     if (socket) {
       const studentUsername = location.state?.username || username || `User${Math.floor(Math.random() * 1000)}`;
       socket.emit('submit-answer', {
@@ -225,16 +233,38 @@ const LoggedInPlayQuiz = () => {
         timeTaken,
         username: studentUsername
       });
+    }
 
-      // Auto-finish quiz if this is the last question and autoStart is enabled
-      if (autoStart && quiz && currentQuestionIndex === quiz.questions.length - 1) {
-        // Wait a moment for the answer to be processed, then finish
-        setTimeout(() => {
-          if (socket) {
-            socket.emit('finish-quiz', { sessionId });
+    // Auto-advance to next question after delay
+    if (currentQuestionIndex < quiz.questions.length - 1) {
+      setTimeout(() => {
+        const nextIndex = currentQuestionIndex + 1;
+        setCurrentQuestionIndex(nextIndex);
+        setCurrentQuestion(quiz.questions[nextIndex]);
+        setSelectedAnswer(null);
+        setAnswered(false);
+        setTimeLeft(quiz.questions[nextIndex].timeLimit || 20);
+        setScore(0);
+        setShowKnownAnimation(false);
+      }, 2000); // 2 second delay to show animation and feedback
+    } else {
+      // Last question - finish quiz after delay
+      setTimeout(() => {
+        if (socket && autoStart) {
+          socket.emit('finish-quiz', { sessionId });
+        } else {
+          if (window.opener || window.history.length <= 1) {
+            window.close();
+            setTimeout(() => {
+              if (!document.hidden) {
+                navigate('/');
+              }
+            }, 100);
+          } else {
+            navigate('/');
           }
-        }, 1000);
-      }
+        }
+      }, 2000);
     }
   };
 
@@ -308,6 +338,7 @@ const LoggedInPlayQuiz = () => {
       </div>
 
       <div className="question-display">
+        <h2 className="question-text">{currentQuestion.questionText}</h2>
         {currentQuestion.imageUrl ? (
           <div className="question-image-container">
             <img src={currentQuestion.imageUrl} alt="Question" className="question-image" />
@@ -315,8 +346,10 @@ const LoggedInPlayQuiz = () => {
         ) : (
           <div className="question-image-container"></div>
         )}
-        <h2 className="question-text">{currentQuestion.questionText}</h2>
         <div className="options-grid">
+          {showKnownAnimation && (
+            <div className="known-text-overlay">Known</div>
+          )}
           {currentQuestion.options.map((option, idx) => {
             let optionClass = 'option-button';
             if (answered) {
@@ -342,52 +375,9 @@ const LoggedInPlayQuiz = () => {
             );
           })}
         </div>
-        {answered && (
+        {answered && score > 0 && (
           <div className={`answer-feedback ${isCorrect ? 'correct' : 'incorrect'}`}>
-            {isCorrect ? '✓ Correct!' : '✗ Wrong Answer'}
-            {score > 0 && <div className="points-earned">+{score} points</div>}
-            {currentQuestionIndex < quiz.questions.length - 1 ? (
-              <button
-                onClick={() => {
-                  // Move to next question
-                  const nextIndex = currentQuestionIndex + 1;
-                  setCurrentQuestionIndex(nextIndex);
-                  setCurrentQuestion(quiz.questions[nextIndex]);
-                  setSelectedAnswer(null);
-                  setAnswered(false);
-                  setTimeLeft(quiz.questions[nextIndex].timeLimit || 20);
-                  setScore(0); // Reset score for next question
-                }}
-                className="btn btn-primary next-question-btn"
-              >
-                Next Question →
-              </button>
-            ) : (
-              <button
-                onClick={() => {
-                  // Auto-finish quiz when last question is answered
-                  if (socket && autoStart) {
-                    socket.emit('finish-quiz', { sessionId });
-                  } else {
-                    // For regular hosted quizzes, just navigate
-                    if (window.opener || window.history.length <= 1) {
-                      window.close();
-                      setTimeout(() => {
-                        if (!document.hidden) {
-                          navigate('/');
-                        }
-                      }, 100);
-                    } else {
-                      navigate('/');
-                    }
-                  }
-                }}
-                className="btn btn-success"
-                style={{ marginTop: '1rem', fontSize: '1.2rem', padding: '1rem 2rem', fontWeight: 'bold' }}
-              >
-                ✓ Finish Quiz
-              </button>
-            )}
+            <div className="points-earned">+{score} points</div>
           </div>
         )}
       </div>
