@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { wordAPI, flashcardAPI } from '../services/api';
 import { useStudyTimer } from '../hooks/useStudyTimer';
 import StudyTimer from '../components/Common/StudyTimer';
@@ -18,6 +18,7 @@ const CONSTANTS = {
 
 const Spelling = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   
   // Deck state
   const [decks, setDecks] = useState([]);
@@ -97,13 +98,24 @@ const Spelling = () => {
     initializeSpelling();
   }, []);
 
-  // Auto-select first deck when decks are loaded
+  // Auto-select deck from navigation state or first deck when decks are loaded
   useEffect(() => {
     if (decks.length > 0 && !currentDeck) {
-      // Automatically select the first deck
+      // Check if deckId was passed from navigation
+      const deckIdFromState = location.state?.deckId;
+      if (deckIdFromState) {
+        const deck = decks.find(d => d._id === deckIdFromState);
+        if (deck) {
+          setCurrentDeck(deck);
+          // Clear the state to avoid re-selecting on re-renders
+          window.history.replaceState({}, document.title);
+          return;
+        }
+      }
+      // Otherwise, automatically select the first deck
       setCurrentDeck(decks[0]);
     }
-  }, [decks, currentDeck]);
+  }, [decks, currentDeck, location.state]);
 
   // Load default cards if no decks exist
   useEffect(() => {

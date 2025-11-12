@@ -30,12 +30,13 @@ export const authAPI = {
 
 // Quiz API
 export const quizAPI = {
-  getAll: () => api.get('/quizzes'),
-  getMyQuizzes: () => api.get('/quizzes/my'),
+  getAll: (includeHidden = false) => api.get(`/quizzes${includeHidden ? '?includeHidden=true' : ''}`),
+  getMyQuizzes: (includeHidden = false) => api.get(`/quizzes/my${includeHidden ? '?includeHidden=true' : ''}`),
   getQuiz: (id) => api.get(`/quizzes/${id}`),
   createQuiz: (data) => api.post('/quizzes', data),
   updateQuiz: (id, data) => api.put(`/quizzes/${id}`, data),
   deleteQuiz: (id) => api.delete(`/quizzes/${id}`),
+  toggleQuizVisibility: (id) => api.patch(`/quizzes/${id}/visibility`),
   generateQuestionImage: (questionText, options) => api.post('/quizzes/generate-image', { questionText, options }),
   generateQuizTitle: (category, difficulty) => api.post('/quizzes/generate-title', { category, difficulty }),
   generateQuizDescription: (title, category, difficulty) => api.post('/quizzes/generate-description', { title, category, difficulty }),
@@ -60,6 +61,7 @@ export const sessionAPI = {
   getMySessions: () => api.get('/sessions/my'),
   saveResult: (data) => api.post('/sessions/results', data),
   getMyResults: () => api.get('/sessions/results/my'),
+  getMyPerformance: (filters) => api.get('/sessions/performance', { params: filters }),
   getTeacherAnalytics: (filters) => api.get('/sessions/analytics', { params: filters }),
 };
 

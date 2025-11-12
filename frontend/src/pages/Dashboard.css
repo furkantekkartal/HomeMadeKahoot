@@ -50,10 +50,14 @@
 
 /* Stats Grid */
 .stats-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
   gap: 1.5rem;
   margin-bottom: 2rem;
+  width: 100%;
+  box-sizing: border-box;
+  align-items: stretch;
 }
 
 .stat-card {
@@ -62,6 +66,9 @@
   border-radius: 12px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   color: white;
+  flex: 1 1 0% !important;
+  min-width: 0;
+  max-width: none;
 }
 
 .stat-card-blue {
@@ -454,11 +461,7 @@
 }
 
 /* Responsive */
-@media (max-width: 1200px) {
-  .stats-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  
+@media (max-width: 992px) {
   .badges-grid {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -478,8 +481,21 @@
   }
 
   .stats-grid {
-    grid-template-columns: 1fr;
-    gap: 1rem;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    gap: 0.75rem;
+  }
+  
+  .stat-card {
+    flex: 1 1 0% !important;
+    min-width: 0;
+    padding: 1rem;
+  }
+  
+  @media (max-width: 480px) {
+    .stats-grid {
+      flex-direction: column !important;
+    }
   }
 
   .badges-grid {

@@ -111,7 +111,7 @@ exports.saveResult = async (req, res) => {
 exports.getMyResults = async (req, res) => {
   try {
     const results = await Result.find({ userId: req.user.userId })
-      .populate('quizId', 'title category difficulty')
+      .populate('quizId', 'title level skill task category difficulty')
       .sort({ completedAt: -1 })
       .limit(50);
     res.json(results);
@@ -120,10 +120,276 @@ exports.getMyResults = async (req, res) => {
   }
 };
 
+// Get all students performance (aggregated by student)
+exports.getMyPerformance = async (req, res) => {
+  try {
+    const { studentName, quizName, level, skill, task, dateFrom, dateTo } = req.query;
+    
+    // Build query for StudentResult (all students, not filtered by user)
+    const studentResultQuery = {};
+
+    // Apply filters to StudentResult query
+    if (studentName && studentName.trim() !== '') {
+      studentResultQuery.username = { $regex: studentName.trim(), $options: 'i' };
+    }
+    if (quizName && quizName.trim() !== '') {
+      studentResultQuery.quizName = { $regex: quizName.trim(), $options: 'i' };
+    }
+    if (level && level.trim() !== '') {
+      studentResultQuery.level = level.trim();
+    }
+    if (skill && skill.trim() !== '') {
+      studentResultQuery.skill = skill.trim();
+    }
+    if (task && task.trim() !== '') {
+      studentResultQuery.task = task.trim();
+    }
+    if (dateFrom || dateTo) {
+      studentResultQuery.completedAt = {};
+      if (dateFrom && dateFrom.trim() !== '') {
+        studentResultQuery.completedAt.$gte = new Date(dateFrom);
+      }
+      if (dateTo && dateTo.trim() !== '') {
+        const toDate = new Date(dateTo);
+        toDate.setHours(23, 59, 59, 999);
+        studentResultQuery.completedAt.$lte = toDate;
+      }
+    }
+
+    // Get all student results (not filtered by user)
+    let studentResults = await StudentResult.find(studentResultQuery)
+      .populate('quizId', 'title level skill task category difficulty')
+      .populate('userId', 'username')
+      .sort({ completedAt: -1 });
+
+    // Also get all logged-in user results from Result collection
+    const resultQuery = {};
+    if (dateFrom || dateTo) {
+      resultQuery.completedAt = {};
+      if (dateFrom && dateFrom.trim() !== '') {
+        resultQuery.completedAt.$gte = new Date(dateFrom);
+      }
+      if (dateTo && dateTo.trim() !== '') {
+        const toDate = new Date(dateTo);
+        toDate.setHours(23, 59, 59, 999);
+        resultQuery.completedAt.$lte = toDate;
+      }
+    }
+
+    const loggedInResults = await Result.find(resultQuery)
+      .populate('quizId', 'title level skill task category difficulty')
+      .populate('userId', 'username')
+      .sort({ completedAt: -1 });
+
+    // Get User model to map userIds to usernames
+    const User = require('../models/User');
+    const userIdToUsername = new Map();
+    const allUserIds = new Set();
+    
+    // Collect all user IDs
+    studentResults.forEach(result => {
+      if (result.userId) {
+        const userId = result.userId._id ? result.userId._id.toString() : result.userId.toString();
+        if (userId) allUserIds.add(userId);
+      }
+    });
+    loggedInResults.forEach(result => {
+      if (result.userId) {
+        const userId = result.userId._id ? result.userId._id.toString() : result.userId.toString();
+        if (userId) allUserIds.add(userId);
+      }
+    });
+
+    // Fetch all users to get usernames
+    if (allUserIds.size > 0) {
+      const userIdArray = Array.from(allUserIds).map(id => {
+        return mongoose.Types.ObjectId.isValid(id) ? new mongoose.Types.ObjectId(id) : id;
+      });
+      const users = await User.find({ _id: { $in: userIdArray } });
+      users.forEach(user => {
+        userIdToUsername.set(user._id.toString(), user.username);
+      });
+    }
+
+    // Combine and normalize results
+    const allResults = [];
+    
+    // Add StudentResult entries
+    studentResults.forEach(result => {
+      const quiz = result.quizId || {};
+      let username = result.username || 'Unknown';
+      if (!username && result.userId) {
+        const userId = result.userId._id ? result.userId._id.toString() : result.userId.toString();
+        username = userIdToUsername.get(userId) || 'Unknown';
+      }
+      
+      allResults.push({
+        studentName: username,
+        quizId: result.quizId ? (result.quizId._id ? result.quizId._id.toString() : result.quizId.toString()) : null,
+        quizName: result.quizName || quiz.title || 'Unknown Quiz',
+        level: result.level || quiz.level || (result.difficulty === 'beginner' ? 'A1' : result.difficulty === 'intermediate' ? 'B1' : result.difficulty === 'advanced' ? 'C1' : null),
+        skill: result.skill || quiz.skill || (result.category === 'reading' ? 'Reading' : result.category === 'listening' ? 'Listening' : null),
+        task: result.task || quiz.task || (result.category === 'vocabulary' ? 'Vocabulary' : result.category === 'grammar' ? 'Grammar' : null),
+        questionCount: result.questionCount || 0,
+        points: result.totalPoints || 0,
+        correctAnswers: result.correctAnswers || 0,
+        wrongAnswers: result.wrongAnswers || 0,
+        successPercentage: result.successPercentage || 0,
+        completedAt: result.completedAt,
+        sessionId: result.sessionId ? result.sessionId.toString() : null
+      });
+    });
+
+    // Add Result entries (convert to same format)
+    loggedInResults.forEach(result => {
+      const quiz = result.quizId || {};
+      let username = 'Unknown';
+      if (result.userId) {
+        const userId = result.userId._id ? result.userId._id.toString() : result.userId.toString();
+        username = userIdToUsername.get(userId) || 'Unknown';
+      }
+      
+      // Check if quiz name matches filter
+      if (quizName && quizName.trim() !== '') {
+        const quizTitle = quiz.title || 'Unknown Quiz';
+        if (!quizTitle.toLowerCase().includes(quizName.toLowerCase().trim())) {
+          return;
+        }
+      }
+      // Check level, skill, task filters
+      if (level && level.trim() !== '' && quiz.level !== level.trim()) {
+        return;
+      }
+      if (skill && skill.trim() !== '' && quiz.skill !== skill.trim()) {
+        return;
+      }
+      if (task && task.trim() !== '' && quiz.task !== task.trim()) {
+        return;
+      }
+      // Check student name filter
+      if (studentName && studentName.trim() !== '') {
+        if (!username.toLowerCase().includes(studentName.toLowerCase().trim())) {
+          return;
+        }
+      }
+
+      const totalQuestions = result.totalQuestions || 0;
+      const correctAnswers = result.correctAnswers || 0;
+      const wrongAnswers = totalQuestions - correctAnswers;
+      const successPercentage = totalQuestions > 0 ? Math.round((correctAnswers / totalQuestions) * 100) : 0;
+
+      allResults.push({
+        studentName: username,
+        quizId: quiz._id ? quiz._id.toString() : (result.quizId ? result.quizId.toString() : null),
+        quizName: quiz.title || 'Unknown Quiz',
+        level: quiz.level || null,
+        skill: quiz.skill || null,
+        task: quiz.task || null,
+        questionCount: totalQuestions,
+        points: result.score || 0,
+        correctAnswers: correctAnswers,
+        wrongAnswers: wrongAnswers,
+        successPercentage: successPercentage,
+        completedAt: result.completedAt,
+        sessionId: result.sessionId ? result.sessionId.toString() : null
+      });
+    });
+
+    // Aggregate by student name
+    const studentMap = new Map();
+
+    allResults.forEach(result => {
+      const studentKey = result.studentName;
+      
+      if (!studentMap.has(studentKey)) {
+        studentMap.set(studentKey, {
+          studentName: studentKey,
+          totalQuizzes: new Set(),
+          totalSessions: 0,
+          totalQuestions: 0,
+          totalPoints: 0,
+          totalCorrect: 0,
+          totalWrong: 0,
+          sessions: []
+        });
+      }
+
+      const student = studentMap.get(studentKey);
+      
+      // Track unique quizzes
+      if (result.quizId) {
+        student.totalQuizzes.add(result.quizId);
+      }
+      
+      // Aggregate totals
+      student.totalSessions += 1;
+      student.totalQuestions += result.questionCount;
+      student.totalPoints += result.points;
+      student.totalCorrect += result.correctAnswers;
+      student.totalWrong += result.wrongAnswers;
+
+      // Add session details
+      student.sessions.push({
+        sessionId: result.sessionId,
+        quizId: result.quizId,
+        quizName: result.quizName,
+        level: result.level,
+        skill: result.skill,
+        task: result.task,
+        date: result.completedAt,
+        questionCount: result.questionCount,
+        points: result.points,
+        correctAnswers: result.correctAnswers,
+        wrongAnswers: result.wrongAnswers,
+        successPercentage: result.successPercentage
+      });
+    });
+
+    // Convert to array and calculate success percentage
+    const performance = Array.from(studentMap.values()).map(student => {
+      const successPercentage = student.totalQuestions > 0 
+        ? Math.round((student.totalCorrect / student.totalQuestions) * 100) 
+        : 0;
+
+      return {
+        studentName: student.studentName,
+        totalQuizzes: student.totalQuizzes.size,
+        totalSessions: student.totalSessions,
+        totalQuestions: student.totalQuestions,
+        totalPoints: student.totalPoints,
+        totalCorrect: student.totalCorrect,
+        totalWrong: student.totalWrong,
+        successPercentage: successPercentage,
+        sessions: student.sessions.sort((a, b) => new Date(b.date) - new Date(a.date))
+      };
+    });
+
+    // Sort by student name
+    performance.sort((a, b) => a.studentName.localeCompare(b.studentName));
+
+    // Calculate totals
+    const totalQuizzes = new Set();
+    performance.forEach(p => {
+      p.sessions.forEach(s => {
+        if (s.quizId) totalQuizzes.add(s.quizId);
+      });
+    });
+
+    res.json({
+      performance,
+      totalQuizzes: totalQuizzes.size,
+      totalSessions: allResults.length
+    });
+  } catch (error) {
+    console.error('Error getting all students performance:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
 // Get teacher analytics (using StudentResult table)
 exports.getTeacherAnalytics = async (req, res) => {
   try {
-    const { studentName, quizName, category, difficulty, dateFrom, dateTo } = req.query;
+    const { studentName, quizName, level, skill, task, category, difficulty, dateFrom, dateTo } = req.query;
     
     // Build query for student results - ensure hostId is ObjectId
     // JWT token contains userId as string, but MongoDB stores it as ObjectId
@@ -139,6 +405,17 @@ exports.getTeacherAnalytics = async (req, res) => {
     if (studentName && typeof studentName === 'string' && studentName.trim() !== '') {
       query.username = { $regex: studentName.trim(), $options: 'i' };
     }
+    // New standardized filters
+    if (level && typeof level === 'string' && level.trim() !== '') {
+      query.level = level.trim();
+    }
+    if (skill && typeof skill === 'string' && skill.trim() !== '') {
+      query.skill = skill.trim();
+    }
+    if (task && typeof task === 'string' && task.trim() !== '') {
+      query.task = task.trim();
+    }
+    // Legacy filters (for backward compatibility)
     if (category && typeof category === 'string' && category.trim() !== '') {
       query.category = category.trim().toLowerCase();
     }
@@ -173,6 +450,25 @@ exports.getTeacherAnalytics = async (req, res) => {
 
     // Verify filters are correctly applied (safety check)
     if (results.length > 0) {
+      if (level && level.trim() !== '') {
+        const filteredResults = results.filter(r => r.level === level.trim());
+        if (filteredResults.length !== results.length) {
+          results = filteredResults;
+        }
+      }
+      if (skill && skill.trim() !== '') {
+        const filteredResults = results.filter(r => r.skill === skill.trim());
+        if (filteredResults.length !== results.length) {
+          results = filteredResults;
+        }
+      }
+      if (task && task.trim() !== '') {
+        const filteredResults = results.filter(r => r.task === task.trim());
+        if (filteredResults.length !== results.length) {
+          results = filteredResults;
+        }
+      }
+      // Legacy filters (for backward compatibility)
       if (difficulty && difficulty.trim() !== '') {
         const filteredResults = results.filter(r => r.difficulty === difficulty.toLowerCase());
         if (filteredResults.length !== results.length) {
@@ -227,6 +523,10 @@ exports.getTeacherAnalytics = async (req, res) => {
         sessionId: result.sessionId.toString(),
         quizId: result.quizId.toString(),
         quizName: result.quizName,
+        level: result.level || (result.difficulty === 'beginner' ? 'A1' : result.difficulty === 'intermediate' ? 'B1' : result.difficulty === 'advanced' ? 'C1' : 'A1'),
+        skill: result.skill || (result.category === 'reading' ? 'Reading' : result.category === 'listening' ? 'Listening' : 'Reading'),
+        task: result.task || (result.category === 'vocabulary' ? 'Vocabulary' : result.category === 'grammar' ? 'Grammar' : 'Vocabulary'),
+        // Legacy fields for backward compatibility
         category: result.category,
         difficulty: result.difficulty,
         questionCount: result.questionCount,
@@ -268,6 +568,10 @@ exports.getTeacherAnalytics = async (req, res) => {
       filters: {
         studentName: studentName || null,
         quizName: quizName || null,
+        level: level || null,
+        skill: skill || null,
+        task: task || null,
+        // Legacy fields for backward compatibility
         category: category || null,
         difficulty: difficulty || null,
         dateFrom: dateFrom || null,

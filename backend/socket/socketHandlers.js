@@ -117,14 +117,23 @@ const initializeSocketHandlers = (io) => {
                 ? Math.round((correctCount / totalQuestions) * 100) 
                 : 0;
 
+              // Map legacy fields to new fields if needed
+              const quizLevel = session.quizId.level || (session.quizId.difficulty === 'beginner' ? 'A1' : session.quizId.difficulty === 'intermediate' ? 'B1' : session.quizId.difficulty === 'advanced' ? 'C1' : 'A1');
+              const quizSkill = session.quizId.skill || (session.quizId.category === 'reading' ? 'Reading' : session.quizId.category === 'listening' ? 'Listening' : 'Reading');
+              const quizTask = session.quizId.task || (session.quizId.category === 'vocabulary' ? 'Vocabulary' : session.quizId.category === 'grammar' ? 'Grammar' : 'Vocabulary');
+              
               await StudentResult.create({
                 username: participant.username,
                 userId: participant.userId || null,
                 sessionId: session._id,
                 quizId: session.quizId._id,
                 quizName: session.quizId.title,
-                category: session.quizId.category,
-                difficulty: session.quizId.difficulty,
+                level: quizLevel,
+                skill: quizSkill,
+                task: quizTask,
+                // Keep legacy fields for backward compatibility
+                category: session.quizId.category || quizTask.toLowerCase(),
+                difficulty: session.quizId.difficulty || (quizLevel === 'A1' || quizLevel === 'A2' ? 'beginner' : quizLevel === 'B1' || quizLevel === 'B2' ? 'intermediate' : 'advanced'),
                 hostId: session.hostId,
                 questionCount: totalQuestions,
                 totalPoints: participant.score || 0,
@@ -182,14 +191,23 @@ const initializeSocketHandlers = (io) => {
               ? Math.round((correctCount / totalQuestions) * 100) 
               : 0;
 
+              // Map legacy fields to new fields if needed
+              const quizLevel = session.quizId.level || (session.quizId.difficulty === 'beginner' ? 'A1' : session.quizId.difficulty === 'intermediate' ? 'B1' : session.quizId.difficulty === 'advanced' ? 'C1' : 'A1');
+              const quizSkill = session.quizId.skill || (session.quizId.category === 'reading' ? 'Reading' : session.quizId.category === 'listening' ? 'Listening' : 'Reading');
+              const quizTask = session.quizId.task || (session.quizId.category === 'vocabulary' ? 'Vocabulary' : session.quizId.category === 'grammar' ? 'Grammar' : 'Vocabulary');
+              
               await StudentResult.create({
                 username: participant.username,
                 userId: participant.userId || null,
                 sessionId: session._id,
                 quizId: session.quizId._id,
                 quizName: session.quizId.title,
-                category: session.quizId.category,
-                difficulty: session.quizId.difficulty,
+                level: quizLevel,
+                skill: quizSkill,
+                task: quizTask,
+                // Keep legacy fields for backward compatibility
+                category: session.quizId.category || quizTask.toLowerCase(),
+                difficulty: session.quizId.difficulty || (quizLevel === 'A1' || quizLevel === 'A2' ? 'beginner' : quizLevel === 'B1' || quizLevel === 'B2' ? 'intermediate' : 'advanced'),
                 hostId: session.hostId,
                 questionCount: totalQuestions,
                 totalPoints: participant.score || 0,

@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { FaEdit, FaTrash } from 'react-icons/fa';
 import { quizAPI, sessionAPI } from '../services/api';
 import './Quiz.css';
 
 const Quiz = () => {
   const navigate = useNavigate();
-  const [myQuizzes, setMyQuizzes] = useState([]);
+  const [allQuizzes, setAllQuizzes] = useState([]);
   const [recentSessions, setRecentSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [hostingQuizId, setHostingQuizId] = useState(null);
+  const [sessionFilter, setSessionFilter] = useState('all'); // 'all', 'completed', 'active', 'waiting'
 
   useEffect(() => {
     loadData();
@@ -17,11 +19,11 @@ const Quiz = () => {
   const loadData = async () => {
     try {
       const [quizzesRes, sessionsRes] = await Promise.all([
-        quizAPI.getMyQuizzes(),
+        quizAPI.getAll(false), // Get all visible quizzes
         sessionAPI.getMySessions()
       ]);
-      setMyQuizzes(quizzesRes.data);
-      setRecentSessions(sessionsRes.data.slice(0, 5));
+      setAllQuizzes(quizzesRes.data);
+      setRecentSessions(sessionsRes.data);
     } catch (error) {
       console.error('Error loading data:', error);
     } finally {
@@ -33,7 +35,7 @@ const Quiz = () => {
     if (window.confirm('Are you sure you want to delete this quiz?')) {
       try {
         await quizAPI.deleteQuiz(id);
-        setMyQuizzes(myQuizzes.filter(q => q._id !== id));
+        setAllQuizzes(allQuizzes.filter(q => q._id !== id));
       } catch (error) {
         alert('Error deleting quiz');
       }
@@ -75,39 +77,41 @@ const Quiz = () => {
     return <div className="loading">Loading...</div>;
   }
 
+  const filteredSessions = sessionFilter === 'all' 
+    ? recentSessions 
+    : recentSessions.filter(session => session.status === sessionFilter);
+
   return (
     <div className="quiz">
       <div className="quiz-header">
         <h1>Quiz</h1>
-        <Link to="/create-quiz" className="btn btn-primary">
-          + Create New Quiz
-        </Link>
       </div>
 
       <div className="quiz-grid-layout">
         <div className="quiz-section">
-          <h2>My Quizzes ({myQuizzes.length})</h2>
-          {myQuizzes.length === 0 ? (
+          <h2>All Quizzes ({allQuizzes.length})</h2>
+          {allQuizzes.length === 0 ? (
             <div className="empty-state">
-              <p>No quizzes yet. Create your first quiz!</p>
-              <Link to="/create-quiz" className="btn btn-primary">
-                Create Quiz
-              </Link>
+              <p>No quizzes available.</p>
             </div>
           ) : (
             <div className="quiz-grid">
-              {myQuizzes.map(quiz => (
+              {allQuizzes.map(quiz => (
                 <div key={quiz._id} className="quiz-card">
                   <div className="quiz-card-header">
                     <h3>{quiz.title}</h3>
-                    <span className={`badge badge-${quiz.difficulty}`}>
-                      {quiz.difficulty}
-                    </span>
+                    <div className="header-badges">
+                      <span className="badge badge-level">
+                        {quiz.level || (quiz.difficulty === 'beginner' ? 'A1' : quiz.difficulty === 'intermediate' ? 'B1' : quiz.difficulty === 'advanced' ? 'C1' : 'A1')}
+                      </span>
+                    </div>
                   </div>
                   <p className="quiz-description">{quiz.description || 'No description'}</p>
                   <div className="quiz-meta">
-                    <span>📚 {quiz.category}</span>
+                    <span>📚 {quiz.task || (quiz.category === 'vocabulary' ? 'Vocabulary' : quiz.category === 'grammar' ? 'Grammar' : quiz.category || 'Vocabulary')}</span>
+                    <span>🎯 {quiz.skill || (quiz.category === 'reading' ? 'Reading' : quiz.category === 'listening' ? 'Listening' : 'Reading')}</span>
                     <span>❓ {quiz.questions.length} questions</span>
+                    <span>👤 {quiz.creatorId?.username || 'Unknown'}</span>
                   </div>
                   <div className="quiz-actions">
                     <button
@@ -117,14 +121,19 @@ const Quiz = () => {
                     >
                       {hostingQuizId === quiz._id ? 'Creating...' : 'Host Quiz'}
                     </button>
-                    <Link to={`/edit-quiz/${quiz._id}`} className="btn btn-secondary btn-sm">
-                      Edit
+                    <Link 
+                      to={`/edit-quiz/${quiz._id}`} 
+                      className="btn btn-secondary btn-sm"
+                      title="Edit quiz"
+                    >
+                      <FaEdit />
                     </Link>
                     <button
                       onClick={() => handleDeleteQuiz(quiz._id)}
                       className="btn btn-danger btn-sm"
+                      title="Delete quiz"
                     >
-                      Delete
+                      <FaTrash />
                     </button>
                   </div>
                 </div>
@@ -134,14 +143,58 @@ const Quiz = () => {
         </div>
 
         <div className="quiz-section">
-          <h2>Recent Sessions</h2>
-          {recentSessions.length === 0 ? (
+          <div className="sessions-header">
+            <h2>Recent Sessions</h2>
+            <div className="session-filters">
+              <label>
+                <input
+                  type="radio"
+                  name="sessionFilter"
+                  value="all"
+                  checked={sessionFilter === 'all'}
+                  onChange={(e) => setSessionFilter(e.target.value)}
+                />
+                All
+              </label>
+              <label>
+                <input
+                  type="radio"
+                  name="sessionFilter"
+                  value="completed"
+                  checked={sessionFilter === 'completed'}
+                  onChange={(e) => setSessionFilter(e.target.value)}
+                />
+                Completed
+              </label>
+              <label>
+                <input
+                  type="radio"
+                  name="sessionFilter"
+                  value="active"
+                  checked={sessionFilter === 'active'}
+                  onChange={(e) => setSessionFilter(e.target.value)}
+                />
+                Active
+              </label>
+              <label>
+                <input
+                  type="radio"
+                  name="sessionFilter"
+                  value="waiting"
+                  checked={sessionFilter === 'waiting'}
+                  onChange={(e) => setSessionFilter(e.target.value)}
+                />
+                Waiting
+              </label>
+            </div>
+          </div>
+          {filteredSessions.length === 0 ? (
             <div className="empty-state">
-              <p>No recent sessions</p>
+              <p>No sessions found</p>
             </div>
           ) : (
             <div className="sessions-list">
-              {recentSessions.map(session => (
+              {filteredSessions.map(session => (
                 <div key={session._id} className="session-item">
                   <div className="session-item-content">
                     <strong>{session.quizId?.title || 'Quiz'}</strong>

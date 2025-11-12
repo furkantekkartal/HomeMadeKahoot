@@ -15,6 +15,23 @@ const quizSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
+  // New standardized fields (Level, Skill, Task)
+  level: {
+    type: String,
+    enum: ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'],
+    default: 'A1'
+  },
+  skill: {
+    type: String,
+    enum: ['Speaking', 'Reading', 'Writing', 'Listening'],
+    default: 'Reading'
+  },
+  task: {
+    type: String,
+    enum: ['Vocabulary', 'Grammar', 'Spelling', 'Essay', 'Repeat', 'Read Aloud'],
+    default: 'Vocabulary'
+  },
+  // Legacy fields (kept for backward compatibility)
   category: {
     type: String,
     enum: ['vocabulary', 'grammar', 'reading', 'listening'],
@@ -59,6 +76,10 @@ const quizSchema = new mongoose.Schema({
   updatedAt: {
     type: Date,
     default: Date.now
+  },
+  isVisible: {
+    type: Boolean,
+    default: true
   }
 });
 

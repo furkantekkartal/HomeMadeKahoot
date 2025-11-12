@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { FaEdit, FaTrash } from 'react-icons/fa';
 import { flashcardAPI } from '../services/api';
 import { DECK_LEVELS, DECK_SKILLS, DECK_TASKS, formatLevel, formatSkill, formatTask } from '../constants/deckConstants';
 import './Decks.css';
@@ -154,14 +155,16 @@ const Decks = () => {
                 <button
                   onClick={() => handleEdit(deck)}
                   className="btn btn-secondary btn-sm"
+                  title="Edit deck"
                 >
-                  ✏️ Edit
+                  <FaEdit />
                 </button>
                 <button
                   onClick={() => handleDelete(deck._id, deck.name)}
                   className="btn btn-danger btn-sm"
+                  title="Delete deck"
                 >
-                  🗑️ Delete
+                  <FaTrash />
                 </button>
               </div>
             </div>

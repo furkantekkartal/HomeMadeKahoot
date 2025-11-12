@@ -25,6 +25,7 @@ import EditQuiz from './pages/EditQuiz';
 import HostQuiz from './pages/HostQuiz';
 import SelfPacedQuiz from './pages/SelfPacedQuiz';
 import Results from './pages/Results';
+import Performance from './pages/Performance';
 import BrowseQuizzes from './pages/BrowseQuizzes';
 import Profile from './pages/Profile';
 import WordDatabase from './pages/WordDatabase';
@@ -98,6 +99,7 @@ function AppContent() {
           <Route path="/quiz/:id/self-paced" element={<SelfPacedQuiz />} />
           <Route path="/browse" element={<PrivateRoute><BrowseQuizzes /></PrivateRoute>} />
           <Route path="/results" element={<PrivateRoute><Results /></PrivateRoute>} />
+          <Route path="/performance" element={<PrivateRoute><Performance /></PrivateRoute>} />
           <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
           <Route path="/words" element={<PrivateRoute><WordDatabase /></PrivateRoute>} />
           <Route path="/flashcards" element={<PrivateRoute><Flashcards /></PrivateRoute>} />

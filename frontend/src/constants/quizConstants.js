@@ -1,24 +1,47 @@
-// Shared constants for quiz categories and difficulties
-export const QUIZ_CATEGORIES = [
-  'vocabulary',
-  'grammar',
-  'reading',
-  'listening'
+// Shared constants for quiz levels, skills, and tasks
+// Using same terminology as decks for consistency
+export const QUIZ_LEVELS = [
+  'A1',
+  'A2',
+  'B1',
+  'B2',
+  'C1',
+  'C2'
 ];
 
-export const QUIZ_DIFFICULTIES = [
-  'beginner',
-  'intermediate',
-  'advanced'
+export const QUIZ_SKILLS = [
+  'Speaking',
+  'Reading',
+  'Writing',
+  'Listening'
+];
+
+export const QUIZ_TASKS = [
+  'Vocabulary',
+  'Grammar',
+  'Spelling',
+  'Essay',
+  'Repeat',
+  'Read Aloud'
 ];
 
 // Helper functions for display
-export const formatCategory = (category) => {
-  return category ? category.charAt(0).toUpperCase() + category.slice(1) : '';
+export const formatLevel = (level) => {
+  return level || '';
 };
 
-export const formatDifficulty = (difficulty) => {
-  return difficulty ? difficulty.charAt(0).toUpperCase() + difficulty.slice(1) : '';
+export const formatSkill = (skill) => {
+  return skill || '';
 };
+
+export const formatTask = (task) => {
+  return task || '';
+};
+
+// Legacy support - map old values to new ones
+export const QUIZ_CATEGORIES = QUIZ_TASKS.map(t => t.toLowerCase());
+export const QUIZ_DIFFICULTIES = QUIZ_LEVELS;
+export const formatCategory = formatTask;
+export const formatDifficulty = formatLevel;
 
 

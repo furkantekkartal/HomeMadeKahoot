@@ -2,10 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { sessionAPI } from '../services/api';
 import { QUIZ_LEVELS, QUIZ_SKILLS, QUIZ_TASKS, formatLevel, formatSkill, formatTask } from '../constants/quizConstants';
-import './Results.css';
+import './Performance.css';
 
-const Results = () => {
-  const [analytics, setAnalytics] = useState([]);
+const Performance = () => {
+  const [performance, setPerformance] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({
     studentName: '',
@@ -26,20 +26,20 @@ const Results = () => {
     dateTo: ''
   });
   const [summary, setSummary] = useState({
-    totalSessions: 0,
-    totalStudents: 0
+    totalQuizzes: 0,
+    totalSessions: 0
   });
   const [expandedRows, setExpandedRows] = useState(new Set());
 
   useEffect(() => {
-    loadAnalytics();
+    loadPerformance();
   }, []);
 
   useEffect(() => {
-    loadAnalytics();
+    loadPerformance();
   }, [appliedFilters]);
 
-  const loadAnalytics = async () => {
+  const loadPerformance = async () => {
     try {
       setLoading(true);
       const activeFilters = Object.entries(appliedFilters).reduce((acc, [key, value]) => {
@@ -49,14 +49,15 @@ const Results = () => {
         return acc;
       }, {});
       
-      const response = await sessionAPI.getTeacherAnalytics(activeFilters);
-      setAnalytics(response.data.analytics || []);
+      const response = await sessionAPI.getMyPerformance(activeFilters);
+      setPerformance(response.data.performance || []);
       setSummary({
-        totalSessions: response.data.totalSessions || 0,
-        totalStudents: response.data.totalStudents || 0
+        totalQuizzes: response.data.totalQuizzes || 0,
+        totalSessions: response.data.totalSessions || 0
       });
     } catch (error) {
-      console.error('Error loading analytics:', error);
+      console.error('Error loading performance:', error);
+      alert('Failed to load performance data: ' + (error.response?.data?.message || error.message));
     } finally {
       setLoading(false);
     }
@@ -98,30 +99,30 @@ const Results = () => {
   };
 
   if (loading) {
-    return <div className="loading">Loading analytics...</div>;
+    return <div className="loading">Loading performance...</div>;
   }
 
   const hasActiveFilters = Object.values(appliedFilters).some(v => v !== '');
 
   return (
-    <div className="results-container">
-      <div className="results-header">
-        <h1>Student Analytics</h1>
+    <div className="performance-container">
+      <div className="performance-header">
+        <h1>Student Performance</h1>
         <Link to="/quiz" className="btn btn-secondary">
           Back to Quiz
         </Link>
       </div>
 
-      <div className="results-content">
+      <div className="performance-content">
         {/* Summary Cards */}
         <div className="summary-cards">
           <div className="summary-card">
-            <div className="summary-value">{summary.totalSessions}</div>
-            <div className="summary-label">Total Sessions</div>
+            <div className="summary-value">{performance.length}</div>
+            <div className="summary-label">Total Students</div>
           </div>
           <div className="summary-card">
-            <div className="summary-value">{summary.totalStudents}</div>
-            <div className="summary-label">Total Students</div>
+            <div className="summary-value">{summary.totalSessions}</div>
+            <div className="summary-label">Total Sessions</div>
           </div>
         </div>
 
@@ -225,26 +226,26 @@ const Results = () => {
           </div>
         </div>
 
-        {/* Analytics Table */}
-        {analytics.length === 0 ? (
+        {/* Performance Table */}
+        {performance.length === 0 ? (
           <div className="empty-state">
-            <p>No analytics data available yet. Host some quizzes to see student performance here!</p>
+            <p>No performance data available yet. Take some quizzes to see your performance here!</p>
             <Link to="/quiz" className="btn btn-primary">
               Go to Quiz
             </Link>
           </div>
         ) : (
-          <div className="analytics-table-container">
+          <div className="performance-table-container">
             <h2>Student Performance</h2>
             <div className="table-wrapper">
-              <table className="analytics-table">
+              <table className="performance-table">
                 <thead>
                   <tr>
                     <th>Student Name</th>
+                    <th>Points</th>
                     <th>Quizzes</th>
                     <th>Sessions</th>
                     <th>Questions</th>
-                    <th>Points</th>
                     <th>Correct</th>
                     <th>Wrong</th>
                     <th>Success</th>
@@ -252,14 +253,14 @@ const Results = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {analytics.map((student, idx) => (
-                    <React.Fragment key={idx}>
+                  {performance.map((student, idx) => (
+                    <React.Fragment key={student.studentName || idx}>
                       <tr className={expandedRows.has(student.studentName) ? 'expanded' : ''}>
                         <td className="student-name">{student.studentName}</td>
-                        <td>{student.totalQuizzes}</td>
-                        <td>{student.totalSessions || 0}</td>
-                        <td>{student.totalQuestions}</td>
                         <td className="score">{student.totalPoints}</td>
+                        <td>{student.totalQuizzes}</td>
+                        <td>{student.totalSessions}</td>
+                        <td>{student.totalQuestions}</td>
                         <td className="correct">{student.totalCorrect}</td>
                         <td className="wrong">{student.totalWrong}</td>
                         <td className="accuracy">{student.successPercentage}%</td>
@@ -283,19 +284,25 @@ const Results = () => {
                                     <div className="session-header">
                                       <h4>{session.quizName}</h4>
                                       <div className="session-badges">
-                                        <span className="badge badge-level">
-                                          {session.level || (session.difficulty === 'beginner' ? 'A1' : session.difficulty === 'intermediate' ? 'B1' : session.difficulty === 'advanced' ? 'C1' : 'A1')}
-                                        </span>
-                                        <span className="badge badge-skill">
-                                          {session.skill || (session.category === 'reading' ? 'Reading' : session.category === 'listening' ? 'Listening' : 'Reading')}
-                                        </span>
-                                        <span className="badge badge-task">
-                                          {session.task || (session.category === 'vocabulary' ? 'Vocabulary' : session.category === 'grammar' ? 'Grammar' : 'Vocabulary')}
-                                        </span>
+                                        {session.level && (
+                                          <span className="badge badge-level">
+                                            {session.level}
+                                          </span>
+                                        )}
+                                        {session.skill && (
+                                          <span className="badge badge-skill">
+                                            {session.skill}
+                                          </span>
+                                        )}
+                                        {session.task && (
+                                          <span className="badge badge-task">
+                                            {session.task}
+                                          </span>
+                                        )}
                                       </div>
                                     </div>
                                     <div className="session-meta">
-                                      <span>Date: {new Date(session.completedAt).toLocaleDateString()}</span>
+                                      <span>Date: {new Date(session.date).toLocaleDateString()}</span>
                                       <span>Questions: {session.questionCount}</span>
                                     </div>
                                     <div className="session-stats">
@@ -335,4 +342,5 @@ const Results = () => {
   );
 };
 
-export default Results;
+export default Performance;
+

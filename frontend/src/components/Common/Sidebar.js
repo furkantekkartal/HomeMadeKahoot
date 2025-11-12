@@ -6,6 +6,7 @@ import {
   FaHome,
   FaSearch,
   FaChartBar,
+  FaTrophy,
   FaCog,
   FaSignOutAlt,
   FaUser,
@@ -115,6 +116,13 @@ const Sidebar = ({ isOpen, onClose }) => {
         >
           <FaChartBar className="nav-icon nav-icon-results" />
           <span className="nav-text">Results</span>
+        </Link>
+        <Link 
+          to="/performance" 
+          className={`nav-item ${isActive('/performance') ? 'active' : ''}`}
+        >
+          <FaTrophy className="nav-icon nav-icon-performance" />
+          <span className="nav-text">Performance</span>
         </Link>
         <Link 
           to="/words" 

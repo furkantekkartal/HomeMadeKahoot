@@ -7,55 +7,79 @@ English learning quiz platform inspired by Kahoot, designed to make language lea
 - [Project Overview](#project-overview)
 - [Features](#features)
 - [Quick Start](#quick-start)
+- [API Setup](#api-setup)
 - [Tech Stack](#tech-stack)
 - [Database Management](#database-management)
 - [Deployment](#deployment)
 - [Project Structure](#project-structure)
+- [Pages & Features](#pages--features)
+- [Key Features Summary](#key-features-summary)
+- [Development Workflow](#development-workflow)
+- [Future Enhancements](#future-enhancements)
 
 ---
 
 ## Project Overview
 
-HomeMadeKahoot is a web-based English learning application that combines the interactive gameplay of Kahoot with English language learning. Teachers can create and host live quiz sessions, while students can join using PIN codes or practice at their own pace.
+HomeMadeKahoot is a comprehensive English learning platform that combines interactive quiz gameplay with advanced vocabulary and flashcard study tools. The platform supports both live multiplayer quiz sessions and individual self-paced learning, making it suitable for both classroom and personal study.
 
 ### Core Features
 
-- **User Authentication**: Registration, login, and profile management
-- **Quiz Management**: Create, edit, and delete quizzes with multiple-choice questions
-- **Live Host Mode**: Host real-time quiz sessions with PIN codes
-- **Self-Paced Mode**: Practice quizzes at your own pace
-- **Real-Time Communication**: WebSocket-based live synchronization
-- **Scoring System**: Points based on speed and accuracy
-- **English Learning**: Vocabulary, grammar, reading comprehension quizzes
-- **Progress Tracking**: Monitor performance and learning progress
+- **Interactive Quizzes**: Create, host, and join live quiz sessions with real-time synchronization
+- **Flashcard System**: Build custom decks and study with interactive flashcards
+- **Word Database**: Manage vocabulary with advanced filtering and import/export capabilities
+- **Spelling Practice**: Practice spelling words with audio pronunciation
+- **Pronunciation Assessment**: Get AI-powered pronunciation feedback using Azure Speech Service
+- **Progress Tracking**: Monitor learning progress with statistics, badges, and study time tracking
+- **AI-Powered Content**: Automatically generate quizzes and extract words from PDFs, SRT files, and YouTube videos
 
 ---
 
 ## Features
 
-### User Features
-- Create and manage quizzes
-- Host live quiz sessions with PIN codes
-- Join quizzes as a participant
-- Track performance and results
-- Profile management with picture upload
-- Mobile-responsive design
+### Quiz System
+- **Live Quizzes**: Host real-time quiz sessions with PIN codes for participants to join
+- **Self-Paced Mode**: Practice quizzes individually at your own pace
+- **AI Quiz Generation**: Upload PDF/SRT files or YouTube videos to automatically generate quizzes
+- **Quiz Management**: Create, edit, browse, and manage your quiz collection
+- **Real-Time Leaderboard**: Live scoring and rankings during quiz sessions
+- **Multiple Question Types**: Multiple-choice questions with timer-based answering
+- **Categories & Levels**: Organize quizzes by category and difficulty level
 
-### Quiz Features
-- AI-generated questions and images
-- **Enhanced AI Quiz Maker**: Upload PDF/SRT files or YouTube videos to automatically generate quizzes
-- Multiple categories (vocabulary, grammar, reading, listening)
-- Difficulty levels (beginner, intermediate, advanced)
-- Real-time leaderboard
-- Timer-based questions
-- Self-paced practice mode
+### Flashcard System
+- **Deck Creation**: Build custom flashcard decks by selecting words from your database
+- **AI Deck Maker**: Upload PDF, SRT, or Excel files to automatically extract words and create decks
+- **Interactive Study**: Study flashcards with swipe gestures, keyboard shortcuts, and audio pronunciation
+- **Spelling Practice**: Practice spelling words with audio prompts and instant feedback
+- **Pronunciation Assessment**: Record and get AI-powered pronunciation feedback (requires Azure Speech Service)
+- **Deck Organization**: Organize decks by CEFR level (A1-C2), skill (Speaking, Reading, Writing, Listening), and task type
+- **Progress Tracking**: Track known/unknown words and study progress per deck
+
+### Word Database
+- **Word Management**: Comprehensive word database with English-Turkish translations
+- **Advanced Filtering**: Filter by level, word type, category, known/unknown status, and source
+- **Import/Export**: Import words from Excel files and export your word collection
+- **Word Editing**: Edit word details including meanings, categories, sample sentences, and images
+- **Bulk Operations**: Select and manage multiple words at once
+- **Source Tracking**: Track where words came from (videos, documents, etc.)
+
+### Dashboard & Analytics
+- **Statistics Overview**: View comprehensive learning statistics including:
+  - Total words known/unknown by level (A1-C2)
+  - Category breakdown with visual charts
+  - Study time tracking per module
+  - Progress metrics and trends
+- **Badge System**: Earn badges based on vocabulary milestones (A1 to C2 proficiency levels)
+- **Study Time Tracking**: Automatic tracking of study sessions across all modules
+- **Visual Analytics**: Interactive charts and graphs for progress visualization
 
 ### Technical Features
-- Separate production and development databases
-- Automatic database schema management
-- Real-time synchronization via Socket.io
-- JWT-based authentication
-- RESTful API architecture
+- **Separate Databases**: Automatic separation of production and development databases
+- **Real-Time Sync**: WebSocket-based live synchronization for quiz sessions
+- **JWT Authentication**: Secure user authentication and authorization
+- **RESTful API**: Clean API architecture with organized routes and controllers
+- **Mobile Responsive**: Fully responsive design for desktop, tablet, and mobile devices
+- **Study Session Tracking**: Automatic time tracking for Flashcards, Words, Quiz, Spelling, and Writing modules
 
 ---
 
@@ -79,10 +103,22 @@ MONGODB_URI=mongodb://localhost:27017/homemadekahoot
 # MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/homemadekahoot?appName=homemadekahoot
 NODE_ENV=development
 JWT_SECRET=your_secret_jwt_key
-UNSPLASH_ACCESS_KEY=your_unsplash_key
+FRONTEND_URL=http://localhost:3000
+
+# AI Services (for quiz and deck generation)
 OPENROUTER_API_KEY=your_openrouter_key
 GEMINI_API_KEY=your_gemini_api_key
-FRONTEND_URL=http://localhost:3000
+
+# Image Services (choose one or both)
+UNSPLASH_ACCESS_KEY=your_unsplash_key
+# OR Google Custom Search API (alternative to Unsplash)
+GOOGLE_API_KEY=your_google_api_key
+GOOGLE_CX=your_search_engine_id
+GOOGLE_DAILY_LIMIT=100
+
+# Optional: Azure Speech Service (for pronunciation assessment)
+AZURE_SPEECH_KEY=your_azure_speech_key
+AZURE_SPEECH_REGION=your_azure_region
 ```
 
 **Note:** The app automatically uses `homemadekahoot_dev` for development and `homemadekahoot_prod` for production based on `NODE_ENV`.
@@ -106,6 +142,77 @@ cd frontend && npm start
 The app will be available at:
 - Frontend: http://localhost:3000
 - Backend: http://localhost:5000
+
+---
+
+## API Setup
+
+### Image Search APIs
+
+The app supports two options for image search:
+
+#### Option 1: Unsplash (Recommended for simplicity)
+- Get your API key from [Unsplash Developers](https://unsplash.com/developers)
+- Add `UNSPLASH_ACCESS_KEY` to your `.env` file
+
+#### Option 2: Google Custom Search API (Alternative)
+
+The app supports Google Custom Search API as an alternative to Unsplash for image searches.
+
+**Setup Steps:**
+
+1. **Create Google Cloud Project**
+   - Go to [Google Cloud Console](https://console.cloud.google.com/)
+   - Create a new project
+
+2. **Enable Custom Search API**
+   - Go to "APIs & Services" → "Library"
+   - Search for "Custom Search API" and enable it
+
+3. **Create API Key**
+   - Go to "APIs & Services" → "Credentials"
+   - Create API Key and optionally restrict it to Custom Search API
+
+4. **Create Custom Search Engine**
+   - Go to [Programmable Search Engine Control Panel](https://programmablesearchengine.google.com/controlpanel/all)
+   - Create new search engine with `*` (asterisk) in "Sites to search" to search entire web
+   - Enable "Search the entire web" and "Image search"
+   - Copy your Search Engine ID (CX)
+
+5. **Add to Environment Variables**
+   ```env
+   GOOGLE_API_KEY=your_api_key_here
+   GOOGLE_CX=your_search_engine_id_here
+   GOOGLE_DAILY_LIMIT=100
+   ```
+
+**Important Notes:**
+- Free tier: 100 searches per day (configurable via `GOOGLE_DAILY_LIMIT`)
+- Daily limit tracking prevents exceeding free tier
+- Usage tracked in `backend/data/google_search_usage.json`
+- Counter resets at midnight automatically
+
+### Azure Speech Service (Optional - For Pronunciation Assessment)
+
+The pronunciation assessment feature uses Azure Speech Service to provide detailed pronunciation feedback.
+
+**Setup Steps:**
+
+1. **Create Azure Account**
+   - Go to [Azure Portal](https://portal.azure.com/)
+   - Create a new Speech resource
+
+2. **Get Credentials**
+   - Copy your Speech Service key
+   - Copy your Speech Service region (e.g., `eastus`, `westus`)
+
+3. **Add to Environment Variables**
+   ```env
+   AZURE_SPEECH_KEY=your_azure_speech_key
+   AZURE_SPEECH_REGION=your_azure_region
+   ```
+
+**Note:** Pronunciation assessment is available in the Flashcards page when studying words. Without Azure credentials, the feature will be disabled.
 
 ---
 
@@ -453,15 +560,115 @@ start-dev.bat        # Start both backend and frontend
 
 ---
 
+## Pages & Features
+
+### Main Pages
+
+- **Home** (`/`) - Landing page with quick access to main features
+- **Dashboard** (`/dashboard`) - Statistics, badges, and progress overview
+- **New** (`/new`) - Quick access to create new quizzes or decks
+
+### Quiz Pages
+
+- **Create Quiz** (`/create-quiz`) - Create new quizzes with AI assistance
+- **Edit Quiz** (`/edit-quiz/:id`) - Modify existing quizzes
+- **Browse Quizzes** (`/browse`) - Browse and discover quizzes
+- **Host Quiz** (`/host/:sessionId`) - Host live quiz sessions
+- **Join Quiz** (`/join`) - Join quiz sessions with PIN code
+- **Play Quiz** (`/play/:sessionId`) - Participate in live or self-paced quizzes
+- **Self-Paced Quiz** (`/quiz/:id/self-paced`) - Practice quizzes individually
+- **Results** (`/results`) - View quiz results and performance history
+
+### Flashcard Pages
+
+- **Decks** (`/decks`) - View and manage all your flashcard decks
+- **Create Deck** (`/create-deck`) - Create new flashcard decks manually or from files
+- **Edit Deck** (`/edit-deck/:id`) - Modify existing decks
+- **Flashcards** (`/flashcards`) - Study flashcards with interactive features
+- **Spelling** (`/spelling`) - Practice spelling words with audio
+
+### Word Management
+
+- **Word Database** (`/words`) - Comprehensive word management interface
+  - View, edit, and filter words
+  - Import/export functionality
+  - Bulk operations
+  - Source tracking
+
+### User Pages
+
+- **Profile** (`/profile`) - Manage your profile, picture, and account settings
+- **Login/Register** - User authentication
+
+### Study Features
+
+**Flashcards Study Mode:**
+- Swipe gestures (up/down for known/unknown)
+- Keyboard shortcuts (Arrow keys, Space, Enter)
+- Audio pronunciation (word and sentence)
+- Pronunciation assessment with Azure Speech Service
+- Card flip animation
+- Progress tracking (known/unknown counts)
+- Study timer integration
+
+**Spelling Practice:**
+- Audio prompts for words
+- Text input for spelling
+- Instant feedback
+- Progress tracking
+- Study timer integration
+
+**Study Session Tracking:**
+- Automatic time tracking for:
+  - Flashcards module
+  - Words module
+  - Quiz module
+  - Spelling module
+  - Writing module
+- Session persistence across page refreshes
+- Daily study time aggregation
+
+---
+
+## Key Features Summary
+
+### For Students/Learners
+- Join live quiz sessions with PIN codes
+- Practice with self-paced quizzes
+- Study vocabulary with interactive flashcards
+- Practice spelling with audio prompts
+- Track learning progress with statistics and badges
+- Manage personal word database
+- Get pronunciation feedback
+
+### For Teachers/Content Creators
+- Create and host live quiz sessions
+- Generate quizzes from PDFs, SRT files, or YouTube videos
+- Build flashcard decks from uploaded files
+- Manage word database with import/export
+- Track student performance and results
+
+### AI-Powered Features
+- **Quiz Generation**: Automatically create quizzes from documents
+- **Word Extraction**: Extract vocabulary from PDFs, SRT files, Excel files
+- **Auto-Fill**: Automatically fill deck information from file content
+- **Image Generation**: AI-generated images for quiz questions
+- **Pronunciation Assessment**: AI-powered pronunciation feedback
+
+---
+
 ## Future Enhancements
 
 - Team mode (collaborative quizzes)
 - Enhanced image and video support in questions
 - Audio questions for listening practice
 - Social features (share quizzes, follow users)
-- Gamification (badges, streaks, achievements)
+- Enhanced gamification (streaks, achievements)
 - AI-powered question generation improvements
 - Multi-language support
+- Bulk word selection across pages
+- Save draft decks
+- Import/export deck functionality
 
 ---
 

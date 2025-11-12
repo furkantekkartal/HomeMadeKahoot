@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { quizAPI } from '../services/api';
-import { QUIZ_CATEGORIES, QUIZ_DIFFICULTIES, formatCategory, formatDifficulty } from '../constants/quizConstants';
+import { QUIZ_LEVELS, QUIZ_SKILLS, QUIZ_TASKS, formatLevel, formatSkill, formatTask } from '../constants/quizConstants';
 import jsPDF from 'jspdf';
 import './QuizForm.css';
 
@@ -10,8 +10,9 @@ const CreateQuiz = () => {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    category: 'vocabulary',
-    difficulty: 'beginner',
+    level: 'A1',
+    skill: 'Reading',
+    task: 'Vocabulary',
     questions: []
   });
   const [error, setError] = useState('');
@@ -29,35 +30,43 @@ const CreateQuiz = () => {
   const [generatingFromSource, setGeneratingFromSource] = useState(false);
   const [studySheet, setStudySheet] = useState(null);
 
-  // Calculate default points based on category and difficulty
-  const calculateDefaultPoints = (category, difficulty) => {
-    const categoryCoefficients = {
-      vocabulary: 1,
-      grammar: 2,
-      reading: 2,
-      listening: 2
+  // Calculate default points based on task and level
+  const calculateDefaultPoints = (task, level) => {
+    const taskCoefficients = {
+      Vocabulary: 1,
+      Grammar: 2,
+      Spelling: 1,
+      Essay: 3,
+      Repeat: 2,
+      'Read Aloud': 2
     };
-    const difficultyCoefficients = {
-      beginner: 1,
-      intermediate: 3,
-      advanced: 5
+    const levelCoefficients = {
+      A1: 1,
+      A2: 2,
+      B1: 3,
+      B2: 4,
+      C1: 5,
+      C2: 6
     };
-    return (categoryCoefficients[category] || 1) * (difficultyCoefficients[difficulty] || 1);
+    return (taskCoefficients[task] || 1) * (levelCoefficients[level] || 1);
   };
 
-  // Calculate default time limit based on difficulty
-  const calculateDefaultTimeLimit = (difficulty) => {
+  // Calculate default time limit based on level
+  const calculateDefaultTimeLimit = (level) => {
     const timeLimits = {
-      beginner: 20,
-      intermediate: 40,
-      advanced: 60
+      A1: 20,
+      A2: 30,
+      B1: 40,
+      B2: 50,
+      C1: 60,
+      C2: 70
     };
-    return timeLimits[difficulty] || 20;
+    return timeLimits[level] || 20;
   };
 
   const addQuestion = () => {
-    const defaultPoints = calculateDefaultPoints(formData.category, formData.difficulty);
-    const defaultTimeLimit = calculateDefaultTimeLimit(formData.difficulty);
+    const defaultPoints = calculateDefaultPoints(formData.task, formData.level);
+    const defaultTimeLimit = calculateDefaultTimeLimit(formData.level);
 
     setFormData({
       ...formData,
@@ -182,8 +191,8 @@ const CreateQuiz = () => {
   };
 
   const generateTitle = async () => {
-    if (!formData.category || !formData.difficulty) {
-      setError('Please select category and difficulty first');
+    if (!formData.level || !formData.skill || !formData.task) {
+      setError('Please select level, skill, and task first');
       return;
     }
 
@@ -191,7 +200,11 @@ const CreateQuiz = () => {
     setError('');
 
     try {
-      const response = await quizAPI.generateQuizTitle(formData.category, formData.difficulty);
+      // Convert to legacy format for API compatibility (will update backend later)
+      const legacyCategory = formData.task.toLowerCase();
+      const legacyDifficulty = formData.level === 'A1' || formData.level === 'A2' ? 'beginner' : 
+                               formData.level === 'B1' || formData.level === 'B2' ? 'intermediate' : 'advanced';
+      const response = await quizAPI.generateQuizTitle(legacyCategory, legacyDifficulty);
       setFormData({ ...formData, title: response.data.title });
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to generate title');
@@ -206,8 +219,8 @@ const CreateQuiz = () => {
       return;
     }
 
-    if (!formData.category || !formData.difficulty) {
-      setError('Please select category and difficulty first');
+    if (!formData.level || !formData.skill || !formData.task) {
+      setError('Please select level, skill, and task first');
       return;
     }
 
@@ -215,10 +228,14 @@ const CreateQuiz = () => {
     setError('');
 
     try {
+      // Convert to legacy format for API compatibility
+      const legacyCategory = formData.task.toLowerCase();
+      const legacyDifficulty = formData.level === 'A1' || formData.level === 'A2' ? 'beginner' : 
+                               formData.level === 'B1' || formData.level === 'B2' ? 'intermediate' : 'advanced';
       const response = await quizAPI.generateQuizDescription(
         formData.title,
-        formData.category,
-        formData.difficulty
+        legacyCategory,
+        legacyDifficulty
       );
       setFormData({ ...formData, description: response.data.description });
     } catch (err) {
@@ -230,15 +247,15 @@ const CreateQuiz = () => {
 
   const generateQuestionsByAI = async () => {
     console.log('Generate by AI button clicked');
-    console.log('Form data:', { title: formData.title, category: formData.category, difficulty: formData.difficulty, questionCount });
+    console.log('Form data:', { title: formData.title, level: formData.level, skill: formData.skill, task: formData.task, questionCount });
     
     if (!formData.title.trim()) {
       setError('Please enter or generate a title first');
       return;
     }
 
-    if (!formData.category || !formData.difficulty) {
-      setError('Please select category and difficulty first');
+    if (!formData.level || !formData.skill || !formData.task) {
+      setError('Please select level, skill, and task first');
       return;
     }
 
@@ -252,11 +269,15 @@ const CreateQuiz = () => {
 
     try {
       console.log('Calling generateQuizQuestions API...');
+      // Convert to legacy format for API compatibility
+      const legacyCategory = formData.task.toLowerCase();
+      const legacyDifficulty = formData.level === 'A1' || formData.level === 'A2' ? 'beginner' : 
+                               formData.level === 'B1' || formData.level === 'B2' ? 'intermediate' : 'advanced';
       const response = await quizAPI.generateQuizQuestions(
         formData.title,
         formData.description || '',
-        formData.category,
-        formData.difficulty,
+        legacyCategory,
+        legacyDifficulty,
         questionCount
       );
       
@@ -347,11 +368,16 @@ const CreateQuiz = () => {
       });
       
       setImageHistory(newImageHistory);
+      // Map legacy category/difficulty to new level/skill/task
+      const mappedLevel = result.level || (result.difficulty === 'beginner' ? 'A1' : result.difficulty === 'intermediate' ? 'B1' : result.difficulty === 'advanced' ? 'C1' : 'A1');
+      const mappedSkill = result.skill || (result.category === 'reading' ? 'Reading' : result.category === 'listening' ? 'Listening' : 'Reading');
+      const mappedTask = result.task || (result.category === 'vocabulary' ? 'Vocabulary' : result.category === 'grammar' ? 'Grammar' : 'Vocabulary');
       setFormData({
         title: result.title,
         description: result.description,
-        category: result.category,
-        difficulty: result.difficulty,
+        level: mappedLevel,
+        skill: mappedSkill,
+        task: mappedTask,
         questions: result.questions
       });
       setQuestionCount(result.questions.length);
@@ -390,11 +416,16 @@ const CreateQuiz = () => {
       });
       
       setImageHistory(newImageHistory);
+      // Map legacy category/difficulty to new level/skill/task
+      const mappedLevel = result.level || (result.difficulty === 'beginner' ? 'A1' : result.difficulty === 'intermediate' ? 'B1' : result.difficulty === 'advanced' ? 'C1' : 'A1');
+      const mappedSkill = result.skill || (result.category === 'reading' ? 'Reading' : result.category === 'listening' ? 'Listening' : 'Reading');
+      const mappedTask = result.task || (result.category === 'vocabulary' ? 'Vocabulary' : result.category === 'grammar' ? 'Grammar' : 'Vocabulary');
       setFormData({
         title: result.title,
         description: result.description,
-        category: result.category,
-        difficulty: result.difficulty,
+        level: mappedLevel,
+        skill: mappedSkill,
+        task: mappedTask,
         questions: result.questions
       });
       setQuestionCount(result.questions.length);
@@ -863,7 +894,7 @@ const CreateQuiz = () => {
                 type="button"
                 onClick={generateTitle}
                 className="icon-button"
-                disabled={generatingTitle || !formData.category || !formData.difficulty}
+                disabled={generatingTitle || !formData.level || !formData.skill || !formData.task}
                 title="Generate title with AI"
               >
                 {generatingTitle ? '⏳' : '✨'}
@@ -897,7 +928,7 @@ const CreateQuiz = () => {
                 type="button"
                 onClick={generateDescription}
                 className="icon-button"
-                disabled={generatingDescription || !formData.title.trim() || !formData.category || !formData.difficulty}
+                disabled={generatingDescription || !formData.title.trim() || !formData.level || !formData.skill || !formData.task}
                 title="Generate description with AI"
               >
                 {generatingDescription ? '⏳' : '✨'}
@@ -907,31 +938,45 @@ const CreateQuiz = () => {
 
           <div className="form-row">
             <div className="form-group">
-              <label className="form-label">Category</label>
+              <label className="form-label">Level *</label>
               <select
                 className="form-select"
-                value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                value={formData.level}
+                onChange={(e) => setFormData({ ...formData, level: e.target.value })}
               >
-                {QUIZ_CATEGORIES.map(cat => (
-                  <option key={cat} value={cat}>
-                    {formatCategory(cat)}
-                    {cat === 'reading' ? ' Comprehension' : ''}
+                {QUIZ_LEVELS.map(level => (
+                  <option key={level} value={level}>
+                    {formatLevel(level)}
                   </option>
                 ))}
               </select>
             </div>
 
             <div className="form-group">
-              <label className="form-label">Difficulty</label>
+              <label className="form-label">Skill *</label>
               <select
                 className="form-select"
-                value={formData.difficulty}
-                onChange={(e) => setFormData({ ...formData, difficulty: e.target.value })}
+                value={formData.skill}
+                onChange={(e) => setFormData({ ...formData, skill: e.target.value })}
               >
-                {QUIZ_DIFFICULTIES.map(diff => (
-                  <option key={diff} value={diff}>
-                    {formatDifficulty(diff)}
+                {QUIZ_SKILLS.map(skill => (
+                  <option key={skill} value={skill}>
+                    {formatSkill(skill)}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Task *</label>
+              <select
+                className="form-select"
+                value={formData.task}
+                onChange={(e) => setFormData({ ...formData, task: e.target.value })}
+              >
+                {QUIZ_TASKS.map(task => (
+                  <option key={task} value={task}>
+                    {formatTask(task)}
                   </option>
                 ))}
               </select>
@@ -955,25 +1000,27 @@ const CreateQuiz = () => {
               type="button"
               onClick={(e) => {
                 e.preventDefault();
-                console.log('Button clicked, disabled state:', generatingQuestions || !formData.title.trim() || !formData.category || !formData.difficulty);
+                console.log('Button clicked, disabled state:', generatingQuestions || !formData.title.trim() || !formData.level || !formData.skill || !formData.task);
                 generateQuestionsByAI();
               }}
               className="btn btn-primary btn-large"
-              disabled={generatingQuestions || !formData.title.trim() || !formData.category || !formData.difficulty}
+              disabled={generatingQuestions || !formData.title.trim() || !formData.level || !formData.skill || !formData.task}
               title={
                 !formData.title.trim() ? 'Please enter a quiz title first' :
-                !formData.category ? 'Please select a category' :
-                !formData.difficulty ? 'Please select a difficulty' :
+                !formData.level ? 'Please select a level' :
+                !formData.skill ? 'Please select a skill' :
+                !formData.task ? 'Please select a task' :
                 'Generate questions using AI'
               }
             >
               {generatingQuestions ? '✨ Generating Questions & Images...' : '✨ Generate by AI'}
             </button>
-            {(!formData.title.trim() || !formData.category || !formData.difficulty) && (
+            {(!formData.title.trim() || !formData.level || !formData.skill || !formData.task) && (
               <div style={{ fontSize: '0.85rem', color: '#666', marginTop: '0.5rem' }}>
                 {!formData.title.trim() && '⚠ Please enter a title first. '}
-                {!formData.category && '⚠ Please select a category. '}
-                {!formData.difficulty && '⚠ Please select a difficulty.'}
+                {!formData.level && '⚠ Please select a level. '}
+                {!formData.skill && '⚠ Please select a skill. '}
+                {!formData.task && '⚠ Please select a task.'}
               </div>
             )}
           </div>

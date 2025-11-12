@@ -167,6 +167,13 @@
 .deck-actions .btn {
   flex: 1;
   min-width: 80px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.deck-actions .btn svg {
+  font-size: 1rem;
 }
 
 .btn-sm {

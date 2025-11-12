@@ -10,7 +10,15 @@ const os = require('os');
 // Get all quizzes
 exports.getAllQuizzes = async (req, res) => {
   try {
-    const quizzes = await Quiz.find().populate('creatorId', 'username').sort({ createdAt: -1 });
+    const includeHidden = req.query.includeHidden === 'true';
+    const query = {};
+    
+    // Only filter by visibility if includeHidden is not explicitly 'true'
+    if (!includeHidden) {
+      query.isVisible = { $ne: false }; // Show visible quizzes (true or undefined/null)
+    }
+    
+    const quizzes = await Quiz.find(query).populate('creatorId', 'username').sort({ createdAt: -1 });
     res.json(quizzes);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -20,7 +28,15 @@ exports.getAllQuizzes = async (req, res) => {
 // Get user's quizzes
 exports.getMyQuizzes = async (req, res) => {
   try {
-    const quizzes = await Quiz.find({ creatorId: req.user.userId }).sort({ createdAt: -1 });
+    const includeHidden = req.query.includeHidden === 'true';
+    const query = { creatorId: req.user.userId };
+    
+    // Only filter by visibility if includeHidden is not explicitly 'true'
+    if (!includeHidden) {
+      query.isVisible = { $ne: false }; // Show visible quizzes (true or undefined/null)
+    }
+    
+    const quizzes = await Quiz.find(query).sort({ createdAt: -1 });
     res.json(quizzes);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -43,17 +59,26 @@ exports.getQuiz = async (req, res) => {
 // Create quiz
 exports.createQuiz = async (req, res) => {
   try {
-    const { title, description, category, difficulty, questions } = req.body;
+    const { title, description, level, skill, task, category, difficulty, questions } = req.body;
 
     if (!questions || questions.length === 0) {
       return res.status(400).json({ message: 'Quiz must have at least one question' });
     }
 
+    // Use new fields if provided, otherwise map from legacy fields
+    const quizLevel = level || (difficulty === 'beginner' ? 'A1' : difficulty === 'intermediate' ? 'B1' : difficulty === 'advanced' ? 'C1' : 'A1');
+    const quizSkill = skill || (category === 'reading' ? 'Reading' : category === 'listening' ? 'Listening' : 'Reading');
+    const quizTask = task || (category === 'vocabulary' ? 'Vocabulary' : category === 'grammar' ? 'Grammar' : 'Vocabulary');
+
     const quiz = await Quiz.create({
       title,
       description,
-      category,
-      difficulty,
+      level: quizLevel,
+      skill: quizSkill,
+      task: quizTask,
+      // Keep legacy fields for backward compatibility
+      category: category || quizTask.toLowerCase(),
+      difficulty: difficulty || (quizLevel === 'A1' || quizLevel === 'A2' ? 'beginner' : quizLevel === 'B1' || quizLevel === 'B2' ? 'intermediate' : 'advanced'),
       questions,
       creatorId: req.user.userId
     });
@@ -73,15 +98,32 @@ exports.updateQuiz = async (req, res) => {
       return res.status(404).json({ message: 'Quiz not found' });
     }
 
-    if (quiz.creatorId.toString() !== req.user.userId) {
-      return res.status(403).json({ message: 'Not authorized' });
-    }
+    // Allow any authenticated user to edit any quiz
 
-    const { title, description, category, difficulty, questions } = req.body;
+    const { title, description, level, skill, task, category, difficulty, questions } = req.body;
     quiz.title = title || quiz.title;
     quiz.description = description !== undefined ? description : quiz.description;
-    quiz.category = category || quiz.category;
-    quiz.difficulty = difficulty || quiz.difficulty;
+    
+    // Update new fields if provided
+    if (level) quiz.level = level;
+    if (skill) quiz.skill = skill;
+    if (task) quiz.task = task;
+    
+    // Update legacy fields if provided (for backward compatibility)
+    if (category) quiz.category = category;
+    if (difficulty) quiz.difficulty = difficulty;
+    
+    // If new fields not provided but legacy fields are, map them
+    if (!level && difficulty) {
+      quiz.level = difficulty === 'beginner' ? 'A1' : difficulty === 'intermediate' ? 'B1' : difficulty === 'advanced' ? 'C1' : quiz.level;
+    }
+    if (!skill && category) {
+      quiz.skill = category === 'reading' ? 'Reading' : category === 'listening' ? 'Listening' : quiz.skill || 'Reading';
+    }
+    if (!task && category) {
+      quiz.task = category === 'vocabulary' ? 'Vocabulary' : category === 'grammar' ? 'Grammar' : quiz.task || 'Vocabulary';
+    }
+    
     quiz.questions = questions || quiz.questions;
     quiz.updatedAt = Date.now();
 
@@ -101,14 +143,39 @@ exports.deleteQuiz = async (req, res) => {
       return res.status(404).json({ message: 'Quiz not found' });
     }
 
-    if (quiz.creatorId.toString() !== req.user.userId) {
-      return res.status(403).json({ message: 'Not authorized' });
-    }
-
+    // Allow any authenticated user to delete any quiz
     await quiz.deleteOne();
     res.json({ message: 'Quiz deleted' });
   } catch (error) {
     res.status(500).json({ message: error.message });
+  }
+};
+
+// Toggle quiz visibility
+exports.toggleQuizVisibility = async (req, res) => {
+  try {
+    const quiz = await Quiz.findById(req.params.id);
+    
+    if (!quiz) {
+      return res.status(404).json({ message: 'Quiz not found' });
+    }
+
+    if (quiz.creatorId.toString() !== req.user.userId) {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+
+    quiz.isVisible = !quiz.isVisible;
+    await quiz.save();
+
+    res.json({
+      message: `Quiz ${quiz.isVisible ? 'shown' : 'hidden'} successfully`,
+      isVisible: quiz.isVisible
+    });
+  } catch (error) {
+    console.error('Error toggling quiz visibility:', error);
+    res.status(500).json({
+      message: error.message || 'Failed to toggle quiz visibility'
+    });
   }
 };
 

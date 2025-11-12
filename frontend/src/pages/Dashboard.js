@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { statisticsAPI } from '../services/api';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { FaClock, FaArrowUp, FaAward, FaBullseye, FaBook } from 'react-icons/fa';
+import { FaAward, FaBullseye, FaBook, FaArrowUp, FaClock } from 'react-icons/fa';
 import './Dashboard.css';
 
 const Dashboard = () => {
@@ -134,14 +134,6 @@ const Dashboard = () => {
           <div className="stat-card-subtext">
             {stats.wordStats?.total ? Math.round((stats.wordStats.known / stats.wordStats.total) * 100) : 0}% of total
           </div>
-        </div>
-
-        <div className="stat-card stat-card-yellow">
-          <div className="stat-card-header">
-            <div className="stat-card-label">Learning</div>
-            <FaBullseye className="stat-card-icon" />
-          </div>
-          <div className="stat-card-value">{stats.wordStats?.learning || 0}</div>
         </div>
 
         <div className="stat-card stat-card-purple">

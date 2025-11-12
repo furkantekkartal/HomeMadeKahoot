@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { quizAPI } from '../services/api';
-import { QUIZ_CATEGORIES, QUIZ_DIFFICULTIES, formatCategory, formatDifficulty } from '../constants/quizConstants';
+import { QUIZ_LEVELS, QUIZ_SKILLS, QUIZ_TASKS, formatLevel, formatSkill, formatTask } from '../constants/quizConstants';
 import './QuizForm.css';
 
 const EditQuiz = () => {
@@ -50,35 +50,46 @@ const EditQuiz = () => {
     }
   };
 
-  // Calculate default points based on category and difficulty
-  const calculateDefaultPoints = (category, difficulty) => {
-    const categoryCoefficients = {
-      vocabulary: 1,
-      grammar: 2,
-      reading: 2,
-      listening: 2
+  // Calculate default points based on task and level
+  const calculateDefaultPoints = (task, level) => {
+    const taskCoefficients = {
+      Vocabulary: 1,
+      Grammar: 2,
+      Spelling: 1,
+      Essay: 3,
+      Repeat: 2,
+      'Read Aloud': 2
     };
-    const difficultyCoefficients = {
-      beginner: 1,
-      intermediate: 3,
-      advanced: 5
+    const levelCoefficients = {
+      A1: 1,
+      A2: 2,
+      B1: 3,
+      B2: 4,
+      C1: 5,
+      C2: 6
     };
-    return (categoryCoefficients[category] || 1) * (difficultyCoefficients[difficulty] || 1);
+    return (taskCoefficients[task] || 1) * (levelCoefficients[level] || 1);
   };
 
-  // Calculate default time limit based on difficulty
-  const calculateDefaultTimeLimit = (difficulty) => {
+  // Calculate default time limit based on level
+  const calculateDefaultTimeLimit = (level) => {
     const timeLimits = {
-      beginner: 20,
-      intermediate: 40,
-      advanced: 60
+      A1: 20,
+      A2: 30,
+      B1: 40,
+      B2: 50,
+      C1: 60,
+      C2: 70
     };
-    return timeLimits[difficulty] || 20;
+    return timeLimits[level] || 20;
   };
 
   const addQuestion = () => {
-    const defaultPoints = calculateDefaultPoints(formData.category, formData.difficulty);
-    const defaultTimeLimit = calculateDefaultTimeLimit(formData.difficulty);
+    // Use new fields if available, fallback to legacy
+    const task = formData.task || (formData.category === 'vocabulary' ? 'Vocabulary' : formData.category === 'grammar' ? 'Grammar' : 'Vocabulary');
+    const level = formData.level || (formData.difficulty === 'beginner' ? 'A1' : formData.difficulty === 'intermediate' ? 'B1' : formData.difficulty === 'advanced' ? 'C1' : 'A1');
+    const defaultPoints = calculateDefaultPoints(task, level);
+    const defaultTimeLimit = calculateDefaultTimeLimit(level);
 
     setFormData({
       ...formData,
@@ -265,31 +276,45 @@ const EditQuiz = () => {
 
           <div className="form-row">
             <div className="form-group">
-              <label className="form-label">Category</label>
+              <label className="form-label">Level *</label>
               <select
                 className="form-select"
-                value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                value={formData.level || (formData.difficulty === 'beginner' ? 'A1' : formData.difficulty === 'intermediate' ? 'B1' : formData.difficulty === 'advanced' ? 'C1' : 'A1')}
+                onChange={(e) => setFormData({ ...formData, level: e.target.value })}
               >
-                {QUIZ_CATEGORIES.map(cat => (
-                  <option key={cat} value={cat}>
-                    {formatCategory(cat)}
-                    {cat === 'reading' ? ' Comprehension' : ''}
+                {QUIZ_LEVELS.map(level => (
+                  <option key={level} value={level}>
+                    {formatLevel(level)}
                   </option>
                 ))}
               </select>
             </div>
 
             <div className="form-group">
-              <label className="form-label">Difficulty</label>
+              <label className="form-label">Skill *</label>
               <select
                 className="form-select"
-                value={formData.difficulty}
-                onChange={(e) => setFormData({ ...formData, difficulty: e.target.value })}
+                value={formData.skill || (formData.category === 'reading' ? 'Reading' : formData.category === 'listening' ? 'Listening' : 'Reading')}
+                onChange={(e) => setFormData({ ...formData, skill: e.target.value })}
               >
-                {QUIZ_DIFFICULTIES.map(diff => (
-                  <option key={diff} value={diff}>
-                    {formatDifficulty(diff)}
+                {QUIZ_SKILLS.map(skill => (
+                  <option key={skill} value={skill}>
+                    {formatSkill(skill)}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Task *</label>
+              <select
+                className="form-select"
+                value={formData.task || (formData.category === 'vocabulary' ? 'Vocabulary' : formData.category === 'grammar' ? 'Grammar' : 'Vocabulary')}
+                onChange={(e) => setFormData({ ...formData, task: e.target.value })}
+              >
+                {QUIZ_TASKS.map(task => (
+                  <option key={task} value={task}>
+                    {formatTask(task)}
                   </option>
                 ))}
               </select>

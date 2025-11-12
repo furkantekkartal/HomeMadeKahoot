@@ -233,8 +233,9 @@ const GuestPlayQuiz = () => {
           <p>You're all set! The host will start the quiz soon.</p>
           <div className="quiz-info">
             <h3>{quiz.title}</h3>
-            <p>Category: {quiz.category}</p>
-            <p>Difficulty: {quiz.difficulty}</p>
+            <p>Level: {quiz.level || (quiz.difficulty === 'beginner' ? 'A1' : quiz.difficulty === 'intermediate' ? 'B1' : quiz.difficulty === 'advanced' ? 'C1' : 'A1')}</p>
+            <p>Skill: {quiz.skill || (quiz.category === 'reading' ? 'Reading' : quiz.category === 'listening' ? 'Listening' : 'Reading')}</p>
+            <p>Task: {quiz.task || (quiz.category === 'vocabulary' ? 'Vocabulary' : quiz.category === 'grammar' ? 'Grammar' : quiz.category || 'Vocabulary')}</p>
           </div>
         </div>
       </div>

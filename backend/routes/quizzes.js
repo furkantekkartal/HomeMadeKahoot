@@ -15,6 +15,7 @@ router.get('/:id', quizController.getQuiz);
 router.post('/', auth, quizController.createQuiz);
 router.put('/:id', auth, quizController.updateQuiz);
 router.delete('/:id', auth, quizController.deleteQuiz);
+router.patch('/:id/visibility', auth, quizController.toggleQuizVisibility);
 
 module.exports = router;
 

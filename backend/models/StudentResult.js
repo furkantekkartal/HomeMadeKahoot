@@ -32,16 +32,31 @@ const studentResultSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  // New standardized fields
+  level: {
+    type: String,
+    enum: ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'],
+    index: true
+  },
+  skill: {
+    type: String,
+    enum: ['Speaking', 'Reading', 'Writing', 'Listening'],
+    index: true
+  },
+  task: {
+    type: String,
+    enum: ['Vocabulary', 'Grammar', 'Spelling', 'Essay', 'Repeat', 'Read Aloud'],
+    index: true
+  },
+  // Legacy fields (kept for backward compatibility)
   category: {
     type: String,
     enum: ['vocabulary', 'grammar', 'reading', 'listening'],
-    required: true,
     index: true
   },
   difficulty: {
     type: String,
     enum: ['beginner', 'intermediate', 'advanced'],
-    required: true,
     index: true
   },
   // Quiz host/teacher
