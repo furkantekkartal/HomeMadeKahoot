@@ -762,7 +762,7 @@ const Flashcards = () => {
     setEvaluationResults(null);
 
     try {
-      const response = await pronunciationAPI.assessPronunciation(audioBlob, referenceText);
+      const response = await pronunciationAPI.assessPronunciation(audioBlob, referenceText, type);
       setEvaluationResults(response.data);
     } catch (error) {
       console.error('Error evaluating pronunciation:', error);

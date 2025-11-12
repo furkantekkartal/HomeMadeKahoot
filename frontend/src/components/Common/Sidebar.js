@@ -5,7 +5,6 @@ import {
   FaPlayCircle,
   FaHome,
   FaSearch,
-  FaChartBar,
   FaTrophy,
   FaCog,
   FaSignOutAlt,
@@ -109,13 +108,6 @@ const Sidebar = ({ isOpen, onClose }) => {
         >
           <FaSearch className="nav-icon nav-icon-browse" />
           <span className="nav-text">Browse</span>
-        </Link>
-        <Link 
-          to="/results" 
-          className={`nav-item ${isActive('/results') ? 'active' : ''}`}
-        >
-          <FaChartBar className="nav-icon nav-icon-results" />
-          <span className="nav-text">Results</span>
         </Link>
         <Link 
           to="/performance" 

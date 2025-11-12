@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { sessionAPI } from '../services/api';
+import { sessionAPI, pronunciationAPI } from '../services/api';
 import { QUIZ_LEVELS, QUIZ_SKILLS, QUIZ_TASKS, formatLevel, formatSkill, formatTask } from '../constants/quizConstants';
 import './Performance.css';
 
@@ -26,18 +26,51 @@ const Performance = () => {
     dateTo: ''
   });
   const [summary, setSummary] = useState({
-    totalQuizzes: 0,
-    totalSessions: 0
+    totalStudents: 0,
+    quizSuccess: 0,
+    quizTotalPoints: 0,
+    quizTotalCompleted: 0,
+    gameTotalTime: 0,
+    gameFlashcardCompleted: 0,
+    gameSpellingCompleted: 0,
+    pronunciationAvgOverall: 0,
+    pronunciationTotalWords: 0,
+    pronunciationTotalSentences: 0
   });
   const [expandedRows, setExpandedRows] = useState(new Set());
+  const [gameStats, setGameStats] = useState([]);
+  const [gameTotals, setGameTotals] = useState({
+    totalStudents: 0,
+    totalFlashcardsSessions: 0,
+    totalSpellingSessions: 0,
+    totalSessions: 0,
+    totalHours: 0
+  });
+  const [pronunciationStats, setPronunciationStats] = useState([]);
+  const [pronunciationTotals, setPronunciationTotals] = useState({
+    totalStudents: 0,
+    totalWords: 0,
+    totalSentences: 0
+  });
+  const [expandedPronunciationRows, setExpandedPronunciationRows] = useState(new Set());
+  const [expandedWordDetails, setExpandedWordDetails] = useState(new Set());
+  const [expandedSentenceDetails, setExpandedSentenceDetails] = useState(new Set());
 
   useEffect(() => {
-    loadPerformance();
+    loadAllData();
   }, []);
 
   useEffect(() => {
-    loadPerformance();
+    loadAllData();
   }, [appliedFilters]);
+
+  const loadAllData = async () => {
+    await Promise.all([
+      loadPerformance(),
+      loadGameStats(),
+      loadPronunciationStats()
+    ]);
+  };
 
   const loadPerformance = async () => {
     try {
@@ -50,16 +83,67 @@ const Performance = () => {
       }, {});
       
       const response = await sessionAPI.getMyPerformance(activeFilters);
-      setPerformance(response.data.performance || []);
-      setSummary({
-        totalQuizzes: response.data.totalQuizzes || 0,
-        totalSessions: response.data.totalSessions || 0
-      });
+      const perfData = response.data.performance || [];
+      setPerformance(perfData);
+      
+      // Calculate quiz performance summary
+      const totalStudents = perfData.length;
+      const totalQuestions = perfData.reduce((sum, p) => sum + (p.totalQuestions || 0), 0);
+      const totalCorrect = perfData.reduce((sum, p) => sum + (p.totalCorrect || 0), 0);
+      const quizSuccess = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0;
+      const quizTotalPoints = perfData.reduce((sum, p) => sum + (p.totalPoints || 0), 0);
+      const quizTotalCompleted = response.data.totalQuizzes || 0;
+      
+      setSummary(prev => ({
+        ...prev,
+        totalStudents,
+        quizSuccess,
+        quizTotalPoints,
+        quizTotalCompleted
+      }));
     } catch (error) {
       console.error('Error loading performance:', error);
       alert('Failed to load performance data: ' + (error.response?.data?.message || error.message));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadGameStats = async () => {
+    try {
+      // Use main filters for game stats
+      const activeFilters = Object.entries(appliedFilters).reduce((acc, [key, value]) => {
+        if (value && value !== '' && (key === 'studentName' || key === 'dateFrom' || key === 'dateTo')) {
+          acc[key] = value;
+        }
+        return acc;
+      }, {});
+      
+      const response = await sessionAPI.getGameStats(activeFilters);
+      setGameStats(response.data.gameStats || []);
+      const totals = response.data.totals || {
+        totalStudents: 0,
+        totalFlashcardsSessions: 0,
+        totalSpellingSessions: 0,
+        totalSessions: 0,
+        totalHours: 0
+      };
+      setGameTotals(totals);
+      
+      // Calculate game performance summary
+      const gameTotalTime = totals.totalHours || 0;
+      const gameFlashcardCompleted = totals.totalFlashcardsSessions || 0;
+      const gameSpellingCompleted = totals.totalSpellingSessions || 0;
+      
+      setSummary(prev => ({
+        ...prev,
+        gameTotalTime,
+        gameFlashcardCompleted,
+        gameSpellingCompleted
+      }));
+    } catch (error) {
+      console.error('Error loading game stats:', error);
+      // Don't show alert for game stats, just log error
     }
   };
 
@@ -86,6 +170,78 @@ const Performance = () => {
     };
     setFilters(emptyFilters);
     setAppliedFilters(emptyFilters);
+  };
+
+
+  const loadPronunciationStats = async () => {
+    try {
+      // Use main filters for pronunciation stats
+      const activeFilters = Object.entries(appliedFilters).reduce((acc, [key, value]) => {
+        if (value && value !== '' && (key === 'studentName' || key === 'dateFrom' || key === 'dateTo')) {
+          acc[key] = value;
+        }
+        return acc;
+      }, {});
+      
+      const response = await pronunciationAPI.getPronunciationStats(activeFilters);
+      const stats = response.data.stats || [];
+      setPronunciationStats(stats);
+      const totals = response.data.totals || {
+        totalStudents: 0,
+        totalWords: 0,
+        totalSentences: 0
+      };
+      setPronunciationTotals(totals);
+      
+      // Calculate pronunciation performance summary
+      const pronunciationTotalWords = totals.totalWords || 0;
+      const pronunciationTotalSentences = totals.totalSentences || 0;
+      
+      // Calculate average overall score (sum of all students' overall scores / student count)
+      const totalOverallScore = stats.reduce((sum, s) => sum + (s.overall.averageScores.generalScore || 0), 0);
+      const pronunciationAvgOverall = stats.length > 0 ? Math.round(totalOverallScore / stats.length) : 0;
+      
+      setSummary(prev => ({
+        ...prev,
+        pronunciationAvgOverall,
+        pronunciationTotalWords,
+        pronunciationTotalSentences
+      }));
+    } catch (error) {
+      console.error('Error loading pronunciation stats:', error);
+      // Don't show alert for pronunciation stats, just log error
+    }
+  };
+
+
+  const togglePronunciationRow = (studentName) => {
+    const newExpanded = new Set(expandedPronunciationRows);
+    if (newExpanded.has(studentName)) {
+      newExpanded.delete(studentName);
+    } else {
+      newExpanded.add(studentName);
+    }
+    setExpandedPronunciationRows(newExpanded);
+  };
+
+  const toggleWordDetails = (studentName) => {
+    const newExpanded = new Set(expandedWordDetails);
+    if (newExpanded.has(studentName)) {
+      newExpanded.delete(studentName);
+    } else {
+      newExpanded.add(studentName);
+    }
+    setExpandedWordDetails(newExpanded);
+  };
+
+  const toggleSentenceDetails = (studentName) => {
+    const newExpanded = new Set(expandedSentenceDetails);
+    if (newExpanded.has(studentName)) {
+      newExpanded.delete(studentName);
+    } else {
+      newExpanded.add(studentName);
+    }
+    setExpandedSentenceDetails(newExpanded);
   };
 
   const toggleRow = (studentName) => {
@@ -116,13 +272,65 @@ const Performance = () => {
       <div className="performance-content">
         {/* Summary Cards */}
         <div className="summary-cards">
-          <div className="summary-card">
-            <div className="summary-value">{performance.length}</div>
+          {/* Total Students for Quizzes - Large Box */}
+          <div className="summary-card summary-card-large summary-card-yellow">
+            <div className="summary-emoji">👥</div>
+            <div className="summary-value">{summary.totalStudents}</div>
             <div className="summary-label">Total Students</div>
           </div>
-          <div className="summary-card">
-            <div className="summary-value">{summary.totalSessions}</div>
-            <div className="summary-label">Total Sessions</div>
+          
+          {/* 3x3 Grid of Performance Metrics */}
+          <div className="summary-cards-grid">
+            {/* Row 1: Quiz Performance - 3 boxes */}
+            <div className="summary-card summary-card-row-1 summary-card-quiz">
+              <div className="summary-emoji">📊</div>
+              <div className="summary-value">{summary.quizSuccess}%</div>
+              <div className="summary-label">% Success</div>
+            </div>
+            <div className="summary-card summary-card-row-1 summary-card-quiz">
+              <div className="summary-emoji">⭐</div>
+              <div className="summary-value">{summary.quizTotalPoints}</div>
+              <div className="summary-label">Total Points</div>
+            </div>
+            <div className="summary-card summary-card-row-1 summary-card-quiz">
+              <div className="summary-emoji">✅</div>
+              <div className="summary-value">{summary.quizTotalCompleted}</div>
+              <div className="summary-label">Total Quiz Completed</div>
+            </div>
+            
+            {/* Row 2: Game Performance - 3 boxes */}
+            <div className="summary-card summary-card-row-2 summary-card-game">
+              <div className="summary-emoji">⏱️</div>
+              <div className="summary-value">{summary.gameTotalTime}</div>
+              <div className="summary-label">Total Game Time (Hours)</div>
+            </div>
+            <div className="summary-card summary-card-row-2 summary-card-game">
+              <div className="summary-emoji">🃏</div>
+              <div className="summary-value">{summary.gameFlashcardCompleted}</div>
+              <div className="summary-label">Flashcard Game Completed</div>
+            </div>
+            <div className="summary-card summary-card-row-2 summary-card-game">
+              <div className="summary-emoji">✍️</div>
+              <div className="summary-value">{summary.gameSpellingCompleted}</div>
+              <div className="summary-label">Spelling Game Completed</div>
+            </div>
+            
+            {/* Row 3: Pronunciation Performance - 3 boxes */}
+            <div className="summary-card summary-card-row-3 summary-card-pronunciation">
+              <div className="summary-emoji">🎯</div>
+              <div className="summary-value">{summary.pronunciationAvgOverall}</div>
+              <div className="summary-label">Average Overall Score</div>
+            </div>
+            <div className="summary-card summary-card-row-3 summary-card-pronunciation">
+              <div className="summary-emoji">🔤</div>
+              <div className="summary-value">{summary.pronunciationTotalWords}</div>
+              <div className="summary-label">Total Word Pronunciation</div>
+            </div>
+            <div className="summary-card summary-card-row-3 summary-card-pronunciation">
+              <div className="summary-emoji">💬</div>
+              <div className="summary-value">{summary.pronunciationTotalSentences}</div>
+              <div className="summary-label">Total Sentence Pronunciation</div>
+            </div>
           </div>
         </div>
 
@@ -141,10 +349,10 @@ const Performance = () => {
             </div>
 
             <div className="filter-group">
-              <label>Quiz Name</label>
+              <label>Quiz/Deck Name</label>
               <input
                 type="text"
-                placeholder="Search by quiz name..."
+                placeholder="Search by quiz or deck name..."
                 value={filters.quizName}
                 onChange={(e) => handleFilterChange('quizName', e.target.value)}
               />
@@ -212,17 +420,17 @@ const Performance = () => {
                 onChange={(e) => handleFilterChange('dateTo', e.target.value)}
               />
             </div>
-          </div>
 
-          <div className="filter-actions">
-            <button onClick={applyFilters} className="btn btn-primary">
-              Apply Filters
-            </button>
-            {hasActiveFilters && (
-              <button onClick={clearFilters} className="btn btn-secondary">
-                Clear Filters
+            <div className="filter-actions-inline">
+              <button onClick={applyFilters} className="btn btn-primary">
+                Apply Filters
               </button>
-            )}
+              {hasActiveFilters && (
+                <button onClick={clearFilters} className="btn btn-secondary">
+                  Clear Filters
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -263,7 +471,11 @@ const Performance = () => {
                         <td>{student.totalQuestions}</td>
                         <td className="correct">{student.totalCorrect}</td>
                         <td className="wrong">{student.totalWrong}</td>
-                        <td className="accuracy">{student.successPercentage}%</td>
+                        <td>
+                          <span className={`accuracy accuracy-${student.successPercentage >= 70 ? 'high' : student.successPercentage >= 40 ? 'medium' : 'low'}`}>
+                            {student.successPercentage}%
+                          </span>
+                        </td>
                         <td>
                           <button
                             onClick={() => toggleRow(student.studentName)}
@@ -337,6 +549,211 @@ const Performance = () => {
             </div>
           </div>
         )}
+
+        {/* Game Stats Section */}
+        <div className="game-stats-container">
+          <h2>Game Performance</h2>
+          
+          {/* Game Stats Table */}
+          {gameStats.length === 0 ? (
+            <div className="empty-state">
+              <p>No game performance data available yet.</p>
+            </div>
+          ) : (
+            <div className="performance-table-container">
+              <div className="table-wrapper">
+                <table className="performance-table">
+                  <thead>
+                    <tr>
+                      <th>Student Name</th>
+                      <th>Flashcards Sessions</th>
+                      <th>Flashcards Time (Hours)</th>
+                      <th>Spelling Sessions</th>
+                      <th>Spelling Time (Hours)</th>
+                      <th>Total Sessions</th>
+                      <th>Total Time (Hours)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {gameStats.map((student, idx) => (
+                      <tr key={student.studentName || idx}>
+                        <td className="student-name">{student.studentName}</td>
+                        <td>{student.flashcards.sessions}</td>
+                        <td>{student.flashcards.totalHours}</td>
+                        <td>{student.spelling.sessions}</td>
+                        <td>{student.spelling.totalHours}</td>
+                        <td>{student.totalSessions}</td>
+                        <td className="score">{student.totalHours}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Pronunciation Stats Section */}
+        <div className="pronunciation-stats-container">
+          <h2>Pronunciation Performance</h2>
+          
+          {/* Pronunciation Stats Table */}
+          {pronunciationStats.length === 0 ? (
+            <div className="empty-state">
+              <p>No pronunciation performance data available yet.</p>
+            </div>
+          ) : (
+            <div className="performance-table-container">
+              <div className="table-wrapper">
+                <table className="performance-table">
+                  <thead>
+                    <tr>
+                      <th>Student Name</th>
+                      <th className="group-separator">Overall Avg Score</th>
+                      <th className="group-separator">Word</th>
+                      <th className="group-separator">Sentences</th>
+                      <th className="group-separator">Word Details</th>
+                      <th>Sentence Details</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pronunciationStats.map((student, idx) => (
+                      <React.Fragment key={student.studentName || idx}>
+                        <tr className={expandedPronunciationRows.has(student.studentName) ? 'expanded' : ''}>
+                          <td className="student-name">{student.studentName}</td>
+                          <td className="score group-separator">{student.overall.averageScores.generalScore}</td>
+                          <td className="group-separator stacked-cell">
+                            <div className="stacked-top">{student.word.totalWords}</div>
+                            <div className="stacked-bottom score">{student.word.averageScores.generalScore}</div>
+                          </td>
+                          <td className="group-separator stacked-cell">
+                            <div className="stacked-top">{student.sentence.totalSentences}</div>
+                            <div className="stacked-bottom score">{student.sentence.averageScores.generalScore}</div>
+                          </td>
+                          <td className="group-separator">
+                            {student.word.totalWords > 0 && (
+                              <button
+                                onClick={() => toggleWordDetails(student.studentName)}
+                                className="btn btn-small"
+                              >
+                                {expandedWordDetails.has(student.studentName) ? '▼ Hide' : '▶ Show'}
+                              </button>
+                            )}
+                          </td>
+                          <td>
+                            {student.sentence.totalSentences > 0 && (
+                              <button
+                                onClick={() => toggleSentenceDetails(student.studentName)}
+                                className="btn btn-small"
+                              >
+                                {expandedSentenceDetails.has(student.studentName) ? '▼ Hide' : '▶ Show'}
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                        {/* Word Details Row */}
+                        {expandedWordDetails.has(student.studentName) && student.word.totalWords > 0 && (
+                          <tr className="detail-row">
+                            <td colSpan="6">
+                              <div className="session-details">
+                                <div className="pronunciation-items-list">
+                                  {student.word.itemsList.map((item, itemIdx) => (
+                                    <div key={itemIdx} className="pronunciation-item-card">
+                                      <div className="pronunciation-item-header">
+                                        <div className="word-analysis">
+                                          {item.wordAnalysis && item.wordAnalysis.length > 0 ? (
+                                            item.wordAnalysis.map((wordItem, wIdx) => {
+                                              const statusTooltips = {
+                                                'matched': 'Matched: Word was pronounced correctly',
+                                                'missing': 'Missing: Word was not pronounced',
+                                                'wrong': 'Wrong: Word was mispronounced'
+                                              };
+                                              return (
+                                                <span
+                                                  key={wIdx}
+                                                  className={`word-status word-${wordItem.status}`}
+                                                  title={statusTooltips[wordItem.status] || wordItem.status}
+                                                >
+                                                  {wordItem.word}
+                                                </span>
+                                              );
+                                            })
+                                          ) : (
+                                            <span className="word-status word-matched" title="Matched: Word was pronounced correctly">{item.referenceText}</span>
+                                          )}
+                                        </div>
+                                        <div className="pronunciation-scores">
+                                          <span className="score-overall" title="Overall Score: Average of all pronunciation metrics">🎯 {item.overallScore}</span>
+                                          <span className="score-pronunciation" title="Pronunciation Score: Accuracy of word pronunciation">🗣️ {item.pronunciationScore}</span>
+                                          <span className="score-fluency" title="Oral Fluency Score: Flow and rhythm of speech">⚡ {item.oralFluencyScore}</span>
+                                          <span className="score-content" title="Content Score: Completeness of the spoken text">📄 {item.contentScore}</span>
+                                          <span className="pronunciation-date-spacer"></span>
+                                          <span className="pronunciation-date">{new Date(item.date).toLocaleDateString()}</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+
+                        {/* Sentence Details Row */}
+                        {expandedSentenceDetails.has(student.studentName) && student.sentence.totalSentences > 0 && (
+                          <tr className="detail-row">
+                            <td colSpan="6">
+                              <div className="session-details">
+                                <div className="pronunciation-items-list">
+                                  {student.sentence.itemsList.map((item, itemIdx) => (
+                                    <div key={itemIdx} className="pronunciation-item-card">
+                                      <div className="pronunciation-item-header">
+                                        <div className="word-analysis">
+                                          {item.wordAnalysis && item.wordAnalysis.length > 0 ? (
+                                            item.wordAnalysis.map((wordItem, wIdx) => {
+                                              const statusTooltips = {
+                                                'matched': 'Matched: Word was pronounced correctly',
+                                                'missing': 'Missing: Word was not pronounced',
+                                                'wrong': 'Wrong: Word was mispronounced'
+                                              };
+                                              return (
+                                                <span
+                                                  key={wIdx}
+                                                  className={`word-status word-${wordItem.status}`}
+                                                  title={statusTooltips[wordItem.status] || wordItem.status}
+                                                >
+                                                  {wordItem.word}
+                                                </span>
+                                              );
+                                            })
+                                          ) : (
+                                            <span className="word-status word-matched" title="Matched: Word was pronounced correctly">{item.referenceText}</span>
+                                          )}
+                                        </div>
+                                        <div className="pronunciation-scores">
+                                          <span className="score-overall" title="Overall Score: Average of all pronunciation metrics">🎯 {item.overallScore}</span>
+                                          <span className="score-pronunciation" title="Pronunciation Score: Accuracy of word pronunciation">🗣️ {item.pronunciationScore}</span>
+                                          <span className="score-fluency" title="Oral Fluency Score: Flow and rhythm of speech">⚡ {item.oralFluencyScore}</span>
+                                          <span className="score-content" title="Content Score: Completeness of the spoken text">📄 {item.contentScore}</span>
+                                          <span className="pronunciation-date-spacer"></span>
+                                          <span className="pronunciation-date">{new Date(item.date).toLocaleDateString()}</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

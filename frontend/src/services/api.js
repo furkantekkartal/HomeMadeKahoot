@@ -62,6 +62,7 @@ export const sessionAPI = {
   saveResult: (data) => api.post('/sessions/results', data),
   getMyResults: () => api.get('/sessions/results/my'),
   getMyPerformance: (filters) => api.get('/sessions/performance', { params: filters }),
+  getGameStats: (filters) => api.get('/sessions/game-stats', { params: filters }),
   getTeacherAnalytics: (filters) => api.get('/sessions/analytics', { params: filters }),
 };
 
@@ -143,16 +144,18 @@ export const studySessionAPI = {
 
 // Pronunciation API
 export const pronunciationAPI = {
-  assessPronunciation: (audioBlob, referenceText) => {
+  assessPronunciation: (audioBlob, referenceText, type = 'word') => {
     const formData = new FormData();
     formData.append('audio', audioBlob, 'recording.wav');
     formData.append('referenceText', referenceText);
+    formData.append('type', type);
     return api.post('/pronunciation/assess', formData, {
       headers: {
         'Content-Type': 'multipart/form-data'
       }
     });
-  }
+  },
+  getPronunciationStats: (filters) => api.get('/pronunciation/stats', { params: filters })
 };
 
 // Statistics API

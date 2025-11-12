@@ -9,6 +9,7 @@ router.get('/my', auth, sessionController.getMySessions);
 router.post('/results', auth, sessionController.saveResult);
 router.get('/results/my', auth, sessionController.getMyResults);
 router.get('/performance', auth, sessionController.getMyPerformance);
+router.get('/game-stats', auth, sessionController.getGameStats);
 router.get('/analytics', auth, sessionController.getTeacherAnalytics);
 router.get('/:id', sessionController.getSession);
 

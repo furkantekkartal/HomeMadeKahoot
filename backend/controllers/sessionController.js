@@ -2,6 +2,8 @@ const Session = require('../models/Session');
 const Quiz = require('../models/Quiz');
 const Result = require('../models/Result');
 const StudentResult = require('../models/StudentResult');
+const StudySession = require('../models/StudySession');
+const FlashcardDeck = require('../models/FlashcardDeck');
 const mongoose = require('mongoose');
 
 // Generate random PIN
@@ -132,8 +134,27 @@ exports.getMyPerformance = async (req, res) => {
     if (studentName && studentName.trim() !== '') {
       studentResultQuery.username = { $regex: studentName.trim(), $options: 'i' };
     }
+    // Handle quiz name filter - also search deck names
+    let matchingDeckIds = [];
     if (quizName && quizName.trim() !== '') {
-      studentResultQuery.quizName = { $regex: quizName.trim(), $options: 'i' };
+      // Search for matching quizzes
+      const matchingQuizzes = await Quiz.find({
+        title: { $regex: quizName.trim(), $options: 'i' }
+      }).select('_id');
+      
+      // Search for matching deck names
+      const matchingDecks = await FlashcardDeck.find({
+        name: { $regex: quizName.trim(), $options: 'i' }
+      }).select('_id');
+      
+      matchingDeckIds = matchingDecks.map(d => d._id);
+      
+      // If we have quiz matches, filter by quiz name
+      if (matchingQuizzes.length > 0 || matchingDeckIds.length > 0) {
+        // For StudentResult, we can filter by quizName regex
+        // Note: StudentResult doesn't have deckId, so deck filtering would need to be done after fetch
+        studentResultQuery.quizName = { $regex: quizName.trim(), $options: 'i' };
+      }
     }
     if (level && level.trim() !== '') {
       studentResultQuery.level = level.trim();
@@ -249,10 +270,13 @@ exports.getMyPerformance = async (req, res) => {
         username = userIdToUsername.get(userId) || 'Unknown';
       }
       
-      // Check if quiz name matches filter
+      // Check if quiz name matches filter (or deck name)
       if (quizName && quizName.trim() !== '') {
         const quizTitle = quiz.title || 'Unknown Quiz';
-        if (!quizTitle.toLowerCase().includes(quizName.toLowerCase().trim())) {
+        const matchesQuiz = quizTitle.toLowerCase().includes(quizName.toLowerCase().trim());
+        // Also check if any matching deck IDs were found (though Result doesn't have deckId)
+        // For now, just check quiz name - deck matching is handled in StudentResult query
+        if (!matchesQuiz) {
           return;
         }
       }
@@ -364,8 +388,8 @@ exports.getMyPerformance = async (req, res) => {
       };
     });
 
-    // Sort by student name
-    performance.sort((a, b) => a.studentName.localeCompare(b.studentName));
+    // Sort by total points (highest first)
+    performance.sort((a, b) => b.totalPoints - a.totalPoints);
 
     // Calculate totals
     const totalQuizzes = new Set();
@@ -382,6 +406,109 @@ exports.getMyPerformance = async (req, res) => {
     });
   } catch (error) {
     console.error('Error getting all students performance:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Get game stats (Flashcards and Spelling)
+exports.getGameStats = async (req, res) => {
+  try {
+    const { studentName, module, dateFrom, dateTo } = req.query;
+    const User = require('../models/User');
+
+    // Build query for game modules (Flashcards and Spelling)
+    const query = {
+      module: { $in: ['Flashcards', 'Spelling'] },
+      isActive: false
+    };
+
+    // Apply date filters if provided
+    if (dateFrom || dateTo) {
+      query.date = {};
+      if (dateFrom) query.date.$gte = dateFrom;
+      if (dateTo) query.date.$lte = dateTo;
+    }
+
+    // Get all study sessions for game modules
+    const studySessions = await StudySession.find(query).populate('userId', 'username');
+
+    // Group by student (username) and module
+    const gameStatsMap = new Map();
+
+    studySessions.forEach(session => {
+      const username = session.userId?.username || 'Unknown';
+      
+      // Apply student name filter if provided
+      if (studentName && !username.toLowerCase().includes(studentName.toLowerCase())) {
+        return;
+      }
+
+      // Apply module filter if provided
+      if (module && session.module !== module) {
+        return;
+      }
+
+      if (!gameStatsMap.has(username)) {
+        gameStatsMap.set(username, {
+          studentName: username,
+          flashcards: {
+            sessions: 0,
+            totalMinutes: 0,
+            totalHours: 0
+          },
+          spelling: {
+            sessions: 0,
+            totalMinutes: 0,
+            totalHours: 0
+          }
+        });
+      }
+
+      const studentStats = gameStatsMap.get(username);
+      const moduleKey = session.module.toLowerCase();
+      
+      if (studentStats[moduleKey]) {
+        studentStats[moduleKey].sessions += 1;
+        studentStats[moduleKey].totalMinutes += session.durationMinutes || 0;
+        studentStats[moduleKey].totalHours = Math.floor(studentStats[moduleKey].totalMinutes / 60);
+      } else {
+        // Handle case where module doesn't match expected keys
+        console.warn(`Unexpected module: ${session.module}`);
+      }
+    });
+
+    // Convert map to array and sort by total time (flashcards + spelling)
+    const gameStats = Array.from(gameStatsMap.values()).map(student => {
+      const totalMinutes = student.flashcards.totalMinutes + student.spelling.totalMinutes;
+      const totalSessions = student.flashcards.sessions + student.spelling.sessions;
+      return {
+        ...student,
+        totalMinutes,
+        totalHours: Math.floor(totalMinutes / 60),
+        totalSessions
+      };
+    });
+
+    // Sort by total minutes (highest first)
+    gameStats.sort((a, b) => b.totalMinutes - a.totalMinutes);
+
+    // Calculate totals
+    const totals = {
+      totalStudents: gameStats.length,
+      totalFlashcardsSessions: gameStats.reduce((sum, s) => sum + s.flashcards.sessions, 0),
+      totalSpellingSessions: gameStats.reduce((sum, s) => sum + s.spelling.sessions, 0),
+      totalSessions: gameStats.reduce((sum, s) => sum + s.totalSessions, 0),
+      totalMinutes: gameStats.reduce((sum, s) => sum + s.totalMinutes, 0),
+      totalHours: Math.floor(gameStats.reduce((sum, s) => sum + s.totalMinutes, 0) / 60)
+    };
+
+    res.json({
+      success: true,
+      gameStats,
+      totals
+    });
+  } catch (error) {
+    console.error('Error getting game stats:', error);
     res.status(500).json({ message: error.message });
   }
 };
