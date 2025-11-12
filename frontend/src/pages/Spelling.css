@@ -872,6 +872,13 @@
   gap: 1rem;
 }
 
+/* Ensure stats stay column on wide screens */
+@media (min-width: 969px) {
+  .spelling-sidebar .stats-grid {
+    flex-direction: column !important;
+  }
+}
+
 .stat-card {
   padding: 1rem;
   border-radius: 12px;
