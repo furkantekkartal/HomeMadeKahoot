@@ -25,7 +25,7 @@ const HostQuiz = () => {
   useEffect(() => {
     if (!sessionId) {
       setLoading(false);
-      setError('Session ID is missing from URL. Please go back to dashboard and try hosting again.');
+      setError('Session ID is missing from URL. Please go back to quiz page and try hosting again.');
       return;
     }
 
@@ -286,8 +286,8 @@ const HostQuiz = () => {
             <button onClick={() => window.location.reload()} className="btn btn-primary">
               Reload Page
             </button>
-            <button onClick={() => navigate('/dashboard')} className="btn btn-secondary">
-              Back to Dashboard
+            <button onClick={() => navigate('/quiz')} className="btn btn-secondary">
+              Back to Quiz
             </button>
           </div>
         </div>
@@ -363,11 +363,11 @@ const HostQuiz = () => {
               <div key={idx} className={`question-card card ${idx === currentQuestionIndex ? 'active-question' : ''}`}>
                 <div className="question-number">Question {idx + 1} of {quiz.questions.length}</div>
                 <h3 className="question-text">{question.questionText}</h3>
-                {question.imageUrl && (
-                  <div className="question-image-container">
+                <div className="question-image-container">
+                  {question.imageUrl && (
                     <img src={question.imageUrl} alt="Question" className="question-image" />
-                  </div>
-                )}
+                  )}
+                </div>
                 <div className="options-display">
                   {question.options.map((option, optIdx) => (
                     <div key={optIdx} className={`option-box option-${optIdx + 1}`}>
@@ -452,8 +452,8 @@ const HostQuiz = () => {
               ))}
             </ol>
           </div>
-          <button onClick={() => navigate('/dashboard')} className="btn btn-primary">
-            Back to Dashboard
+          <button onClick={() => navigate('/quiz')} className="btn btn-primary">
+            Back to Quiz
           </button>
         </div>
       )}

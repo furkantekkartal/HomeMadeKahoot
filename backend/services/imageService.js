@@ -1,13 +1,21 @@
 const axios = require('axios');
+const fs = require('fs').promises;
+const path = require('path');
 
-const UNSPLASH_ACCESS_KEY = process.env.UNSPLASH_ACCESS_KEY;
+const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
+const GOOGLE_CX = process.env.GOOGLE_CX; // Custom Search Engine ID
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+const GOOGLE_DAILY_LIMIT = parseInt(process.env.GOOGLE_DAILY_LIMIT) || 100; // Default 100 free searches per day
+const UNSPLASH_ACCESS_KEY = process.env.UNSPLASH_ACCESS_KEY || process.env.UNSPLASH_API_KEY;
+
+// Path to store daily usage counter
+const USAGE_FILE_PATH = path.join(__dirname, '../data/google_search_usage.json');
 
 /**
- * Generate a search query for Unsplash using AI (OpenRouter)
+ * Generate a search query for image search using AI (OpenRouter)
  * @param {string} questionText - The quiz question text
  * @param {Array<string>} options - The answer options
- * @returns {Promise<string>} - A search query string for Unsplash
+ * @returns {Promise<string>} - A search query string for image search
  */
 async function generateSearchQuery(questionText, options = []) {
   if (!OPENROUTER_API_KEY) {
@@ -82,11 +90,191 @@ Return ONLY the search query (1-3 words), nothing else.`;
 }
 
 /**
- * Fetch an image URL from Unsplash based on a search query
- * @param {string} query - Search query for Unsplash
+ * Get today's date string (YYYY-MM-DD) for tracking daily usage
+ * @returns {string} - Today's date string
+ */
+function getTodayDateString() {
+  const today = new Date();
+  return today.toISOString().split('T')[0]; // Returns YYYY-MM-DD
+}
+
+/**
+ * Load daily usage counter from file
+ * @returns {Promise<{date: string, count: number}>} - Usage data
+ */
+async function loadUsageCounter() {
+  try {
+    // Ensure data directory exists
+    const dataDir = path.dirname(USAGE_FILE_PATH);
+    await fs.mkdir(dataDir, { recursive: true });
+    
+    const data = await fs.readFile(USAGE_FILE_PATH, 'utf8');
+    const usage = JSON.parse(data);
+    
+    // Check if it's a new day - reset counter if needed
+    const today = getTodayDateString();
+    if (usage.date !== today) {
+      return { date: today, count: 0 };
+    }
+    
+    return usage;
+  } catch (error) {
+    // File doesn't exist or is invalid - start fresh
+    const today = getTodayDateString();
+    return { date: today, count: 0 };
+  }
+}
+
+/**
+ * Save daily usage counter to file
+ * @param {number} count - Current usage count
+ * @returns {Promise<void>}
+ */
+async function saveUsageCounter(count) {
+  try {
+    const usage = {
+      date: getTodayDateString(),
+      count: count
+    };
+    
+    // Ensure data directory exists
+    const dataDir = path.dirname(USAGE_FILE_PATH);
+    await fs.mkdir(dataDir, { recursive: true });
+    
+    await fs.writeFile(USAGE_FILE_PATH, JSON.stringify(usage, null, 2), 'utf8');
+  } catch (error) {
+    console.error('Failed to save usage counter:', error);
+    // Don't throw - we can continue without saving
+  }
+}
+
+/**
+ * Check daily usage limit (without incrementing)
+ * @returns {Promise<{allowed: boolean, count: number, remaining: number}>}
+ */
+async function checkUsageLimit() {
+  const usage = await loadUsageCounter();
+  
+  if (usage.count >= GOOGLE_DAILY_LIMIT) {
+    return {
+      allowed: false,
+      count: usage.count,
+      remaining: 0
+    };
+  }
+  
+  return {
+    allowed: true,
+    count: usage.count,
+    remaining: GOOGLE_DAILY_LIMIT - usage.count
+  };
+}
+
+/**
+ * Increment daily usage counter (call after successful API call)
+ * @returns {Promise<{count: number, remaining: number}>}
+ */
+async function incrementUsageCounter() {
+  const usage = await loadUsageCounter();
+  const newCount = usage.count + 1;
+  await saveUsageCounter(newCount);
+  
+  return {
+    count: newCount,
+    remaining: GOOGLE_DAILY_LIMIT - newCount
+  };
+}
+
+/**
+ * Fetch an image URL from Google Custom Search API based on a search query
+ * @param {string} query - Search query for Google Images
  * @param {number} page - Page number for pagination (default: 1, random for variety)
  * @param {Array<string>} fallbackQueries - Fallback queries to try if main query fails
- * @returns {Promise<string>} - Image URL (regular size, optimized for web)
+ * @returns {Promise<string>} - Image URL
+ */
+async function fetchImageFromGoogle(query, page = null, fallbackQueries = []) {
+  if (!GOOGLE_API_KEY) {
+    throw new Error('GOOGLE_API_KEY is not set in environment variables');
+  }
+  if (!GOOGLE_CX) {
+    throw new Error('GOOGLE_CX (Custom Search Engine ID) is not set in environment variables');
+  }
+
+  // Check daily usage limit before making API call
+  const usageCheck = await checkUsageLimit();
+  if (!usageCheck.allowed) {
+    throw new Error(`Daily Google Search API limit reached (${GOOGLE_DAILY_LIMIT} searches/day). Remaining: 0. Please try again tomorrow.`);
+  }
+  
+  console.log(`Google Search API usage: ${usageCheck.count}/${GOOGLE_DAILY_LIMIT} (${usageCheck.remaining} remaining)`);
+
+  const queriesToTry = [query, ...fallbackQueries];
+  let apiCallMade = false;
+  
+  for (const searchQuery of queriesToTry) {
+    try {
+      // Use random start index if not specified to get different images each time
+      // Google API uses start parameter (1-91, increments of 10)
+      const randomStart = page ? (page - 1) * 10 + 1 : Math.floor(Math.random() * 9) * 10 + 1;
+      const numResults = 10; // Get 10 images per request
+      
+      const response = await axios.get('https://www.googleapis.com/customsearch/v1', {
+        params: {
+          key: GOOGLE_API_KEY,
+          cx: GOOGLE_CX,
+          q: searchQuery,
+          searchType: 'image',
+          num: numResults,
+          start: randomStart,
+          safe: 'active', // Safe search
+          imgSize: 'large', // Prefer larger images
+          imgType: 'photo' // Prefer photos over clipart/drawings
+        }
+      });
+
+      // Mark that we made an API call (only increment on first successful call)
+      if (!apiCallMade) {
+        await incrementUsageCounter();
+        apiCallMade = true;
+      }
+
+      const items = response.data.items;
+      
+      if (!items || items.length === 0) {
+        if (queriesToTry.indexOf(searchQuery) < queriesToTry.length - 1) {
+          continue;
+        }
+        throw new Error('No images found for the query');
+      }
+
+      // Randomly select from the results to get variety
+      const randomIndex = Math.floor(Math.random() * Math.min(items.length, numResults));
+      const selectedImage = items[randomIndex];
+
+      return selectedImage.link; // Google returns direct image URL in 'link' field
+    } catch (error) {
+      // If this is the last query to try, throw the error
+      if (queriesToTry.indexOf(searchQuery) === queriesToTry.length - 1) {
+        // Only increment if we actually made an API call (not a validation error)
+        if (!apiCallMade && error.response) {
+          await incrementUsageCounter();
+        }
+        const errorMessage = error.response?.data?.error?.message || error.message || 'Unknown error';
+        const googleError = new Error(`Failed to fetch image from Google: ${errorMessage}`);
+        googleError.searchQuery = searchQuery;
+        throw googleError;
+      }
+      continue;
+    }
+  }
+}
+
+/**
+ * Fetch an image URL from Unsplash API based on a search query
+ * @param {string} query - Search query for Unsplash
+ * @param {number} page - Page number for pagination (not used by Unsplash, kept for compatibility)
+ * @param {Array<string>} fallbackQueries - Fallback queries to try if main query fails
+ * @returns {Promise<string>} - Image URL
  */
 async function fetchImageFromUnsplash(query, page = null, fallbackQueries = []) {
   if (!UNSPLASH_ACCESS_KEY) {
@@ -97,21 +285,17 @@ async function fetchImageFromUnsplash(query, page = null, fallbackQueries = []) 
   
   for (const searchQuery of queriesToTry) {
     try {
-      // Fetch more images per page for variety
-      // Use random page if not specified to get different images each time
-      const randomPage = page || Math.floor(Math.random() * 5) + 1;
-      const perPage = 10; // Get 10 images per request for more variety
-      
       const response = await axios.get('https://api.unsplash.com/search/photos', {
         params: {
           query: searchQuery,
-          per_page: perPage,
-          page: randomPage,
-          orientation: 'landscape'
+          per_page: 10, // Get 10 images per request
+          orientation: 'landscape',
+          content_filter: 'high'
         },
         headers: {
           'Authorization': `Client-ID ${UNSPLASH_ACCESS_KEY}`
-        }
+        },
+        timeout: 10000 // 10 second timeout
       });
 
       const results = response.data.results;
@@ -124,10 +308,10 @@ async function fetchImageFromUnsplash(query, page = null, fallbackQueries = []) 
       }
 
       // Randomly select from the results to get variety
-      const randomIndex = Math.floor(Math.random() * Math.min(results.length, perPage));
+      const randomIndex = Math.floor(Math.random() * Math.min(results.length, 10));
       const selectedImage = results[randomIndex];
 
-      return selectedImage.urls.regular;
+      return selectedImage.urls.regular; // Unsplash returns image URL in 'urls.regular' field
     } catch (error) {
       // If this is the last query to try, throw the error
       if (queriesToTry.indexOf(searchQuery) === queriesToTry.length - 1) {
@@ -205,8 +389,252 @@ function generateFallbackQueries(questionText, options = [], originalQuery = '')
   return fallbacks;
 }
 
+/**
+ * Extract the phrase containing the target word from a sentence
+ * @param {string} sentence - The sentence to search in
+ * @param {string} targetWord - The target word to find
+ * @returns {string} - The phrase containing the target word (e.g., "rolled down" for "down")
+ */
+function extractWordPhrase(sentence, targetWord) {
+  if (!sentence || !targetWord) {
+    return targetWord.toLowerCase();
+  }
+
+  const lowerSentence = sentence.toLowerCase();
+  const lowerTargetWord = targetWord.toLowerCase();
+
+  // Try to find the word in the sentence (case-insensitive)
+  const wordRegex = new RegExp(`\\b${lowerTargetWord.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+  const match = sentence.match(wordRegex);
+  
+  if (!match) {
+    return lowerTargetWord; // Word not found, return just the word
+  }
+
+  const matchIndex = match.index;
+  const words = sentence.split(/\s+/);
+  
+  // Find which word index contains the match
+  let currentIndex = 0;
+  let wordIndex = -1;
+  for (let i = 0; i < words.length; i++) {
+    const wordStart = currentIndex;
+    const wordEnd = currentIndex + words[i].length;
+    
+    if (matchIndex >= wordStart && matchIndex < wordEnd) {
+      wordIndex = i;
+      break;
+    }
+    currentIndex = wordEnd + 1; // +1 for space
+  }
+
+  if (wordIndex === -1) {
+    return lowerTargetWord;
+  }
+
+  // Extract phrase: check if previous word forms a common phrase (phrasal verb, etc.)
+  // Look for 2-word phrases (e.g., "rolled down", "went up", "came back")
+  let phrase = '';
+  
+  // Check if previous word + target word form a phrase
+  if (wordIndex > 0) {
+    const prevWord = words[wordIndex - 1].toLowerCase().replace(/[.,!?;:()"']/g, '');
+    const currentWord = words[wordIndex].toLowerCase().replace(/[.,!?;:()"']/g, '');
+    phrase = `${prevWord} ${currentWord}`;
+  } else {
+    phrase = words[wordIndex].toLowerCase().replace(/[.,!?;:()"']/g, '');
+  }
+
+  return phrase;
+}
+
+/**
+ * Extract keywords from a sentence, preserving the natural order
+ * @param {string} sentence - The sentence to extract keywords from
+ * @param {string} targetWord - The target word that must be included
+ * @returns {string[]} - Array of keywords in sentence order (e.g., ["ball", "rolled down", "hill"])
+ */
+function extractKeywordsFromSentence(sentence, targetWord) {
+  if (!sentence || !targetWord) {
+    return [targetWord.toLowerCase()];
+  }
+
+  // Extract the phrase containing the target word (e.g., "rolled down" instead of just "down")
+  const targetPhrase = extractWordPhrase(sentence, targetWord);
+  const phraseWords = targetPhrase.split(/\s+/);
+
+  // Remove punctuation and split into words, preserving order
+  const words = sentence
+    .toLowerCase()
+    .replace(/[.,!?;:()"']/g, ' ')
+    .split(/\s+/)
+    .filter(word => word.length > 0);
+
+  // Remove common stop words
+  const stopWords = new Set([
+    'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 
+    'of', 'with', 'by', 'from', 'as', 'is', 'was', 'are', 'were', 'be', 
+    'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 
+    'would', 'should', 'could', 'may', 'might', 'must', 'can', 'this', 
+    'that', 'these', 'those', 'it', 'its', 'they', 'them', 'their', 'there'
+  ]);
+
+  // Build keywords array preserving sentence order
+  const keywords = [];
+  let i = 0;
+  let phraseFound = false;
+  
+  while (i < words.length && keywords.length < 4) {
+    const word = words[i];
+    
+    // Skip stop words and very short words
+    if (stopWords.has(word) || word.length <= 2) {
+      i++;
+      continue;
+    }
+
+    // Check if this word is part of the target phrase
+    if (phraseWords.includes(word) && i < words.length - 1) {
+      // Check if next word completes the phrase
+      const nextWord = words[i + 1];
+      if (phraseWords.includes(nextWord)) {
+        // Add the phrase as a single unit
+        keywords.push(`${word} ${nextWord}`);
+        phraseFound = true;
+        i += 2; // Skip both words
+        continue;
+      }
+    }
+
+    // Add individual word if it's not part of the phrase
+    if (!phraseWords.includes(word)) {
+      keywords.push(word);
+    } else if (!phraseFound) {
+      // If we found a phrase word but couldn't form the phrase, skip it
+      // (it will be handled by the phrase insertion below if needed)
+    }
+    
+    i++;
+  }
+
+  // If we didn't get the target phrase, add it in the correct position
+  if (!phraseFound && targetPhrase !== targetWord.toLowerCase()) {
+    // Try to find where "rolled" appears in the original sentence
+    const phraseFirstWord = targetPhrase.split(' ')[0];
+    const phraseFirstIndex = words.indexOf(phraseFirstWord);
+    
+    if (phraseFirstIndex > 0) {
+      // Insert after words that come before the phrase
+      let insertIndex = 0;
+      for (let j = 0; j < phraseFirstIndex; j++) {
+        if (!stopWords.has(words[j]) && words[j].length > 2 && !phraseWords.includes(words[j])) {
+          insertIndex++;
+        }
+      }
+      keywords.splice(insertIndex, 0, targetPhrase);
+    } else {
+      // If phrase is at the start, add it first
+      keywords.unshift(targetPhrase);
+    }
+  }
+
+  // Limit to 4 keywords max and remove duplicates
+  const result = [];
+  for (const keyword of keywords) {
+    if (result.length >= 4) break;
+    if (!result.includes(keyword)) {
+      result.push(keyword);
+    }
+  }
+  
+  return result;
+}
+
+/**
+ * Generate and fetch an image for a word
+ * @param {string} englishWord - The English word
+ * @param {string} wordType - The word type (noun, verb, etc.)
+ * @param {string} sampleSentence - Optional sample sentence for context
+ * @param {string} customKeywords - Optional custom keywords from user
+ * @param {string} service - Image service to use: 'google' or 'unsplash' (default: 'google')
+ * @returns {Promise<{imageUrl: string, searchQuery: string}>} - Image URL and search query
+ */
+async function generateWordImage(englishWord, wordType = '', sampleSentence = '', customKeywords = '', service = 'google') {
+  let searchQuery = englishWord.toLowerCase();
+  
+  // If custom keywords are provided, use them as-is (user controls the order)
+  if (customKeywords && customKeywords.trim()) {
+    searchQuery = customKeywords.trim().toLowerCase();
+    
+    console.log(`Using custom keywords for "${englishWord}": "${searchQuery}"`);
+    
+    // Use custom keywords directly, skip automatic extraction and AI refinement
+    // Generate fallback queries
+    const fallbackQueries = [englishWord.toLowerCase()];
+    if (wordType) {
+      fallbackQueries.push(`${englishWord} ${wordType}`);
+    }
+
+    try {
+      // Use the selected service
+      const imageUrl = service === 'unsplash' 
+        ? await fetchImageFromUnsplash(searchQuery, null, fallbackQueries)
+        : await fetchImageFromGoogle(searchQuery, null, fallbackQueries);
+      return { imageUrl, searchQuery };
+    } catch (error) {
+      console.error('Error generating word image:', error);
+      throw error;
+    }
+  }
+  
+  // If no custom keywords, proceed with automatic extraction
+  if (sampleSentence && sampleSentence.trim()) {
+    // If we have a sample sentence, extract keywords from it
+    const keywords = extractKeywordsFromSentence(sampleSentence, englishWord);
+    
+    // Create search query: target word first, then 2-3 other keywords
+    // Join with spaces for better image search results
+    if (keywords.length > 1) {
+      searchQuery = keywords.join(' ');
+    } else {
+      searchQuery = keywords[0] || englishWord.toLowerCase();
+    }
+    
+    console.log(`Extracted keywords for "${englishWord}": "${searchQuery}"`);
+  }
+
+  // Skip AI refinement - use extracted keywords as they preserve sentence order
+  // AI was forcing target word first, which breaks natural sentence flow
+
+  // Generate fallback queries
+  const fallbackQueries = [englishWord.toLowerCase()];
+  if (wordType) {
+    fallbackQueries.push(`${englishWord} ${wordType}`);
+  }
+  // Add a fallback with just the word if keyword extraction didn't work well
+  if (searchQuery === englishWord.toLowerCase() && sampleSentence) {
+    // Try a simple extraction as fallback
+    const simpleKeywords = extractKeywordsFromSentence(sampleSentence, englishWord);
+    if (simpleKeywords.length > 1) {
+      fallbackQueries.push(simpleKeywords.join(' '));
+    }
+  }
+
+  try {
+    // Use the selected service
+    const imageUrl = service === 'unsplash'
+      ? await fetchImageFromUnsplash(searchQuery, null, fallbackQueries)
+      : await fetchImageFromGoogle(searchQuery, null, fallbackQueries);
+    return { imageUrl, searchQuery };
+  } catch (error) {
+    console.error('Error generating word image:', error);
+    throw error;
+  }
+}
+
 module.exports = {
   generateQuestionImage,
+  generateWordImage,
   generateSearchQuery,
   fetchImageFromUnsplash
 };

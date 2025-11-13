@@ -57,11 +57,11 @@
   display: flex;
   align-items: center;
   gap: 1rem;
-  padding: 1.5rem;
+  padding: 1rem;
   border-radius: 12px;
   font-size: 1.1rem;
   font-weight: 600;
-  color: white;
+  color: rgb(0, 0, 0);
   text-align: left;
   border: none;
   cursor: pointer;

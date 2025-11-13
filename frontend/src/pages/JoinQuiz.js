@@ -1,14 +1,23 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { sessionAPI } from '../services/api';
 import './JoinQuiz.css';
 
-const JoinQuiz = () => {
+const LoggedInJoinQuiz = () => {
+  const { user } = useAuth();
   const [pin, setPin] = useState('');
   const [username, setUsername] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  // Initialize username with logged-in user's name
+  useEffect(() => {
+    if (user && user.username) {
+      setUsername(user.username);
+    }
+  }, [user]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -77,5 +86,5 @@ const JoinQuiz = () => {
   );
 };
 
-export default JoinQuiz;
+export default LoggedInJoinQuiz;
 

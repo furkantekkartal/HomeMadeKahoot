@@ -9,10 +9,13 @@ router.post('/generate-image', auth, quizController.generateQuestionImage);
 router.post('/generate-title', auth, quizController.generateQuizTitle);
 router.post('/generate-description', auth, quizController.generateQuizDescription);
 router.post('/generate-questions', auth, quizController.generateQuizQuestions);
+router.post('/generate-from-file', auth, quizController.uploadFile, quizController.generateQuizFromFile);
+router.post('/generate-from-youtube', auth, quizController.generateQuizFromYouTube);
 router.get('/:id', quizController.getQuiz);
 router.post('/', auth, quizController.createQuiz);
 router.put('/:id', auth, quizController.updateQuiz);
 router.delete('/:id', auth, quizController.deleteQuiz);
+router.patch('/:id/visibility', auth, quizController.toggleQuizVisibility);
 
 module.exports = router;
 

@@ -4,7 +4,7 @@ import { sessionAPI, quizAPI } from '../services/api';
 import { connectSocket } from '../services/socket';
 import './PlayQuiz.css';
 
-const PlayQuiz = () => {
+const LoggedInPlayQuiz = () => {
   const { sessionId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
@@ -23,8 +23,12 @@ const PlayQuiz = () => {
   const [leaderboard, setLeaderboard] = useState([]);
   const [timeLeft, setTimeLeft] = useState(20);
   const [username, setUsername] = useState(location.state?.username || null);
+  const autoStart = location.state?.autoStart || false;
+  const [studentJoined, setStudentJoined] = useState(false);
   const studentJoinedRef = useRef(false);
   const initialLoadRef = useRef(false);
+  const autoStartedRef = useRef(false);
+  const [showKnownAnimation, setShowKnownAnimation] = useState(false);
 
   useEffect(() => {
     const socketInstance = connectSocket();
@@ -142,6 +146,7 @@ const PlayQuiz = () => {
     const joinSession = () => {
       if (studentJoinedRef.current) return;
       studentJoinedRef.current = true;
+      setStudentJoined(true);
       
       socket.emit('join-session', {
         pin: session.pin,
@@ -164,6 +169,20 @@ const PlayQuiz = () => {
       }, 1000);
     }
   }, [socket, socketConnected, session]);
+
+  // Auto-start quiz if autoStart flag is set (for self-paced quizzes from browse page)
+  // Wait until student has joined the session before starting
+  useEffect(() => {
+    if (autoStart && socket && socketConnected && session && session.status === 'waiting' && studentJoined && !autoStartedRef.current) {
+      autoStartedRef.current = true;
+      // Auto-start the quiz after a short delay to ensure everything is ready
+      setTimeout(() => {
+        if (socket && socket.connected) {
+          socket.emit('start-quiz', { sessionId });
+        }
+      }, 500);
+    }
+  }, [autoStart, socket, socketConnected, session, sessionId, studentJoined]);
 
   // Load current question if quiz is already active (only on initial load)
   useEffect(() => {
@@ -198,6 +217,13 @@ const PlayQuiz = () => {
     setSelectedAnswer(answerIndex);
     setAnswered(true);
 
+    // Show animation if correct
+    const isCorrectAnswer = answerIndex === currentQuestion.correctAnswer;
+    if (isCorrectAnswer) {
+      setShowKnownAnimation(true);
+      setTimeout(() => setShowKnownAnimation(false), 300);
+    }
+
     if (socket) {
       const studentUsername = location.state?.username || username || `User${Math.floor(Math.random() * 1000)}`;
       socket.emit('submit-answer', {
@@ -207,6 +233,38 @@ const PlayQuiz = () => {
         timeTaken,
         username: studentUsername
       });
+    }
+
+    // Auto-advance to next question after delay
+    if (currentQuestionIndex < quiz.questions.length - 1) {
+      setTimeout(() => {
+        const nextIndex = currentQuestionIndex + 1;
+        setCurrentQuestionIndex(nextIndex);
+        setCurrentQuestion(quiz.questions[nextIndex]);
+        setSelectedAnswer(null);
+        setAnswered(false);
+        setTimeLeft(quiz.questions[nextIndex].timeLimit || 20);
+        setScore(0);
+        setShowKnownAnimation(false);
+      }, 2000); // 2 second delay to show animation and feedback
+    } else {
+      // Last question - finish quiz after delay
+      setTimeout(() => {
+        if (socket && autoStart) {
+          socket.emit('finish-quiz', { sessionId });
+        } else {
+          if (window.opener || window.history.length <= 1) {
+            window.close();
+            setTimeout(() => {
+              if (!document.hidden) {
+                navigate('/');
+              }
+            }, 100);
+          } else {
+            navigate('/');
+          }
+        }
+      }, 2000);
     }
   };
 
@@ -222,8 +280,9 @@ const PlayQuiz = () => {
           <p>You're all set! The host will start the quiz soon.</p>
           <div className="quiz-info">
             <h3>{quiz.title}</h3>
-            <p>Category: {quiz.category}</p>
-            <p>Difficulty: {quiz.difficulty}</p>
+            <p>Level: {quiz.level || (quiz.difficulty === 'beginner' ? 'A1' : quiz.difficulty === 'intermediate' ? 'B1' : quiz.difficulty === 'advanced' ? 'C1' : 'A1')}</p>
+            <p>Skill: {quiz.skill || (quiz.category === 'reading' ? 'Reading' : quiz.category === 'listening' ? 'Listening' : 'Reading')}</p>
+            <p>Task: {quiz.task || (quiz.category === 'vocabulary' ? 'Vocabulary' : quiz.category === 'grammar' ? 'Grammar' : quiz.category || 'Vocabulary')}</p>
           </div>
         </div>
       </div>
@@ -268,21 +327,29 @@ const PlayQuiz = () => {
   return (
     <div className="play-quiz">
       <div className="play-header">
-        <div className="score-display-small">Score: {totalScore}</div>
-        <div className="question-counter">
+        <div className="play-header-content">
+          <div className="score-display-small">Score: {totalScore}</div>
+          <div className="play-header-title">Question</div>
+          <div className="timer">{timeLeft}s</div>
+        </div>
+        <div className="question-counter" style={{ marginTop: '0.5rem', color: 'black' }}>
           Question {currentQuestionIndex + 1} of {quiz.questions.length}
         </div>
-        <div className="timer">{timeLeft}s</div>
       </div>
 
-      <div className="question-display card">
+      <div className="question-display">
         <h2 className="question-text">{currentQuestion.questionText}</h2>
-        {currentQuestion.imageUrl && (
+        {currentQuestion.imageUrl ? (
           <div className="question-image-container">
             <img src={currentQuestion.imageUrl} alt="Question" className="question-image" />
           </div>
+        ) : (
+          <div className="question-image-container"></div>
         )}
         <div className="options-grid">
+          {showKnownAnimation && (
+            <div className="known-text-overlay">Known</div>
+          )}
           {currentQuestion.options.map((option, idx) => {
             let optionClass = 'option-button';
             if (answered) {
@@ -308,47 +375,9 @@ const PlayQuiz = () => {
             );
           })}
         </div>
-        {answered && (
+        {answered && score > 0 && (
           <div className={`answer-feedback ${isCorrect ? 'correct' : 'incorrect'}`}>
-            {isCorrect ? '✓ Correct!' : '✗ Wrong Answer'}
-            {score > 0 && <div className="points-earned">+{score} points</div>}
-            {currentQuestionIndex < quiz.questions.length - 1 ? (
-              <button
-                onClick={() => {
-                  // Move to next question
-                  const nextIndex = currentQuestionIndex + 1;
-                  setCurrentQuestionIndex(nextIndex);
-                  setCurrentQuestion(quiz.questions[nextIndex]);
-                  setSelectedAnswer(null);
-                  setAnswered(false);
-                  setTimeLeft(quiz.questions[nextIndex].timeLimit || 20);
-                  setScore(0); // Reset score for next question
-                }}
-                className="btn btn-primary"
-                style={{ marginTop: '1rem' }}
-              >
-                Next Question →
-              </button>
-            ) : (
-              <button
-                onClick={() => {
-                  if (window.opener || window.history.length <= 1) {
-                    window.close();
-                    setTimeout(() => {
-                      if (!document.hidden) {
-                        navigate('/');
-                      }
-                    }, 100);
-                  } else {
-                    navigate('/');
-                  }
-                }}
-                className="btn btn-success"
-                style={{ marginTop: '1rem', fontSize: '1.2rem', padding: '1rem 2rem', fontWeight: 'bold' }}
-              >
-                ✓ Finish Quiz
-              </button>
-            )}
+            <div className="points-earned">+{score} points</div>
           </div>
         )}
       </div>
@@ -356,5 +385,5 @@ const PlayQuiz = () => {
   );
 };
 
-export default PlayQuiz;
+export default LoggedInPlayQuiz;
 

@@ -1,11 +1,24 @@
 const Quiz = require('../models/Quiz');
 const { generateQuestionImage } = require('../services/imageService');
 const { generateQuizTitle, generateQuizDescription, generateQuizQuestions } = require('../services/aiQuizService');
+const { processFileAndGenerateQuiz, processYouTubeAndGenerateQuiz } = require('../services/enhancedAiQuizService');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs').promises;
+const os = require('os');
 
 // Get all quizzes
 exports.getAllQuizzes = async (req, res) => {
   try {
-    const quizzes = await Quiz.find().populate('creatorId', 'username').sort({ createdAt: -1 });
+    const includeHidden = req.query.includeHidden === 'true';
+    const query = {};
+    
+    // Only filter by visibility if includeHidden is not explicitly 'true'
+    if (!includeHidden) {
+      query.isVisible = { $ne: false }; // Show visible quizzes (true or undefined/null)
+    }
+    
+    const quizzes = await Quiz.find(query).populate('creatorId', 'username').sort({ createdAt: -1 });
     res.json(quizzes);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -15,7 +28,15 @@ exports.getAllQuizzes = async (req, res) => {
 // Get user's quizzes
 exports.getMyQuizzes = async (req, res) => {
   try {
-    const quizzes = await Quiz.find({ creatorId: req.user.userId }).sort({ createdAt: -1 });
+    const includeHidden = req.query.includeHidden === 'true';
+    const query = { creatorId: req.user.userId };
+    
+    // Only filter by visibility if includeHidden is not explicitly 'true'
+    if (!includeHidden) {
+      query.isVisible = { $ne: false }; // Show visible quizzes (true or undefined/null)
+    }
+    
+    const quizzes = await Quiz.find(query).sort({ createdAt: -1 });
     res.json(quizzes);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -38,17 +59,26 @@ exports.getQuiz = async (req, res) => {
 // Create quiz
 exports.createQuiz = async (req, res) => {
   try {
-    const { title, description, category, difficulty, questions } = req.body;
+    const { title, description, level, skill, task, category, difficulty, questions } = req.body;
 
     if (!questions || questions.length === 0) {
       return res.status(400).json({ message: 'Quiz must have at least one question' });
     }
 
+    // Use new fields if provided, otherwise map from legacy fields
+    const quizLevel = level || (difficulty === 'beginner' ? 'A1' : difficulty === 'intermediate' ? 'B1' : difficulty === 'advanced' ? 'C1' : 'A1');
+    const quizSkill = skill || (category === 'reading' ? 'Reading' : category === 'listening' ? 'Listening' : 'Reading');
+    const quizTask = task || (category === 'vocabulary' ? 'Vocabulary' : category === 'grammar' ? 'Grammar' : 'Vocabulary');
+
     const quiz = await Quiz.create({
       title,
       description,
-      category,
-      difficulty,
+      level: quizLevel,
+      skill: quizSkill,
+      task: quizTask,
+      // Keep legacy fields for backward compatibility
+      category: category || quizTask.toLowerCase(),
+      difficulty: difficulty || (quizLevel === 'A1' || quizLevel === 'A2' ? 'beginner' : quizLevel === 'B1' || quizLevel === 'B2' ? 'intermediate' : 'advanced'),
       questions,
       creatorId: req.user.userId
     });
@@ -68,15 +98,32 @@ exports.updateQuiz = async (req, res) => {
       return res.status(404).json({ message: 'Quiz not found' });
     }
 
-    if (quiz.creatorId.toString() !== req.user.userId) {
-      return res.status(403).json({ message: 'Not authorized' });
-    }
+    // Allow any authenticated user to edit any quiz
 
-    const { title, description, category, difficulty, questions } = req.body;
+    const { title, description, level, skill, task, category, difficulty, questions } = req.body;
     quiz.title = title || quiz.title;
     quiz.description = description !== undefined ? description : quiz.description;
-    quiz.category = category || quiz.category;
-    quiz.difficulty = difficulty || quiz.difficulty;
+    
+    // Update new fields if provided
+    if (level) quiz.level = level;
+    if (skill) quiz.skill = skill;
+    if (task) quiz.task = task;
+    
+    // Update legacy fields if provided (for backward compatibility)
+    if (category) quiz.category = category;
+    if (difficulty) quiz.difficulty = difficulty;
+    
+    // If new fields not provided but legacy fields are, map them
+    if (!level && difficulty) {
+      quiz.level = difficulty === 'beginner' ? 'A1' : difficulty === 'intermediate' ? 'B1' : difficulty === 'advanced' ? 'C1' : quiz.level;
+    }
+    if (!skill && category) {
+      quiz.skill = category === 'reading' ? 'Reading' : category === 'listening' ? 'Listening' : quiz.skill || 'Reading';
+    }
+    if (!task && category) {
+      quiz.task = category === 'vocabulary' ? 'Vocabulary' : category === 'grammar' ? 'Grammar' : quiz.task || 'Vocabulary';
+    }
+    
     quiz.questions = questions || quiz.questions;
     quiz.updatedAt = Date.now();
 
@@ -96,14 +143,39 @@ exports.deleteQuiz = async (req, res) => {
       return res.status(404).json({ message: 'Quiz not found' });
     }
 
-    if (quiz.creatorId.toString() !== req.user.userId) {
-      return res.status(403).json({ message: 'Not authorized' });
-    }
-
+    // Allow any authenticated user to delete any quiz
     await quiz.deleteOne();
     res.json({ message: 'Quiz deleted' });
   } catch (error) {
     res.status(500).json({ message: error.message });
+  }
+};
+
+// Toggle quiz visibility
+exports.toggleQuizVisibility = async (req, res) => {
+  try {
+    const quiz = await Quiz.findById(req.params.id);
+    
+    if (!quiz) {
+      return res.status(404).json({ message: 'Quiz not found' });
+    }
+
+    if (quiz.creatorId.toString() !== req.user.userId) {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+
+    quiz.isVisible = !quiz.isVisible;
+    await quiz.save();
+
+    res.json({
+      message: `Quiz ${quiz.isVisible ? 'shown' : 'hidden'} successfully`,
+      isVisible: quiz.isVisible
+    });
+  } catch (error) {
+    console.error('Error toggling quiz visibility:', error);
+    res.status(500).json({
+      message: error.message || 'Failed to toggle quiz visibility'
+    });
   }
 };
 
@@ -194,4 +266,123 @@ exports.generateQuizQuestions = async (req, res) => {
     });
   }
 };
+
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+  destination: async (req, file, cb) => {
+    const uploadDir = path.join(os.tmpdir(), 'quiz-uploads');
+    try {
+      await fs.mkdir(uploadDir, { recursive: true });
+      cb(null, uploadDir);
+    } catch (error) {
+      cb(error);
+    }
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({
+  storage: storage,
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit (increased for video files)
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['.pdf', '.srt', '.mp4', '.mov', '.webm', '.avi'];
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (allowedTypes.includes(ext)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only PDF, SRT, and video files (MP4, MOV, WEBM, AVI) are allowed'));
+    }
+  }
+});
+
+// Enhanced AI Quiz Maker - Process file upload
+exports.generateQuizFromFile = async (req, res) => {
+  let filePath = null;
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'No file uploaded' });
+    }
+
+    filePath = req.file.path;
+    const fileExt = path.extname(req.file.originalname).toLowerCase();
+    
+    // Check if it's a video file
+    const videoExtensions = ['.mp4', '.mov', '.webm', '.avi'];
+    if (videoExtensions.includes(fileExt)) {
+      // Process video file using Gemini's video analysis
+      const { processVideoFileAndGenerateQuiz } = require('../services/enhancedAiQuizService');
+      const result = await processVideoFileAndGenerateQuiz(filePath);
+      
+      // Clean up uploaded file
+      try {
+        await fs.unlink(filePath);
+      } catch (cleanupError) {
+        console.warn('Failed to cleanup file:', cleanupError);
+      }
+      
+      return res.json(result);
+    }
+    
+    const sourceType = fileExt === '.pdf' ? 'pdf' : 'srt';
+
+    // Process file and generate quiz
+    const result = await processFileAndGenerateQuiz(filePath, sourceType);
+
+    // Clean up uploaded file
+    try {
+      await fs.unlink(filePath);
+    } catch (cleanupError) {
+      console.warn('Failed to cleanup file:', cleanupError);
+    }
+
+    res.json(result);
+  } catch (error) {
+    // Clean up uploaded file on error
+    if (filePath) {
+      try {
+        await fs.unlink(filePath);
+      } catch (cleanupError) {
+        console.warn('Failed to cleanup file on error:', cleanupError);
+      }
+    }
+
+    console.error('Error generating quiz from file:', error);
+    res.status(500).json({ 
+      message: error.message || 'Failed to generate quiz from file' 
+    });
+  }
+};
+
+// Enhanced AI Quiz Maker - Process YouTube URL
+exports.generateQuizFromYouTube = async (req, res) => {
+  try {
+    const { videoUrl } = req.body;
+
+    if (!videoUrl) {
+      return res.status(400).json({ message: 'YouTube URL is required' });
+    }
+
+    // Validate YouTube URL
+    const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+/;
+    if (!youtubeRegex.test(videoUrl)) {
+      return res.status(400).json({ message: 'Invalid YouTube URL' });
+    }
+
+    // Process YouTube video and generate quiz
+    const result = await processYouTubeAndGenerateQuiz(videoUrl);
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error generating quiz from YouTube:', error);
+    res.status(500).json({ 
+      message: error.message || 'Failed to generate quiz from YouTube video' 
+    });
+  }
+};
+
+// Export multer upload middleware
+exports.uploadFile = upload.single('file');
 

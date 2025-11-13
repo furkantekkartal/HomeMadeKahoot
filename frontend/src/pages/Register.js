@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import './Auth.css';
 
-const Register = () => {
+const LoggedInRegister = () => {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -27,7 +27,7 @@ const Register = () => {
 
     try {
       await register(username, email, password);
-      navigate('/dashboard');
+      navigate('/quiz');
     } catch (err) {
       setError(err.response?.data?.message || 'Registration failed');
     } finally {
@@ -97,5 +97,5 @@ const Register = () => {
   );
 };
 
-export default Register;
+export default LoggedInRegister;
 

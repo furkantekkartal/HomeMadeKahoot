@@ -1,0 +1,78 @@
+.study-timer {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: white;
+  border: 2px solid #667eea;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  flex-shrink: 0;
+  height: 40px;
+  box-sizing: border-box;
+}
+
+.study-timer-icon {
+  color: #667eea;
+  font-size: 1.1rem;
+}
+
+.study-timer-time {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #2d3748;
+  min-width: 60px;
+  text-align: center;
+}
+
+@media (max-width: 768px) {
+  .study-timer {
+    padding: 0.4rem 0.6rem;
+    gap: 0.4rem;
+  }
+
+  .study-timer-icon {
+    font-size: 0.9rem;
+  }
+
+  .study-timer-time {
+    font-size: 0.85rem;
+    min-width: 50px;
+  }
+
+  .study-timer-toggle {
+    padding: 0.2rem;
+  }
+
+  .study-timer-pause-icon,
+  .study-timer-play-icon {
+    font-size: 0.8rem;
+  }
+}
+
+.study-timer-toggle {
+  padding: 0.25rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.study-timer-toggle:hover {
+  background-color: #f3f4f6;
+}
+
+.study-timer-pause-icon {
+  color: #f59e0b;
+  font-size: 0.9rem;
+}
+
+.study-timer-play-icon {
+  color: #10b981;
+  font-size: 0.9rem;
+}
+

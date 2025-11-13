@@ -27,7 +27,8 @@ exports.register = async (req, res) => {
       user: {
         id: user._id,
         username: user.username,
-        email: user.email
+        email: user.email,
+        profilePictureUrl: user.profilePictureUrl
       }
     });
   } catch (error) {
@@ -59,7 +60,8 @@ exports.login = async (req, res) => {
       user: {
         id: user._id,
         username: user.username,
-        email: user.email
+        email: user.email,
+        profilePictureUrl: user.profilePictureUrl
       }
     });
   } catch (error) {
@@ -75,6 +77,96 @@ exports.getMe = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
     res.json(user);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Update profile
+exports.updateProfile = async (req, res) => {
+  try {
+    const { username, email } = req.body;
+    const user = await User.findById(req.user.userId);
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Check if username or email already exists (excluding current user)
+    if (username && username !== user.username) {
+      const existingUser = await User.findOne({ username });
+      if (existingUser) {
+        return res.status(400).json({ message: 'Username already taken' });
+      }
+      user.username = username;
+    }
+
+    if (email && email !== user.email) {
+      const existingUser = await User.findOne({ email });
+      if (existingUser) {
+        return res.status(400).json({ message: 'Email already taken' });
+      }
+      user.email = email;
+    }
+
+    await user.save();
+
+    res.json({
+      id: user._id,
+      username: user.username,
+      email: user.email,
+      profilePictureUrl: user.profilePictureUrl
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Update password
+exports.updatePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const user = await User.findById(req.user.userId);
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Verify current password
+    const isMatch = await user.comparePassword(currentPassword);
+    if (!isMatch) {
+      return res.status(400).json({ message: 'Current password is incorrect' });
+    }
+
+    // Update password
+    user.password = newPassword;
+    await user.save();
+
+    res.json({ message: 'Password updated successfully' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Update profile picture
+exports.updateProfilePicture = async (req, res) => {
+  try {
+    const { profilePictureUrl } = req.body;
+    const user = await User.findById(req.user.userId);
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    user.profilePictureUrl = profilePictureUrl || null;
+    await user.save();
+
+    res.json({
+      id: user._id,
+      username: user.username,
+      email: user.email,
+      profilePictureUrl: user.profilePictureUrl
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

@@ -1,26 +1,90 @@
 .home {
-  color: white;
+  min-height: 100vh;
+  background: #f3f4f6;
+  padding: 0 0 2rem 0;
+  max-width: 100%;
+  margin: 0;
+}
+
+.home-header {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  padding: 1rem 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  z-index: 1000;
+  box-sizing: border-box;
+}
+
+.home-logo {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #667eea;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.home-logo .brand-icon {
+  font-size: 1.5rem;
+}
+
+.home-auth {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.home-login-link {
+  color: #667eea;
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.3s;
+  font-size: 0.9rem;
+}
+
+.home-login-link:hover {
+  color: #8258ff;
 }
 
 .hero {
   text-align: center;
-  padding: 4rem 0;
+  padding: 4rem 2rem;
+  max-width: 100%;
+  margin: 0 auto 2rem auto;
+  background: linear-gradient(135deg, #6b73ff 0%, #8258ff 50%, #6a49ff 100%);
+  color: #ffffff;
+}
+
+/* Guest version has header, needs margin-top */
+.home .home-header ~ .hero {
+  margin-top: 80px; /* Space for fixed header */
 }
 
 .hero-title {
   font-size: 3.5rem;
   font-weight: 800;
   margin-bottom: 1rem;
-  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+  color: #ffffff;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.15);
 }
 
 .hero-subtitle {
   font-size: 1.25rem;
   margin-bottom: 2rem;
-  opacity: 0.95;
-  max-width: 600px;
+  color: #eef2ff;
+  max-width: 800px;
   margin-left: auto;
   margin-right: auto;
+  line-height: 1.6;
 }
 
 .hero-actions {
@@ -40,10 +104,14 @@
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
   gap: 2rem;
   margin-top: 4rem;
+  max-width: 1200px;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 0 2rem;
 }
 
 .feature-card {
-  background: rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, 0.98);
   padding: 2rem;
   border-radius: 12px;
   text-align: center;
@@ -72,12 +140,90 @@
 }
 
 @media (max-width: 768px) {
+  .home {
+    padding: 1rem;
+  }
+
+  .home-header {
+    padding: 0.75rem 1rem;
+  }
+
+  .home-logo {
+    font-size: 1.1rem;
+  }
+
+  .home-logo .brand-icon {
+    font-size: 1.25rem;
+  }
+
+  .hero {
+    padding: 2rem 1rem;
+  }
+
+  .home .home-header ~ .hero {
+    margin-top: 70px; /* Smaller margin on mobile */
+  }
+
   .hero-title {
-    font-size: 2.5rem;
+    font-size: 2rem;
   }
   
   .hero-subtitle {
+    font-size: 0.95rem;
+  }
+
+  .features {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    padding: 0 1rem;
+  }
+
+  .feature-card {
+    padding: 1.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .home {
+    padding: 0.5rem;
+  }
+
+  .home-header {
+    padding: 0.75rem 1rem;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .home-logo {
     font-size: 1rem;
+  }
+
+  .home-auth {
+    gap: 0.5rem;
+  }
+
+  .home-login-link {
+    font-size: 0.85rem;
+  }
+
+  .hero {
+    padding: 1.5rem 0.5rem;
+  }
+
+  .hero-title {
+    font-size: 1.75rem;
+  }
+
+  .hero-subtitle {
+    font-size: 0.85rem;
+  }
+
+  .feature-card {
+    padding: 1rem;
+  }
+
+  .feature-icon {
+    font-size: 2rem;
   }
 }
 

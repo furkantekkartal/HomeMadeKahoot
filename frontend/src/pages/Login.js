@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import './Auth.css';
 
-const Login = () => {
+const LoggedInLogin = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -18,7 +18,7 @@ const Login = () => {
 
     try {
       await login(email, password);
-      navigate('/dashboard');
+      navigate('/quiz');
     } catch (err) {
       setError(err.response?.data?.message || 'Login failed');
     } finally {
@@ -64,5 +64,5 @@ const Login = () => {
   );
 };
 
-export default Login;
+export default LoggedInLogin;
 

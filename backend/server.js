@@ -10,6 +10,11 @@ const errorHandler = require('./middleware/errorHandler');
 const authRoutes = require('./routes/auth');
 const quizRoutes = require('./routes/quizzes');
 const sessionRoutes = require('./routes/sessions');
+const studySessionRoutes = require('./routes/studySessions');
+const wordRoutes = require('./routes/words');
+const flashcardRoutes = require('./routes/flashcards');
+const pronunciationRoutes = require('./routes/pronunciation');
+const statisticsRoutes = require('./routes/statistics');
 
 // Socket handlers
 const initializeSocketHandlers = require('./socket/socketHandlers');
@@ -38,13 +43,18 @@ app.use(cors({
   origin: frontendUrl,
   credentials: true
 }));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/quizzes', quizRoutes);
 app.use('/api/sessions', sessionRoutes);
+app.use('/api/study-sessions', studySessionRoutes);
+app.use('/api/words', wordRoutes);
+app.use('/api/flashcards', flashcardRoutes);
+app.use('/api/pronunciation', pronunciationRoutes);
+app.use('/api/statistics', statisticsRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

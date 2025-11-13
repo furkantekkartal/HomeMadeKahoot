@@ -1,9 +1,11 @@
 .quiz-form-container {
-  color: white;
+  padding: 2rem;
+  min-height: 100vh;
+  background: #f3f4f6;
 }
 
 .quiz-form {
-  background: rgba(255, 255, 255, 0.95);
+  background: white;
   border-radius: 12px;
   padding: 2rem;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
