@@ -64,6 +64,7 @@ export const sessionAPI = {
   getMyPerformance: (filters) => api.get('/sessions/performance', { params: filters }),
   getGameStats: (filters) => api.get('/sessions/game-stats', { params: filters }),
   getTeacherAnalytics: (filters) => api.get('/sessions/analytics', { params: filters }),
+  resetGamePerformance: () => api.delete('/sessions/game-stats/reset'),
 };
 
 // Word Database API

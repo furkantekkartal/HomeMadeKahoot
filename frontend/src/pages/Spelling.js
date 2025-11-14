@@ -87,6 +87,10 @@ const Spelling = () => {
   const [touchEnd, setTouchEnd] = useState({ x: null, y: null });
   const swipeDetectedRef = useRef(false);
 
+  // Auto-pause timer state
+  const cardDisplayStartTimeRef = useRef(null);
+  const wasAutoPausedRef = useRef(false);
+
   // Study timer
   const [timerActive, setTimerActive] = useState(true);
   const { durationFormatted, isActive, endSession, resetSession } = useStudyTimer('Spelling', timerActive);
@@ -163,6 +167,40 @@ const Spelling = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentIndex, cards, showAnswer]);
+
+  // Track card display time and auto-pause timer after 60 seconds
+  useEffect(() => {
+    if (cards.length > 0 && currentIndex < cards.length && !loading) {
+      // Reset card display start time when card changes
+      cardDisplayStartTimeRef.current = Date.now();
+      
+      // Resume timer if it was auto-paused
+      if (wasAutoPausedRef.current) {
+        setTimerActive(true);
+        wasAutoPausedRef.current = false;
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentIndex, cards.length, loading]);
+
+  // Check every second if card has been displayed for more than 60 seconds
+  useEffect(() => {
+    if (!timerActive || loading || cards.length === 0) return;
+
+    const checkInterval = setInterval(() => {
+      if (cardDisplayStartTimeRef.current && timerActive) {
+        const timeDisplayed = (Date.now() - cardDisplayStartTimeRef.current) / 1000; // in seconds
+        
+        if (timeDisplayed > 60) {
+          // Auto-pause timer if card shown for more than 60 seconds
+          setTimerActive(false);
+          wasAutoPausedRef.current = true;
+        }
+      }
+    }, 1000); // Check every second
+
+    return () => clearInterval(checkInterval);
+  }, [timerActive, loading, cards.length]);
 
   // Keyboard navigation
   useEffect(() => {

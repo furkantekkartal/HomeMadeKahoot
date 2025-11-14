@@ -513,6 +513,32 @@ exports.getGameStats = async (req, res) => {
   }
 };
 
+// Reset game performance statistics (DEV only, not production)
+exports.resetGamePerformance = async (req, res) => {
+  try {
+    // Only allow reset in development environment
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(403).json({ 
+        message: 'Game performance reset is not allowed in production environment' 
+      });
+    }
+
+    // Delete all study sessions for Flashcards and Spelling modules
+    const result = await StudySession.deleteMany({
+      module: { $in: ['Flashcards', 'Spelling'] }
+    });
+
+    res.json({
+      success: true,
+      message: `Successfully deleted ${result.deletedCount} game performance sessions`,
+      deletedCount: result.deletedCount
+    });
+  } catch (error) {
+    console.error('Error resetting game performance:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
 // Get teacher analytics (using StudentResult table)
 exports.getTeacherAnalytics = async (req, res) => {
   try {
