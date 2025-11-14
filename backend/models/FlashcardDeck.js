@@ -32,6 +32,11 @@ const flashcardDeckSchema = new mongoose.Schema({
     enum: ['Vocabulary', 'Grammar', 'Spelling', 'Essay', 'Repeat', 'Read Aloud'],
     default: null
   },
+  deckType: {
+    type: String,
+    enum: ['static', 'dynamic'],
+    default: 'static'
+  },
   wordIds: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Word'

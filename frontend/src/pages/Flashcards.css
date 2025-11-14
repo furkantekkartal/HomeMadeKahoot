@@ -136,7 +136,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  padding: 1rem;
+  padding: 1rem 3rem; /* Extra horizontal padding for scrollable areas */
   background: linear-gradient(135deg, #e0e7ff 0%, #ddd6fe 100%);
   min-height: calc(100vh - 200px);
   gap: 0.5rem;
@@ -187,12 +187,14 @@
 /* Card Stack Container */
 .card-stack-container {
   position: relative;
-  width: 480px;
-  max-width: 480px;
-  min-width: 480px;
-  height: 300px;
-  max-height: 300px;
-  min-height: 300px;
+  width: 384px; /* 20% smaller than image (480px * 0.8 = 384px) */
+  max-width: 384px;
+  min-width: 384px;
+  height: 240px; /* 20% smaller than image (300px * 0.8 = 240px) */
+  max-height: 240px;
+  min-height: 240px;
+  margin-left: auto;
+  margin-right: auto;
   margin-bottom: 0.75rem;
   flex-shrink: 0;
   display: flex;
@@ -209,12 +211,19 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  top: 0;
+  left: 0;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .card-stack-item {
   position: absolute;
   width: 100%;
   height: 100%;
+  top: 0;
+  left: 0;
+  box-sizing: border-box;
 }
 
 .flashcard-image-container {
@@ -225,6 +234,8 @@
   height: 300px;
   max-height: 300px;
   min-height: 300px;
+  margin-left: auto;
+  margin-right: auto;
   margin-bottom: 0.75rem;
   flex-shrink: 0;
   display: flex;
@@ -393,9 +404,12 @@
 }
 
 .flashcard {
-  width: 480px;
-  max-width: 480px;
-  height: 300px;
+  width: 384px; /* 20% smaller than image (480px * 0.8 = 384px) */
+  max-width: 384px;
+  min-width: 384px;
+  height: 240px; /* 20% smaller than image (300px * 0.8 = 240px) */
+  max-height: 240px;
+  min-height: 240px;
   perspective: 1000px;
   cursor: pointer;
   margin-bottom: 0.75rem;
@@ -411,6 +425,13 @@
   position: absolute;
   top: 0;
   left: 0;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  box-sizing: border-box;
 }
 
 .flashcard.card-stack-top {
@@ -489,9 +510,10 @@
 
 .card-sentence-container {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.75rem;
+  gap: 0.5rem;
   margin: 1rem 0;
   max-width: 90%;
 }
@@ -503,23 +525,31 @@
   margin: 0;
   opacity: 0.95;
   line-height: 1.4;
-  flex: 1;
+  width: 100%;
+}
+
+.card-sentence-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
 }
 
 .audio-btn-inline {
-  padding: 0.5rem;
+  padding: 0;
   background: rgba(255, 255, 255, 0.2);
   border: 2px solid rgba(255, 255, 255, 0.3);
   border-radius: 8px;
   color: white;
   font-size: 1.2rem;
+  line-height: 1;
   cursor: pointer;
   transition: all 0.3s;
   backdrop-filter: blur(10px);
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 40px;
+  width: 40px;
   height: 40px;
   flex-shrink: 0;
   position: relative;
@@ -582,8 +612,10 @@
   flex-wrap: nowrap !important;
   justify-content: center;
   align-items: center;
-  width: 480px;
-  max-width: 480px;
+  width: 384px; /* Match card width */
+  max-width: 384px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .card-navigation > * {
@@ -873,6 +905,60 @@
   margin: 0;
 }
 
+.deck-statistics-panel {
+  background: #f7fafc;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-top: 1.5rem;
+  border: 2px solid #e2e8f0;
+}
+
+.deck-statistics-title {
+  font-size: 0.9rem;
+  color: #2d3748;
+  margin-bottom: 0.75rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.deck-statistics-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+}
+
+.deck-stat-item {
+  background: white;
+  border-radius: 6px;
+  padding: 0.75rem;
+  text-align: center;
+  border: 1px solid #e2e8f0;
+}
+
+.deck-stat-label {
+  font-size: 0.75rem;
+  color: #718096;
+  margin-bottom: 0.25rem;
+  font-weight: 500;
+  margin: 0 0 0.25rem 0;
+}
+
+.deck-stat-value {
+  font-size: 1.25rem;
+  color: #2d3748;
+  font-weight: 700;
+  margin: 0;
+}
+
+.deck-type-badge {
+  text-align: center;
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: #667eea;
+  font-style: italic;
+  margin: 0.5rem 0 0 0;
+}
+
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -1081,7 +1167,7 @@
   }
 
   .flashcard-area {
-    padding: 0.5rem;
+    padding: 0.5rem 1.5rem; /* Extra horizontal padding for scrollable areas */
     gap: 0.25rem;
     justify-content: flex-start;
     overflow-y: auto;
@@ -1102,13 +1188,13 @@
   }
 
   .card-stack-container {
-    width: 100%;
-    max-width: 100%;
+    width: 80%; /* 20% smaller than container */
+    max-width: 384px;
     min-width: 0;
     height: auto;
     aspect-ratio: 480 / 300;
     max-height: 40vh;
-    margin-bottom: 0.5rem;
+    margin: 0 auto 0.5rem auto;
     flex-shrink: 0;
   }
 
@@ -1119,7 +1205,7 @@
     height: auto;
     aspect-ratio: 480 / 300;
     max-height: 40vh;
-    margin-bottom: 0.75rem;
+    margin: 0 auto 0.75rem auto;
     flex-shrink: 0;
   }
 
@@ -1158,14 +1244,16 @@
   }
 
   .flashcard {
-    width: 100%;
-    max-width: 100%;
-    min-width: 0;
-    height: auto;
-    aspect-ratio: 480 / 300;
-    max-height: 50vh;
+    width: 80% !important; /* 20% smaller than container */
+    max-width: 384px !important;
+    min-width: 0 !important;
+    height: auto !important;
+    aspect-ratio: 480 / 300 !important;
+    max-height: 50vh !important;
     margin-bottom: 0.75rem;
     flex-shrink: 0;
+    margin-left: auto !important;
+    margin-right: auto !important;
   }
 
   .card-word {
@@ -1196,14 +1284,13 @@
     flex-direction: row;
     flex-wrap: nowrap;
     gap: 0.5rem;
-    width: 100%;
-    max-width: 100%;
+    width: 80%; /* Match card width */
+    max-width: 384px;
     padding: 0 0.5rem;
     justify-content: center;
     align-items: center;
     flex-shrink: 0;
-    margin-top: 0.5rem;
-    margin-bottom: 0;
+    margin: 0.5rem auto 0 auto;
   }
 
   .nav-btn {
@@ -1374,12 +1461,13 @@
   }
 
   .card-stack-container {
-    width: 100% !important;
-    max-width: 100% !important;
+    width: 80% !important; /* 20% smaller than container */
+    max-width: 384px !important;
     min-width: 0 !important;
     height: auto !important;
     aspect-ratio: 480 / 300 !important;
     max-height: 40vh !important;
+    margin: 0 auto !important;
   }
 
   .flashcard-image-container {
@@ -1389,7 +1477,7 @@
     height: auto;
     aspect-ratio: 480 / 300;
     max-height: 40vh;
-    margin-bottom: 0.75rem;
+    margin: 0 auto 0.75rem auto;
     flex-shrink: 0;
   }
 
@@ -1405,17 +1493,20 @@
   }
 
   .flashcard {
-    width: 100% !important;
-    max-width: 100% !important;
+    width: 80% !important; /* 20% smaller than container */
+    max-width: 384px !important;
     min-width: 0 !important;
     height: auto !important;
     aspect-ratio: 480 / 300 !important;
     max-height: 50vh !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
   }
 
   .card-navigation {
-    width: 100% !important;
-    max-width: 100% !important;
+    width: 80% !important; /* Match card width */
+    max-width: 384px !important;
+    margin: 0 auto !important;
   }
 
   .flashcard-sidebar {
@@ -1560,6 +1651,28 @@
     width: 100px;
     height: 100px;
   }
+
+  .deck-statistics-panel {
+    margin-top: 1rem;
+    padding: 0.75rem;
+  }
+
+  .deck-statistics-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+  }
+
+  .deck-stat-item {
+    padding: 0.5rem;
+  }
+
+  .deck-stat-label {
+    font-size: 0.7rem;
+  }
+
+  .deck-stat-value {
+    font-size: 1.1rem;
+  }
 }
 
 /* Speech Evaluation Styles */
@@ -1571,19 +1684,20 @@
 }
 
 .mic-btn-inline {
-  padding: 0.5rem;
+  padding: 0;
   background: rgba(255, 255, 255, 0.2);
   border: 2px solid rgba(255, 255, 255, 0.3);
   border-radius: 8px;
   color: white;
   font-size: 1.2rem;
+  line-height: 1;
   cursor: pointer;
   transition: all 0.3s;
   backdrop-filter: blur(10px);
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 40px;
+  width: 40px;
   height: 40px;
   flex-shrink: 0;
   user-select: none;
@@ -1637,19 +1751,20 @@
 .play-btn-inline,
 .record-again-btn-inline,
 .evaluate-btn-inline {
-  padding: 0.5rem;
+  padding: 0;
   background: rgba(255, 255, 255, 0.2);
   border: 2px solid rgba(255, 255, 255, 0.3);
   border-radius: 8px;
   color: white;
   font-size: 1.2rem;
+  line-height: 1;
   cursor: pointer;
   transition: all 0.3s;
   backdrop-filter: blur(10px);
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 40px;
+  width: 40px;
   height: 40px;
   flex-shrink: 0;
 }
@@ -1908,8 +2023,8 @@
   .play-btn-inline,
   .record-again-btn-inline,
   .evaluate-btn-inline {
-    min-width: 35px;
-    height: 35px;
+    min-width: 40px;
+    height: 40px;
     font-size: 1rem;
     padding: 0.4rem;
   }

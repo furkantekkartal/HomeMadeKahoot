@@ -104,7 +104,7 @@ export const wordAPI = {
 export const flashcardAPI = {
   getMyDecks: (includeHidden = false) => api.get(`/flashcards/decks${includeHidden ? '?includeHidden=true' : ''}`),
   getDeck: (id) => api.get(`/flashcards/decks/${id}`),
-  createDeck: (name, description, level, skill, task, wordIds) => api.post('/flashcards/decks', { name, description, level, skill, task, wordIds }),
+  createDeck: (name, description, level, skill, task, deckType, wordIds) => api.post('/flashcards/decks', { name, description, level, skill, task, deckType, wordIds }),
   updateDeck: (id, updates) => api.put(`/flashcards/decks/${id}`, updates),
   deleteDeck: (id) => api.delete(`/flashcards/decks/${id}`),
   updateLastStudied: (id) => api.patch(`/flashcards/decks/${id}/last-studied`),

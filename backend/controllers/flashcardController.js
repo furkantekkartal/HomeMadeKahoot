@@ -76,14 +76,30 @@ exports.getDeck = async (req, res) => {
     });
     
     // Add status to each word
-    const wordsWithStatus = deck.wordIds.map(word => ({
+    let wordsWithStatus = deck.wordIds.map(word => ({
       ...word.toObject(),
       isKnown: userWordMap[word._id.toString()] || null
     }));
     
+    // For dynamic decks, filter out known words for this user
+    // (words remain in deck for other users)
+    if (deck.deckType === 'dynamic') {
+      wordsWithStatus = wordsWithStatus.filter(word => word.isKnown !== true);
+    }
+    
+    // Calculate statistics
+    const totalWords = deck.wordIds.length; // Total words in deck (all users)
+    const masteredWords = wordsWithStatus.filter(w => w.isKnown === true).length;
+    const remainingWords = wordsWithStatus.length; // For dynamic decks, this excludes known words
+    
     res.json({
       ...deck.toObject(),
-      words: wordsWithStatus
+      words: wordsWithStatus,
+      stats: {
+        totalWords,
+        masteredWords: deck.deckType === 'dynamic' ? totalWords - remainingWords : masteredWords,
+        remainingWords
+      }
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -94,7 +110,7 @@ exports.getDeck = async (req, res) => {
 exports.createDeck = async (req, res) => {
   try {
     const userId = req.user.userId;
-    const { name, description, level, skill, task, wordIds } = req.body;
+    const { name, description, level, skill, task, deckType, wordIds } = req.body;
     
     if (!name || !wordIds || !Array.isArray(wordIds) || wordIds.length === 0) {
       return res.status(400).json({ message: 'Deck name and word IDs are required' });
@@ -113,6 +129,7 @@ exports.createDeck = async (req, res) => {
       level: level || null,
       skill: skill || null,
       task: task || null,
+      deckType: deckType || 'static',
       wordIds,
       totalCards: wordIds.length
     });

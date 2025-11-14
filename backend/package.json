@@ -9,7 +9,9 @@
     "reset-db": "node scripts/resetDatabase.js",
     "db-status": "node scripts/databaseStatus.js",
     "db-cleanup": "node scripts/safeCleanup.js",
-    "import-words": "node scripts/importWords.js"
+    "import-words": "node scripts/importWords.js",
+    "migrate-to-prod": "node scripts/migrateDataToProduction.js",
+    "reset-prod-db": "node scripts/resetProductionDatabase.js"
   },
   "keywords": [
     "quiz",

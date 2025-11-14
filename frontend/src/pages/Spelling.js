@@ -23,6 +23,7 @@ const Spelling = () => {
   // Deck state
   const [decks, setDecks] = useState([]);
   const [currentDeck, setCurrentDeck] = useState(null);
+  const [deckStats, setDeckStats] = useState({ totalWords: 0, masteredWords: 0, remainingWords: 0 });
 
   // Card state
   const [cards, setCards] = useState([]);
@@ -278,6 +279,16 @@ const Spelling = () => {
       setShowResults(false); // Reset results when loading new deck
       const response = await flashcardAPI.getDeck(currentDeck._id);
       setCards(response.data.words || []);
+      
+      // Store deck statistics
+      if (response.data.stats) {
+        setDeckStats({
+          totalWords: response.data.stats.totalWords || 0,
+          masteredWords: response.data.stats.masteredWords || 0,
+          remainingWords: response.data.stats.remainingWords || 0
+        });
+      }
+      
       setCurrentIndex(0);
       setUserAnswer('');
       setShowAnswer(false);
@@ -608,6 +619,45 @@ const Spelling = () => {
       // Update last studied if using a deck
       if (currentDeck) {
         await flashcardAPI.updateLastStudied(currentDeck._id);
+        
+        // Reload deck to get updated stats (especially important for dynamic decks)
+        if (currentDeck.deckType === 'dynamic' && isKnown) {
+          setTimeout(async () => {
+            try {
+              const response = await flashcardAPI.getDeck(currentDeck._id);
+              if (response.data.stats) {
+                setDeckStats({
+                  totalWords: response.data.stats.totalWords || 0,
+                  masteredWords: response.data.stats.masteredWords || 0,
+                  remainingWords: response.data.stats.remainingWords || 0
+                });
+              }
+              // Update cards (known words will be filtered out for dynamic decks)
+              setCards(response.data.words || []);
+              // Adjust current index if needed
+              if (currentIndex >= (response.data.words || []).length) {
+                setCurrentIndex(Math.max(0, (response.data.words || []).length - 1));
+              }
+            } catch (error) {
+              console.error('Failed to reload deck after status update:', error);
+            }
+          }, 500);
+        } else {
+          // For static decks, update stats locally
+          if (isKnown) {
+            setDeckStats(prev => ({
+              ...prev,
+              masteredWords: prev.masteredWords + 1,
+              remainingWords: Math.max(0, prev.remainingWords - 1)
+            }));
+          } else {
+            setDeckStats(prev => ({
+              ...prev,
+              masteredWords: Math.max(0, prev.masteredWords - 1),
+              remainingWords: prev.remainingWords + 1
+            }));
+          }
+        }
       }
 
       // Auto-advance to next card, or show results if on last card
@@ -1054,32 +1104,40 @@ const Spelling = () => {
 
           <h3>Progress</h3>
           
-          {/* Progress Stats */}
-          <div className="stats-grid">
-            <div className="stat-card stat-correct">
-              <p className="stat-label">Known</p>
-              <p className="stat-value">{progressStats.known}</p>
-            </div>
+          {/* Progress Stats - Now showing Deck Statistics */}
+          {currentDeck ? (
+            <div className="stats-grid">
+              <div className="stat-card stat-incorrect">
+                <p className="stat-label">Total Words</p>
+                <p className="stat-value">{deckStats.totalWords}</p>
+              </div>
 
-            <div className="stat-card stat-incorrect">
-              <p className="stat-label">Unknown</p>
-              <p className="stat-value">{progressStats.unknown}</p>
-            </div>
+              <div className="stat-card stat-correct">
+                <p className="stat-label">Mastered</p>
+                <p className="stat-value">{deckStats.masteredWords}</p>
+              </div>
 
-            <div className="stat-card stat-remaining">
-              <p className="stat-label">Remaining</p>
-              <p className="stat-value">{progressStats.remaining}</p>
+              <div className="stat-card stat-remaining">
+                <p className="stat-label">Remaining</p>
+                <p className="stat-value">{deckStats.remainingWords}</p>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="stats-grid">
+              <div className="stat-card stat-correct">
+                <p className="stat-label">Known</p>
+                <p className="stat-value">{progressStats.known}</p>
+              </div>
 
-          {/* Deck Info */}
-          {currentDeck && (
-            <div className="deck-info">
-              <p className="deck-info-title">Current Deck</p>
-              <p className="deck-info-name">{currentDeck.name}</p>
-              <p className="deck-info-stats">
-                {currentDeck.masteredCards || 0} / {currentDeck.totalCards} mastered
-              </p>
+              <div className="stat-card stat-incorrect">
+                <p className="stat-label">Unknown</p>
+                <p className="stat-value">{progressStats.unknown}</p>
+              </div>
+
+              <div className="stat-card stat-remaining">
+                <p className="stat-label">Remaining</p>
+                <p className="stat-value">{progressStats.remaining}</p>
+              </div>
             </div>
           )}
         </div>
