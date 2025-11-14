@@ -147,44 +147,57 @@ const EditDeck = () => {
       return;
     }
 
+    // Filter words that need images (no imageUrl or empty imageUrl)
+    const wordsNeedingImages = words.filter((word, index) => {
+      return word._id && (!word.imageUrl || word.imageUrl.trim() === '' || word.imageUrl === DEFAULT_IMAGE_URL);
+    });
+
+    if (wordsNeedingImages.length === 0) {
+      setError('All words already have images');
+      return;
+    }
+
     setGeneratingAllImages(true);
     setError('');
 
     try {
-      // Generate images for all words sequentially
+      // Generate images only for words that don't have images
       for (let i = 0; i < words.length; i++) {
         const word = words[i];
-        if (word._id) {
-          setGeneratingImages(prev => ({ ...prev, [i]: true }));
-          // Clear previous error for this word
-          setImageErrors(prev => {
-            const newErrors = { ...prev };
-            delete newErrors[i];
-            return newErrors;
+        // Skip words that already have an image
+        if (!word._id || (word.imageUrl && word.imageUrl.trim() !== '' && word.imageUrl !== DEFAULT_IMAGE_URL)) {
+          continue;
+        }
+
+        setGeneratingImages(prev => ({ ...prev, [i]: true }));
+        // Clear previous error for this word
+        setImageErrors(prev => {
+          const newErrors = { ...prev };
+          delete newErrors[i];
+          return newErrors;
+        });
+        try {
+          const customKeyword = customKeywords[i]?.trim();
+          const response = await wordAPI.generateWordImage(word._id, customKeyword, imageService);
+          const newImageUrl = response.data.imageUrl;
+          const searchQuery = response.data.searchQuery;
+          
+          // Store the search query for display
+          setSearchQueries(prev => ({ ...prev, [i]: searchQuery }));
+          
+          // Update the word in the words array
+          setWords(prevWords => {
+            const updated = [...prevWords];
+            updated[i] = { ...updated[i], imageUrl: newImageUrl };
+            return updated;
           });
-          try {
-            const customKeyword = customKeywords[i]?.trim();
-            const response = await wordAPI.generateWordImage(word._id, customKeyword, imageService);
-            const newImageUrl = response.data.imageUrl;
-            const searchQuery = response.data.searchQuery;
-            
-            // Store the search query for display
-            setSearchQueries(prev => ({ ...prev, [i]: searchQuery }));
-            
-            // Update the word in the words array
-            setWords(prevWords => {
-              const updated = [...prevWords];
-              updated[i] = { ...updated[i], imageUrl: newImageUrl };
-              return updated;
-            });
-          } catch (err) {
-            // Set error specific to this word
-            const errorMessage = err.response?.data?.message || err.message || 'Failed to generate image';
-            setImageErrors(prev => ({ ...prev, [i]: errorMessage }));
-            console.error(`Failed to generate image for word ${i + 1}:`, err);
-          } finally {
-            setGeneratingImages(prev => ({ ...prev, [i]: false }));
-          }
+        } catch (err) {
+          // Set error specific to this word
+          const errorMessage = err.response?.data?.message || err.message || 'Failed to generate image';
+          setImageErrors(prev => ({ ...prev, [i]: errorMessage }));
+          console.error(`Failed to generate image for word ${i + 1}:`, err);
+        } finally {
+          setGeneratingImages(prev => ({ ...prev, [i]: false }));
         }
       }
     } catch (err) {
