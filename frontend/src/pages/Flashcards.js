@@ -88,6 +88,7 @@ const Flashcards = () => {
   // Auto-pause timer state
   const cardDisplayStartTimeRef = useRef(null);
   const wasAutoPausedRef = useRef(false);
+  const isAutoReadingRef = useRef(false);
 
   // Study timer
   const [timerActive, setTimerActive] = useState(true);
@@ -215,8 +216,13 @@ const Flashcards = () => {
       const currentCard = cards[currentIndex];
       if (currentCard && currentCard.englishWord) {
         // Small delay to ensure card is rendered
+        isAutoReadingRef.current = true;
         setTimeout(() => {
           speakText(currentCard.englishWord, 'en-US', 'audioWord');
+          // Reset flag after a delay to allow speech to complete
+          setTimeout(() => {
+            isAutoReadingRef.current = false;
+          }, 1000);
         }, 300);
       }
     }
@@ -280,13 +286,15 @@ const Flashcards = () => {
           break;
         case 'ArrowUp':
           e.preventDefault();
-          if (cards.length > 0 && currentIndex < cards.length) {
+          // Prevent status update during auto-read
+          if (!isAutoReadingRef.current && cards.length > 0 && currentIndex < cards.length) {
             await handleStatusUpdate(true);
           }
           break;
         case 'ArrowDown':
           e.preventDefault();
-          if (cards.length > 0 && currentIndex < cards.length) {
+          // Prevent status update during auto-read
+          if (!isAutoReadingRef.current && cards.length > 0 && currentIndex < cards.length) {
             await handleStatusUpdate(false);
           }
           break;
@@ -615,6 +623,11 @@ const Flashcards = () => {
     const targetCard = card || cards[currentIndex];
     if (!targetCard || !targetCard._id) return;
 
+    // Prevent status update during auto-read to avoid accidental navigation
+    if (isAutoReadingRef.current) {
+      return;
+    }
+
     triggerAnimation(isKnown ? 'known' : 'unknown');
 
     // Show text animation overlay
@@ -745,6 +758,14 @@ const Flashcards = () => {
   const handleTouchEnd = async (e) => {
     if (!touchStart.x || !touchStart.y || !touchEnd.x || !touchEnd.y) {
       // If no swipe detected, allow click to flip
+      return;
+    }
+
+    // Prevent touch actions during auto-read to avoid accidental navigation
+    if (isAutoReadingRef.current) {
+      setTouchStart({ x: null, y: null });
+      setTouchEnd({ x: null, y: null });
+      swipeDetectedRef.current = false;
       return;
     }
 
