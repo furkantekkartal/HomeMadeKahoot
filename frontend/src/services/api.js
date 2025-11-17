@@ -76,6 +76,7 @@ export const wordAPI = {
   getUserWordStats: () => api.get('/words/user/stats'),
   getWordsWithStatus: (params) => api.get('/words/user/words', { params }),
   toggleWordStatus: (wordId, isKnown) => api.post('/words/user/toggle', { wordId, isKnown }),
+  toggleSpellingStatus: (wordId, isSpelled) => api.post('/words/user/toggle-spelling', { wordId, isSpelled }),
   bulkMarkWords: (wordIds, isKnown) => api.post('/words/user/bulk-mark', { wordIds, isKnown }),
   exportWords: (format = 'csv') => {
     return api.get('/words/user/export', { 
@@ -104,7 +105,10 @@ export const wordAPI = {
 // Flashcard API
 export const flashcardAPI = {
   getMyDecks: (includeHidden = false) => api.get(`/flashcards/decks${includeHidden ? '?includeHidden=true' : ''}`),
-  getDeck: (id) => api.get(`/flashcards/decks/${id}`),
+  getDeck: (id, filterType = null) => {
+    const params = filterType ? `?filterType=${filterType}` : '';
+    return api.get(`/flashcards/decks/${id}${params}`);
+  },
   createDeck: (name, description, level, skill, task, deckType, wordIds) => api.post('/flashcards/decks', { name, description, level, skill, task, deckType, wordIds }),
   updateDeck: (id, updates) => api.put(`/flashcards/decks/${id}`, updates),
   deleteDeck: (id) => api.delete(`/flashcards/decks/${id}`),

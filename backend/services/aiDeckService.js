@@ -223,6 +223,7 @@ Extract ONLY:
 1. Individual words (nouns, verbs, adjectives, adverbs) - extract each unique word
 2. Common/important idioms (e.g., "break the ice", "hit the nail on the head") - NOT regular phrases
 3. Phrasal verbs (e.g., "give up", "look after", "turn down") - verbs with prepositions that have special meaning
+4. V1 of a verb. For example; "swimming", "swim," "swam," and "swum" " should be swim in your output. 
 
 DO NOT extract:
 - Regular phrases that are not idioms or phrasal verbs

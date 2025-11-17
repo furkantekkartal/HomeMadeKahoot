@@ -5,7 +5,7 @@ import '../Auth.css';
 import '../Home.css';
 
 const GuestLogin = () => {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -18,7 +18,7 @@ const GuestLogin = () => {
     setLoading(true);
 
     try {
-      await login(email, password);
+      await login(username, password);
       navigate('/quiz');
     } catch (err) {
       setError(err.response?.data?.message || 'Login failed');
@@ -44,12 +44,12 @@ const GuestLogin = () => {
         {error && <div className="error-message">{error}</div>}
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label className="form-label">Email</label>
+            <label className="form-label">Username</label>
             <input
-              type="email"
+              type="text"
               className="form-input"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
               required
             />
           </div>

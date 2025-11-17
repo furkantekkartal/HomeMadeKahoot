@@ -453,11 +453,13 @@ exports.getGameStats = async (req, res) => {
           studentName: username,
           flashcards: {
             sessions: 0,
+            totalSeconds: 0,
             totalMinutes: 0,
             totalHours: 0
           },
           spelling: {
             sessions: 0,
+            totalSeconds: 0,
             totalMinutes: 0,
             totalHours: 0
           }
@@ -469,8 +471,11 @@ exports.getGameStats = async (req, res) => {
       
       if (studentStats[moduleKey]) {
         studentStats[moduleKey].sessions += 1;
-        studentStats[moduleKey].totalMinutes += session.durationMinutes || 0;
-        studentStats[moduleKey].totalHours = Math.floor(studentStats[moduleKey].totalMinutes / 60);
+        // Use durationSeconds for accurate calculation, then convert to minutes/hours
+        const sessionSeconds = session.durationSeconds || (session.durationMinutes || 0) * 60;
+        studentStats[moduleKey].totalSeconds = (studentStats[moduleKey].totalSeconds || 0) + sessionSeconds;
+        studentStats[moduleKey].totalMinutes = Math.floor(studentStats[moduleKey].totalSeconds / 60);
+        studentStats[moduleKey].totalHours = Math.floor(studentStats[moduleKey].totalSeconds / 3600);
       } else {
         // Handle case where module doesn't match expected keys
         console.warn(`Unexpected module: ${session.module}`);
@@ -479,12 +484,14 @@ exports.getGameStats = async (req, res) => {
 
     // Convert map to array and sort by total time (flashcards + spelling)
     const gameStats = Array.from(gameStatsMap.values()).map(student => {
-      const totalMinutes = student.flashcards.totalMinutes + student.spelling.totalMinutes;
+      const totalSeconds = (student.flashcards.totalSeconds || 0) + (student.spelling.totalSeconds || 0);
+      const totalMinutes = Math.floor(totalSeconds / 60);
       const totalSessions = student.flashcards.sessions + student.spelling.sessions;
       return {
         ...student,
+        totalSeconds,
         totalMinutes,
-        totalHours: Math.floor(totalMinutes / 60),
+        totalHours: Math.floor(totalSeconds / 3600),
         totalSessions
       };
     });
@@ -493,13 +500,15 @@ exports.getGameStats = async (req, res) => {
     gameStats.sort((a, b) => b.totalMinutes - a.totalMinutes);
 
     // Calculate totals
+    const totalSeconds = gameStats.reduce((sum, s) => sum + (s.totalSeconds || 0), 0);
     const totals = {
       totalStudents: gameStats.length,
       totalFlashcardsSessions: gameStats.reduce((sum, s) => sum + s.flashcards.sessions, 0),
       totalSpellingSessions: gameStats.reduce((sum, s) => sum + s.spelling.sessions, 0),
       totalSessions: gameStats.reduce((sum, s) => sum + s.totalSessions, 0),
-      totalMinutes: gameStats.reduce((sum, s) => sum + s.totalMinutes, 0),
-      totalHours: Math.floor(gameStats.reduce((sum, s) => sum + s.totalMinutes, 0) / 60)
+      totalSeconds: totalSeconds,
+      totalMinutes: Math.floor(totalSeconds / 60),
+      totalHours: Math.floor(totalSeconds / 3600)
     };
 
     res.json({

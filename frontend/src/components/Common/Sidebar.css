@@ -156,6 +156,15 @@
   color: #9f7aea;
 }
 
+.nav-icon-deck-quiz {
+  color: #10b981;
+}
+
+.nav-icon-spelling {
+  color: #ec4899; /* Vibrant pink color */
+  filter: drop-shadow(0 0 2px rgba(236, 72, 153, 0.5));
+}
+
 .nav-icon-writing {
   color: #f59e0b;
 }

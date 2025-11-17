@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { wordAPI, flashcardAPI } from '../services/api';
 import { useStudyTimer } from '../hooks/useStudyTimer';
 import StudyTimer from '../components/Common/StudyTimer';
+import { FaHourglassHalf } from 'react-icons/fa';
 import './Spelling.css';
 
 // Constants
@@ -17,7 +18,6 @@ const CONSTANTS = {
 };
 
 const Spelling = () => {
-  const navigate = useNavigate();
   const location = useLocation();
   
   // Deck state
@@ -234,15 +234,11 @@ const Spelling = () => {
           break;
         case 'ArrowUp':
           e.preventDefault();
-          if (cards.length > 0 && currentIndex < cards.length) {
-            await handleStatusUpdate(true);
-          }
+          // Arrow up no longer used for known/unknown in spelling page
           break;
         case 'ArrowDown':
           e.preventDefault();
-          if (cards.length > 0 && currentIndex < cards.length) {
-            await handleStatusUpdate(false);
-          }
+          // Arrow down no longer used for known/unknown in spelling page
           break;
         case 'Enter':
           e.preventDefault();
@@ -315,7 +311,7 @@ const Spelling = () => {
     try {
       setLoading(true);
       setShowResults(false); // Reset results when loading new deck
-      const response = await flashcardAPI.getDeck(currentDeck._id);
+      const response = await flashcardAPI.getDeck(currentDeck._id, 'spelling');
       setCards(response.data.words || []);
       
       // Store deck statistics
@@ -444,15 +440,15 @@ const Spelling = () => {
     }, 300);
   };
 
-  // Update card status without advancing to next card
-  const updateCardStatusOnly = async (isKnown, card = null) => {
+  // Update spelling status without advancing to next card
+  const updateSpellingStatus = async (isSpelled, card = null) => {
     const targetCard = card || cards[currentIndex];
     if (!targetCard || !targetCard._id) return;
 
-    triggerAnimation(isKnown ? 'known' : 'unknown');
+    triggerAnimation(isSpelled ? 'known' : 'unknown');
 
     // Show text animation overlay
-    if (isKnown) {
+    if (isSpelled) {
       setShowKnownText(true);
       playSuccessSound();
       setTimeout(() => setShowKnownText(false), 300);
@@ -463,11 +459,11 @@ const Spelling = () => {
     }
 
     try {
-      await wordAPI.toggleWordStatus(targetCard._id, isKnown);
+      await wordAPI.toggleSpellingStatus(targetCard._id, isSpelled);
       
       // Update local card state
       setCards(prevCards => prevCards.map(c => 
-        c._id === targetCard._id ? { ...c, isKnown } : c
+        c._id === targetCard._id ? { ...c, isSpelled } : c
       ));
 
       // Update last studied if using a deck
@@ -475,7 +471,7 @@ const Spelling = () => {
         await flashcardAPI.updateLastStudied(currentDeck._id);
       }
     } catch (error) {
-      console.error('Failed to update card status:', error);
+      console.error('Failed to update spelling status:', error);
     }
   };
 
@@ -492,9 +488,9 @@ const Spelling = () => {
     // Show the answer
     setShowAnswer(true);
     
-    // Wait a bit, then mark as known/unknown (but don't advance)
+    // Wait a bit, then mark spelling status (but don't advance)
     setTimeout(async () => {
-      await updateCardStatusOnly(isCorrect);
+      await updateSpellingStatus(isCorrect);
     }, 1000);
   };
 
@@ -628,96 +624,6 @@ const Spelling = () => {
     }
   };
 
-  // Shared function for status updates (used by keyboard, touch, and buttons)
-  const handleStatusUpdate = async (isKnown, card = null) => {
-    const targetCard = card || cards[currentIndex];
-    if (!targetCard || !targetCard._id) return;
-
-    triggerAnimation(isKnown ? 'known' : 'unknown');
-
-    // Show text animation overlay
-    if (isKnown) {
-      setShowKnownText(true);
-      playSuccessSound();
-      setTimeout(() => setShowKnownText(false), 300);
-    } else {
-      setShowUnknownText(true);
-      playUnknownSound();
-      setTimeout(() => setShowUnknownText(false), 300);
-    }
-
-    try {
-      await wordAPI.toggleWordStatus(targetCard._id, isKnown);
-      
-      // Update local card state
-      setCards(prevCards => prevCards.map(c => 
-        c._id === targetCard._id ? { ...c, isKnown } : c
-      ));
-
-      // Update last studied if using a deck
-      if (currentDeck) {
-        await flashcardAPI.updateLastStudied(currentDeck._id);
-        
-        // Reload deck to get updated stats (especially important for dynamic decks)
-        if (currentDeck.deckType === 'dynamic' && isKnown) {
-          setTimeout(async () => {
-            try {
-              const response = await flashcardAPI.getDeck(currentDeck._id);
-              if (response.data.stats) {
-                setDeckStats({
-                  totalWords: response.data.stats.totalWords || 0,
-                  masteredWords: response.data.stats.masteredWords || 0,
-                  remainingWords: response.data.stats.remainingWords || 0
-                });
-              }
-              // Update cards (known words will be filtered out for dynamic decks)
-              setCards(response.data.words || []);
-              // Adjust current index if needed
-              if (currentIndex >= (response.data.words || []).length) {
-                setCurrentIndex(Math.max(0, (response.data.words || []).length - 1));
-              }
-            } catch (error) {
-              console.error('Failed to reload deck after status update:', error);
-            }
-          }, 500);
-        } else {
-          // For static decks, update stats locally
-          if (isKnown) {
-            setDeckStats(prev => ({
-              ...prev,
-              masteredWords: prev.masteredWords + 1,
-              remainingWords: Math.max(0, prev.remainingWords - 1)
-            }));
-          } else {
-            setDeckStats(prev => ({
-              ...prev,
-              masteredWords: Math.max(0, prev.masteredWords - 1),
-              remainingWords: prev.remainingWords + 1
-            }));
-          }
-        }
-      }
-
-      // Auto-advance to next card, or show results if on last card
-      setTimeout(() => {
-        if (currentIndex >= cards.length - 1) {
-          // On last card, show results when trying to advance
-          if (!showResults) {
-            setShowResults(true);
-            setTimerActive(false);
-          }
-        } else {
-          setCurrentIndex((prevIndex) => prevIndex + 1);
-        }
-      }, CONSTANTS.AUTO_ADVANCE_DELAY);
-    } catch (error) {
-      console.error('Failed to update card status:', error);
-    }
-  };
-
-  const updateCardStatus = async (isKnown) => {
-    await handleStatusUpdate(isKnown);
-  };
 
   const speakText = (text, lang = 'en-US', animationType = null) => {
     if ('speechSynthesis' in window) {
@@ -785,18 +691,8 @@ const Spelling = () => {
       }
     } else if (absDeltaY > absDeltaX && absDeltaY > minSwipeDistance) {
       swipeDetectedRef.current = true;
-      // Vertical swipe
-      if (deltaY > 0) {
-        // Swipe up - known word
-        if (cards.length > 0 && currentIndex < cards.length) {
-          await handleStatusUpdate(true);
-        }
-      } else {
-        // Swipe down - unknown word
-        if (cards.length > 0 && currentIndex < cards.length) {
-          await handleStatusUpdate(false);
-        }
-      }
+      // Vertical swipe - no longer used for known/unknown in spelling page
+      // Swipe gestures are now only for navigation
     }
     
     // Reset touch state
@@ -845,15 +741,12 @@ const Spelling = () => {
 
   // Memoized progress stats (must be called before any early returns)
   const progressStats = useMemo(() => ({
-    known: cards.filter(card => card.isKnown).length,
-    unknown: cards.filter(card => !card.isKnown).length,
+    spelledCorrectly: cards.filter(card => card.isSpelled === true).length,
+    spelledIncorrectly: cards.filter(card => card.isSpelled === false).length,
+    notSpelled: cards.filter(card => card.isSpelled === null || card.isSpelled === undefined).length,
     // Remaining = cards left AFTER current card (so last card shows remaining = 0, but we still show it)
     remaining: Math.max(0, cards.length - currentIndex - 1)
   }), [cards, currentIndex]);
-
-  if (loading) {
-    return <div className="loading">Loading cards...</div>;
-  }
 
   const isAnswerCorrect = currentCard && userAnswer.trim() && showAnswer 
     ? userAnswer.trim().toLowerCase() === currentCard.englishWord.trim().toLowerCase()
@@ -883,13 +776,6 @@ const Spelling = () => {
               </option>
             ))}
           </select>
-
-          <button
-            onClick={() => navigate('/decks')}
-            className="btn btn-secondary"
-          >
-            Decks
-          </button>
         </div>
       </div>
 
@@ -897,7 +783,11 @@ const Spelling = () => {
       <div className="spelling-content">
         {/* Center - Writing Area */}
         <div className="spelling-area">
-          {cards.length === 0 ? (
+          {loading ? (
+            <div className="empty-state" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1rem' }}>
+              <FaHourglassHalf style={{ fontSize: '4rem', opacity: 0.6 }} />
+            </div>
+          ) : cards.length === 0 ? (
             <div className="empty-state">
               <p>No words available. Select a deck from the dropdown above or create a new deck.</p>
             </div>
@@ -911,12 +801,12 @@ const Spelling = () => {
                     <p className="result-stat-value">{cards.length}</p>
                   </div>
                   <div className="result-stat-card result-stat-known">
-                    <p className="result-stat-label">Known</p>
-                    <p className="result-stat-value">{progressStats.known}</p>
+                    <p className="result-stat-label">Spelled Correctly</p>
+                    <p className="result-stat-value">{progressStats.spelledCorrectly}</p>
                   </div>
                   <div className="result-stat-card result-stat-unknown">
-                    <p className="result-stat-label">Unknown</p>
-                    <p className="result-stat-value">{progressStats.unknown}</p>
+                    <p className="result-stat-label">Spelled Incorrectly</p>
+                    <p className="result-stat-value">{progressStats.spelledIncorrectly}</p>
                   </div>
                   <div className="result-stat-card result-stat-time">
                     <p className="result-stat-label">Time Spent</p>
@@ -1119,65 +1009,46 @@ const Spelling = () => {
           )}
         </div>
 
-        {/* Right Sidebar - Mark As */}
+        {/* Right Sidebar - Mark As & Progress */}
         <div className="spelling-sidebar">
           {/* Mark as Section */}
           <div className="mark-as-section">
-            <h3 className="mark-as-title">Mark as</h3>
+            <h3 className="mark-as-title">Is Spelled?</h3>
             <div className="status-buttons">
               <button
-                onClick={() => updateCardStatus(false)}
+                onClick={() => updateSpellingStatus(false)}
                 className={`status-btn status-unknown ${animations.unknown ? 'animate-pulse-status' : ''}`}
               >
-                ❓ Unknown
+                ❌ No
               </button>
               <button
-                onClick={() => updateCardStatus(true)}
+                onClick={() => updateSpellingStatus(true)}
                 className={`status-btn status-known ${animations.known ? 'animate-pulse-status' : ''}`}
               >
-                ✅ Known
+                ✅ Yes
               </button>
             </div>
           </div>
 
           <h3>Progress</h3>
           
-          {/* Progress Stats - Now showing Deck Statistics */}
-          {currentDeck ? (
-            <div className="stats-grid">
-              <div className="stat-card stat-incorrect">
-                <p className="stat-label">Total Words</p>
-                <p className="stat-value">{deckStats.totalWords}</p>
-              </div>
-
-              <div className="stat-card stat-correct">
-                <p className="stat-label">Mastered</p>
-                <p className="stat-value">{deckStats.masteredWords}</p>
-              </div>
-
-              <div className="stat-card stat-remaining">
-                <p className="stat-label">Remaining</p>
-                <p className="stat-value">{deckStats.remainingWords}</p>
-              </div>
+          {/* Progress Stats - Showing Spelling Statistics */}
+          <div className="stats-grid">
+            <div className="stat-card stat-correct">
+              <p className="stat-label">Spelled Correctly</p>
+              <p className="stat-value">{progressStats.spelledCorrectly}</p>
             </div>
-          ) : (
-            <div className="stats-grid">
-              <div className="stat-card stat-correct">
-                <p className="stat-label">Known</p>
-                <p className="stat-value">{progressStats.known}</p>
-              </div>
 
-              <div className="stat-card stat-incorrect">
-                <p className="stat-label">Unknown</p>
-                <p className="stat-value">{progressStats.unknown}</p>
-              </div>
-
-              <div className="stat-card stat-remaining">
-                <p className="stat-label">Remaining</p>
-                <p className="stat-value">{progressStats.remaining}</p>
-              </div>
+            <div className="stat-card stat-incorrect">
+              <p className="stat-label">Spelled Incorrectly</p>
+              <p className="stat-value">{progressStats.spelledIncorrectly}</p>
             </div>
-          )}
+
+            <div className="stat-card stat-remaining">
+              <p className="stat-label">Not Spelled Yet</p>
+              <p className="stat-value">{progressStats.notSpelled}</p>
+            </div>
+          </div>
         </div>
       </div>
 

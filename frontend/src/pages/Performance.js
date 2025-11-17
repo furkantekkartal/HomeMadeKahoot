@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { sessionAPI, pronunciationAPI } from '../services/api';
 import { QUIZ_LEVELS, QUIZ_SKILLS, QUIZ_TASKS, formatLevel, formatSkill, formatTask } from '../constants/quizConstants';
+import { FaHourglassHalf } from 'react-icons/fa';
 import './Performance.css';
 
 const Performance = () => {
@@ -277,10 +278,6 @@ const Performance = () => {
     setExpandedRows(newExpanded);
   };
 
-  if (loading) {
-    return <div className="loading">Loading performance...</div>;
-  }
-
   const hasActiveFilters = Object.values(appliedFilters).some(v => v !== '');
 
   return (
@@ -292,67 +289,57 @@ const Performance = () => {
         </Link>
       </div>
 
-      <div className="performance-content">
-        {/* Summary Cards */}
-        <div className="summary-cards">
-          {/* Total Students for Quizzes - Large Box */}
-          <div className="summary-card summary-card-large summary-card-yellow">
-            <div className="summary-emoji">👥</div>
-            <div className="summary-value">{summary.totalStudents}</div>
-            <div className="summary-label">Total Students</div>
+      <div className="performance-content-wrapper">
+        <div className="performance-content">
+        {/* Simplified Summary Cards - Only Key Metrics */}
+        <div className="summary-cards-simple">
+          <div className="summary-card-simple">
+            <div className="summary-card-icon">👥</div>
+            <div className="summary-card-content">
+              <div className="summary-card-value">
+                {loading ? <FaHourglassHalf style={{ fontSize: '2rem', opacity: 0.7 }} /> : summary.totalStudents}
+              </div>
+              <div className="summary-card-label">Total Students</div>
+            </div>
           </div>
           
-          {/* 3x3 Grid of Performance Metrics */}
-          <div className="summary-cards-grid">
-            {/* Row 1: Quiz Performance - 3 boxes */}
-            <div className="summary-card summary-card-row-1 summary-card-quiz">
-              <div className="summary-emoji">📊</div>
-              <div className="summary-value">{summary.quizSuccess}%</div>
-              <div className="summary-label">% Success</div>
+          <div className="summary-card-simple">
+            <div className="summary-card-icon">📊</div>
+            <div className="summary-card-content">
+              <div className="summary-card-value">
+                {loading ? <FaHourglassHalf style={{ fontSize: '2rem', opacity: 0.7 }} /> : `${summary.quizSuccess}%`}
+              </div>
+              <div className="summary-card-label">Quiz Success Rate</div>
             </div>
-            <div className="summary-card summary-card-row-1 summary-card-quiz">
-              <div className="summary-emoji">⭐</div>
-              <div className="summary-value">{summary.quizTotalPoints}</div>
-              <div className="summary-label">Total Points</div>
+          </div>
+          
+          <div className="summary-card-simple">
+            <div className="summary-card-icon">✅</div>
+            <div className="summary-card-content">
+              <div className="summary-card-value">
+                {loading ? <FaHourglassHalf style={{ fontSize: '2rem', opacity: 0.7 }} /> : summary.quizTotalCompleted}
+              </div>
+              <div className="summary-card-label">Quizzes Completed</div>
             </div>
-            <div className="summary-card summary-card-row-1 summary-card-quiz">
-              <div className="summary-emoji">✅</div>
-              <div className="summary-value">{summary.quizTotalCompleted}</div>
-              <div className="summary-label">Total Quiz Completed</div>
+          </div>
+          
+          <div className="summary-card-simple">
+            <div className="summary-card-icon">⏱️</div>
+            <div className="summary-card-content">
+              <div className="summary-card-value">
+                {loading ? <FaHourglassHalf style={{ fontSize: '2rem', opacity: 0.7 }} /> : `${summary.gameTotalTime}h`}
+              </div>
+              <div className="summary-card-label">Total Study Time</div>
             </div>
-            
-            {/* Row 2: Game Performance - 3 boxes */}
-            <div className="summary-card summary-card-row-2 summary-card-game">
-              <div className="summary-emoji">⏱️</div>
-              <div className="summary-value">{summary.gameTotalTime}</div>
-              <div className="summary-label">Total Game Time (Hours)</div>
-            </div>
-            <div className="summary-card summary-card-row-2 summary-card-game">
-              <div className="summary-emoji">🃏</div>
-              <div className="summary-value">{summary.gameFlashcardCompleted}</div>
-              <div className="summary-label">Flashcard Game Completed</div>
-            </div>
-            <div className="summary-card summary-card-row-2 summary-card-game">
-              <div className="summary-emoji">✍️</div>
-              <div className="summary-value">{summary.gameSpellingCompleted}</div>
-              <div className="summary-label">Spelling Game Completed</div>
-            </div>
-            
-            {/* Row 3: Pronunciation Performance - 3 boxes */}
-            <div className="summary-card summary-card-row-3 summary-card-pronunciation">
-              <div className="summary-emoji">🎯</div>
-              <div className="summary-value">{summary.pronunciationAvgOverall}</div>
-              <div className="summary-label">Average Overall Score</div>
-            </div>
-            <div className="summary-card summary-card-row-3 summary-card-pronunciation">
-              <div className="summary-emoji">🔤</div>
-              <div className="summary-value">{summary.pronunciationTotalWords}</div>
-              <div className="summary-label">Total Word Pronunciation</div>
-            </div>
-            <div className="summary-card summary-card-row-3 summary-card-pronunciation">
-              <div className="summary-emoji">💬</div>
-              <div className="summary-value">{summary.pronunciationTotalSentences}</div>
-              <div className="summary-label">Total Sentence Pronunciation</div>
+          </div>
+          
+          <div className="summary-card-simple">
+            <div className="summary-card-icon">🎯</div>
+            <div className="summary-card-content">
+              <div className="summary-card-value">
+                {loading ? <FaHourglassHalf style={{ fontSize: '2rem', opacity: 0.7 }} /> : summary.pronunciationAvgOverall}
+              </div>
+              <div className="summary-card-label">Avg Pronunciation Score</div>
             </div>
           </div>
         </div>
@@ -457,17 +444,18 @@ const Performance = () => {
           </div>
         </div>
 
-        {/* Performance Table */}
-        {performance.length === 0 ? (
-          <div className="empty-state">
-            <p>No performance data available yet. Take some quizzes to see your performance here!</p>
-            <Link to="/quiz" className="btn btn-primary">
-              Go to Quiz
-            </Link>
-          </div>
-        ) : (
-          <div className="performance-table-container">
-            <h2>Student Performance</h2>
+        {/* Quiz Performance Table */}
+        <div className="quiz-performance-container">
+          {performance.length === 0 ? (
+            <div className="empty-state">
+              <p>No performance data available yet. Take some quizzes to see your performance here!</p>
+              <Link to="/quiz" className="btn btn-primary">
+                Go to Quiz
+              </Link>
+            </div>
+          ) : (
+            <div className="performance-table-container">
+              <h2>Quiz Performance</h2>
             <div className="table-wrapper">
               <table className="performance-table">
                 <thead>
@@ -570,8 +558,9 @@ const Performance = () => {
                 </tbody>
               </table>
             </div>
-          </div>
-        )}
+            </div>
+          )}
+        </div>
 
         {/* Game Stats Section */}
         <div className="game-stats-container">
@@ -610,12 +599,30 @@ const Performance = () => {
                   <thead>
                     <tr>
                       <th>Student Name</th>
-                      <th>Flashcards Sessions</th>
-                      <th>Flashcards Time (Hours)</th>
-                      <th>Spelling Sessions</th>
-                      <th>Spelling Time (Hours)</th>
-                      <th>Total Sessions</th>
-                      <th>Total Time (Hours)</th>
+                      <th>
+                        <div>Flashcards</div>
+                        <div>Sessions</div>
+                      </th>
+                      <th>
+                        <div>Flashcards</div>
+                        <div>Time (Minutes)</div>
+                      </th>
+                      <th>
+                        <div>Spelling</div>
+                        <div>Sessions</div>
+                      </th>
+                      <th>
+                        <div>Spelling</div>
+                        <div>Time (Minutes)</div>
+                      </th>
+                      <th>
+                        <div>Total</div>
+                        <div>Sessions</div>
+                      </th>
+                      <th>
+                        <div>Total</div>
+                        <div>Time (Minutes)</div>
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -623,11 +630,11 @@ const Performance = () => {
                       <tr key={student.studentName || idx}>
                         <td className="student-name">{student.studentName}</td>
                         <td>{student.flashcards.sessions}</td>
-                        <td>{student.flashcards.totalHours}</td>
+                        <td>{student.flashcards.totalMinutes}</td>
                         <td>{student.spelling.sessions}</td>
-                        <td>{student.spelling.totalHours}</td>
+                        <td>{student.spelling.totalMinutes}</td>
                         <td>{student.totalSessions}</td>
-                        <td className="score">{student.totalHours}</td>
+                        <td className="score">{student.totalMinutes}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -798,6 +805,54 @@ const Performance = () => {
             </div>
           )}
         </div>
+        </div>
+        
+        {/* Right Sidebar - Filter Summary */}
+        {hasActiveFilters && (
+          <div className="performance-sidebar">
+            <h3>Active Filters</h3>
+            <div className="sidebar-filters">
+              {appliedFilters.studentName && (
+                <div className="sidebar-filter-item">
+                  <span className="sidebar-filter-label">Student:</span>
+                  <span className="sidebar-filter-value">{appliedFilters.studentName}</span>
+                </div>
+              )}
+              {appliedFilters.quizName && (
+                <div className="sidebar-filter-item">
+                  <span className="sidebar-filter-label">Quiz:</span>
+                  <span className="sidebar-filter-value">{appliedFilters.quizName}</span>
+                </div>
+              )}
+              {appliedFilters.level && (
+                <div className="sidebar-filter-item">
+                  <span className="sidebar-filter-label">Level:</span>
+                  <span className="sidebar-filter-value">{formatLevel(appliedFilters.level)}</span>
+                </div>
+              )}
+              {appliedFilters.skill && (
+                <div className="sidebar-filter-item">
+                  <span className="sidebar-filter-label">Skill:</span>
+                  <span className="sidebar-filter-value">{formatSkill(appliedFilters.skill)}</span>
+                </div>
+              )}
+              {appliedFilters.task && (
+                <div className="sidebar-filter-item">
+                  <span className="sidebar-filter-label">Task:</span>
+                  <span className="sidebar-filter-value">{formatTask(appliedFilters.task)}</span>
+                </div>
+              )}
+              {(appliedFilters.dateFrom || appliedFilters.dateTo) && (
+                <div className="sidebar-filter-item">
+                  <span className="sidebar-filter-label">Date Range:</span>
+                  <span className="sidebar-filter-value">
+                    {appliedFilters.dateFrom || 'Any'} - {appliedFilters.dateTo || 'Any'}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

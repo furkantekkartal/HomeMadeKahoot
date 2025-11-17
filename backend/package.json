@@ -12,7 +12,8 @@
     "import-words": "node scripts/importWords.js",
     "migrate-to-prod": "node scripts/migrateDataToProduction.js",
     "reset-prod-db": "node scripts/resetProductionDatabase.js",
-    "reset-game-performance": "node scripts/resetGamePerformance.js"
+    "reset-game-performance": "node scripts/resetGamePerformance.js",
+    "generate-all-images": "node scripts/generateAllWordImages.js"
   },
   "keywords": [
     "quiz",

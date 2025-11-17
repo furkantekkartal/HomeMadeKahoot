@@ -1,7 +1,7 @@
 .play-quiz {
   padding: 2rem;
   min-height: 100vh;
-  background: #f3f4f6;
+  background: linear-gradient(135deg, #e0e7ff 0%, #ddd6fe 100%);
   max-width: 100%;
   overflow-x: hidden;
 }
@@ -23,7 +23,7 @@
     overflow-y: auto;
     display: flex;
     flex-direction: column;
-    background: #f3f4f6;
+    background: linear-gradient(135deg, #e0e7ff 0%, #ddd6fe 100%);
   }
 }
 

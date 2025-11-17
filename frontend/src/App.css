@@ -40,7 +40,9 @@
   align-items: center;
   min-height: 50vh;
   font-size: 1.5rem;
-  color: white;
+  color: #2d3748;
+  background: #f3f4f6;
+  padding: 2rem;
 }
 
 /* Button Styles */

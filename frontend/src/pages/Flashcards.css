@@ -1,6 +1,6 @@
 .flashcards-container {
   min-height: 100vh;
-  background: #f3f4f6;
+  background: linear-gradient(135deg, #e0e7ff 0%, #ddd6fe 100%);
   display: flex;
   flex-direction: column;
   overflow-x: hidden;
@@ -33,7 +33,7 @@
   display: flex;
   gap: 0.75rem;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   justify-content: flex-end;
 }
 
@@ -1101,7 +1101,7 @@
     position: relative;
     flex-direction: row;
     align-items: center;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     justify-content: space-between;
   }
 
@@ -1112,6 +1112,8 @@
     white-space: nowrap;
     flex-shrink: 0;
     margin-right: auto;
+    width: 100%;
+    margin-bottom: 0.25rem;
   }
 
   .header-controls {
@@ -1122,6 +1124,7 @@
     flex-wrap: nowrap;
     flex-shrink: 0;
     justify-content: flex-end;
+    width: 100%;
   }
 
   .header-controls > * {
@@ -1135,6 +1138,7 @@
     padding: 0.5rem 0.75rem;
     display: flex;
     align-items: center;
+    flex-shrink: 0;
   }
 
   .deck-select {
@@ -1145,6 +1149,7 @@
     height: 40px;
     display: flex;
     align-items: center;
+    flex-shrink: 0;
   }
 
   .header-buttons {

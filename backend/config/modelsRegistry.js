@@ -9,7 +9,7 @@ const models = {
     file: '../models/User',
     description: 'User accounts and authentication',
     required: true, // Cannot be safely deleted without data migration
-    indexes: ['username', 'email']
+    indexes: ['username']
   },
   'quizzes': {
     model: 'Quiz',

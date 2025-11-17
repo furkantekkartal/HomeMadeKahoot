@@ -152,10 +152,13 @@ exports.endSession = async (req, res) => {
     }
 
     const endTime = new Date();
-    // Use saved durationSeconds if available, otherwise calculate from startTime
+    // Use saved durationSeconds if available
+    // IMPORTANT: Do NOT fallback to calculating from startTime to endTime
+    // This would count time when the page was in background, minimized, or user was idle
+    // Only use the tracked durationSeconds (which respects page visibility and idle detection)
     const finalDurationSeconds = session.durationSeconds > 0 
       ? session.durationSeconds 
-      : Math.floor((endTime - session.startTime) / 1000);
+      : 0; // If no tracked time, use 0 (don't count time that wasn't actually studied)
     const finalDurationMinutes = Math.floor(finalDurationSeconds / 60);
 
     session.endTime = endTime;

@@ -8,6 +8,18 @@ const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const GOOGLE_DAILY_LIMIT = parseInt(process.env.GOOGLE_DAILY_LIMIT) || 100; // Default 100 free searches per day
 const UNSPLASH_ACCESS_KEY = process.env.UNSPLASH_ACCESS_KEY || process.env.UNSPLASH_API_KEY;
 
+// Multiple Unsplash API keys for parallel processing
+// Split 13,000 words across 5 keys: 0-2600, 2601-5200, 5201-7800, 7801-10400, 10401+
+const UNSPLASH_KEYS = [
+  process.env.UNSPLASH_ACCESS_KEY_1 || process.env.UNSPLASH_ACCESS_KEY,
+  process.env.UNSPLASH_ACCESS_KEY_2,
+  process.env.UNSPLASH_ACCESS_KEY_3,
+  process.env.UNSPLASH_ACCESS_KEY_4,
+  process.env.UNSPLASH_ACCESS_KEY_5
+].filter(key => key); // Remove undefined keys
+
+const WORDS_PER_KEY = 2600; // Split words evenly across keys
+
 // Path to store daily usage counter
 const USAGE_FILE_PATH = path.join(__dirname, '../data/google_search_usage.json');
 
@@ -270,14 +282,45 @@ async function fetchImageFromGoogle(query, page = null, fallbackQueries = []) {
 }
 
 /**
+ * Get Unsplash API key based on word index for load balancing
+ * @param {number} wordIndex - Index of the word (0-based)
+ * @returns {string} - Unsplash API key to use
+ */
+function getUnsplashKeyForWord(wordIndex) {
+  if (UNSPLASH_KEYS.length === 0) {
+    throw new Error('No Unsplash API keys configured');
+  }
+  
+  // If only one key, use it
+  if (UNSPLASH_KEYS.length === 1) {
+    return UNSPLASH_KEYS[0];
+  }
+  
+  // Distribute words across keys based on index
+  // Key 1: words 0-2599, Key 2: 2600-5199, Key 3: 5200-7799, Key 4: 7800-10399, Key 5: 10400+
+  const keyIndex = Math.floor(wordIndex / WORDS_PER_KEY);
+  // Ensure we don't exceed available keys (cap at last key)
+  const cappedKeyIndex = Math.min(keyIndex, UNSPLASH_KEYS.length - 1);
+  const selectedKey = UNSPLASH_KEYS[cappedKeyIndex];
+  
+  return selectedKey;
+}
+
+/**
  * Fetch an image URL from Unsplash API based on a search query
  * @param {string} query - Search query for Unsplash
  * @param {number} page - Page number for pagination (not used by Unsplash, kept for compatibility)
  * @param {Array<string>} fallbackQueries - Fallback queries to try if main query fails
+ * @param {number} wordIndex - Optional word index for key selection (for load balancing)
  * @returns {Promise<string>} - Image URL
  */
-async function fetchImageFromUnsplash(query, page = null, fallbackQueries = []) {
-  if (!UNSPLASH_ACCESS_KEY) {
+async function fetchImageFromUnsplash(query, page = null, fallbackQueries = [], wordIndex = null) {
+  // Select API key based on word index if provided, otherwise use default
+  const accessKey = wordIndex !== null 
+    ? getUnsplashKeyForWord(wordIndex)
+    : (UNSPLASH_ACCESS_KEY || UNSPLASH_KEYS[0]);
+  
+  if (!accessKey) {
     throw new Error('UNSPLASH_ACCESS_KEY is not set in environment variables');
   }
 
@@ -293,7 +336,7 @@ async function fetchImageFromUnsplash(query, page = null, fallbackQueries = []) 
           content_filter: 'high'
         },
         headers: {
-          'Authorization': `Client-ID ${UNSPLASH_ACCESS_KEY}`
+          'Authorization': `Client-ID ${accessKey}`
         },
         timeout: 10000 // 10 second timeout
       });
@@ -313,6 +356,14 @@ async function fetchImageFromUnsplash(query, page = null, fallbackQueries = []) 
 
       return selectedImage.urls.regular; // Unsplash returns image URL in 'urls.regular' field
     } catch (error) {
+      // Check for rate limit errors (403) - don't retry with fallback queries
+      if (error.response?.status === 403) {
+        const errorMessage = error.response?.data?.errors?.[0] || 'Rate limit exceeded or invalid API key';
+        const unsplashError = new Error(`Rate limit exceeded (403): ${errorMessage}. Please check your API key or wait before retrying.`);
+        unsplashError.searchQuery = searchQuery;
+        throw unsplashError;
+      }
+      
       // If this is the last query to try, throw the error
       if (queriesToTry.indexOf(searchQuery) === queriesToTry.length - 1) {
         const errorMessage = error.response?.data?.errors?.[0] || error.message || 'Unknown error';
@@ -557,16 +608,32 @@ function extractKeywordsFromSentence(sentence, targetWord) {
  * @param {string} sampleSentence - Optional sample sentence for context
  * @param {string} customKeywords - Optional custom keywords from user
  * @param {string} service - Image service to use: 'google' or 'unsplash' (default: 'google')
+ * @param {number} wordIndex - Optional word index for Unsplash key selection (for load balancing)
  * @returns {Promise<{imageUrl: string, searchQuery: string}>} - Image URL and search query
  */
-async function generateWordImage(englishWord, wordType = '', sampleSentence = '', customKeywords = '', service = 'google') {
+async function generateWordImage(englishWord, wordType = '', sampleSentence = '', customKeywords = '', service = 'google', wordIndex = null) {
   let searchQuery = englishWord.toLowerCase();
   
+  // For Unsplash, always use just the word itself
+  if (service === 'unsplash') {
+    searchQuery = englishWord.toLowerCase();
+    const fallbackQueries = []; // No fallback queries needed, just the word
+    
+    try {
+      const imageUrl = await fetchImageFromUnsplash(searchQuery, null, fallbackQueries, wordIndex);
+      return { imageUrl, searchQuery };
+    } catch (error) {
+      console.error('Error generating word image:', error);
+      throw error;
+    }
+  }
+  
+  // For Google service, use the existing logic with custom keywords or sentence extraction
   // If custom keywords are provided, use them as-is (user controls the order)
   if (customKeywords && customKeywords.trim()) {
     searchQuery = customKeywords.trim().toLowerCase();
     
-    console.log(`Using custom keywords for "${englishWord}": "${searchQuery}"`);
+    // Using custom keywords (no log needed)
     
     // Use custom keywords directly, skip automatic extraction and AI refinement
     // Generate fallback queries
@@ -576,10 +643,8 @@ async function generateWordImage(englishWord, wordType = '', sampleSentence = ''
     }
 
     try {
-      // Use the selected service
-      const imageUrl = service === 'unsplash' 
-        ? await fetchImageFromUnsplash(searchQuery, null, fallbackQueries)
-        : await fetchImageFromGoogle(searchQuery, null, fallbackQueries);
+      // Use Google service
+      const imageUrl = await fetchImageFromGoogle(searchQuery, null, fallbackQueries);
       return { imageUrl, searchQuery };
     } catch (error) {
       console.error('Error generating word image:', error);
@@ -600,7 +665,7 @@ async function generateWordImage(englishWord, wordType = '', sampleSentence = ''
       searchQuery = keywords[0] || englishWord.toLowerCase();
     }
     
-    console.log(`Extracted keywords for "${englishWord}": "${searchQuery}"`);
+    // Keywords extracted (no log needed)
   }
 
   // Skip AI refinement - use extracted keywords as they preserve sentence order
@@ -621,10 +686,8 @@ async function generateWordImage(englishWord, wordType = '', sampleSentence = ''
   }
 
   try {
-    // Use the selected service
-    const imageUrl = service === 'unsplash'
-      ? await fetchImageFromUnsplash(searchQuery, null, fallbackQueries)
-      : await fetchImageFromGoogle(searchQuery, null, fallbackQueries);
+    // Use Google service
+    const imageUrl = await fetchImageFromGoogle(searchQuery, null, fallbackQueries);
     return { imageUrl, searchQuery };
   } catch (error) {
     console.error('Error generating word image:', error);

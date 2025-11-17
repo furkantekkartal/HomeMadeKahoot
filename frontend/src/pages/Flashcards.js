@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { wordAPI, flashcardAPI, pronunciationAPI } from '../services/api';
 import { useStudyTimer } from '../hooks/useStudyTimer';
 import StudyTimer from '../components/Common/StudyTimer';
 import { AudioRecorder } from '../utils/audioRecorder';
+import { FaHourglassHalf } from 'react-icons/fa';
 import './Flashcards.css';
 
 // Constants
@@ -18,7 +19,6 @@ const CONSTANTS = {
 };
 
 const Flashcards = () => {
-  const navigate = useNavigate();
   const location = useLocation();
   
   // Deck state
@@ -355,7 +355,7 @@ const Flashcards = () => {
     try {
       setLoading(true);
       setShowResults(false); // Reset results when loading new deck
-      const response = await flashcardAPI.getDeck(currentDeck._id);
+      const response = await flashcardAPI.getDeck(currentDeck._id, 'flashcards');
       setCards(response.data.words || []);
       setCurrentIndex(0);
       setIsFlipped(false);
@@ -649,17 +649,17 @@ const Flashcards = () => {
       triggerAnimation('known');
       // Show text animation overlay for known
       if (!showKnownText) {
-        setShowKnownText(true);
-        playSuccessSound();
-        setTimeout(() => setShowKnownText(false), 300);
+      setShowKnownText(true);
+      playSuccessSound();
+      setTimeout(() => setShowKnownText(false), 300);
       }
     } else {
       triggerAnimation('unknown');
       // Show text animation overlay for unknown
       if (!showUnknownText) {
-        setShowUnknownText(true);
-        playUnknownSound();
-        setTimeout(() => setShowUnknownText(false), 300);
+      setShowUnknownText(true);
+      playUnknownSound();
+      setTimeout(() => setShowUnknownText(false), 300);
       }
     }
 
@@ -692,7 +692,7 @@ const Flashcards = () => {
             masteredWords: Math.max(0, prev.masteredWords - 1),
             remainingWords: prev.remainingWords + 1
           }));
-        }
+          }
       }
       
       // Reset flag after a delay to allow normal operation
@@ -1009,10 +1009,6 @@ const Flashcards = () => {
   // We don't check remaining === 0 here because that would trigger on the last card itself
   // Instead, we check in goToNextCard and handleStatusUpdate when trying to go past the last card
 
-  if (loading) {
-    return <div className="loading">Loading cards...</div>;
-  }
-
   return (
     <div className="flashcards-container">
       {/* Top Bar */}
@@ -1037,13 +1033,6 @@ const Flashcards = () => {
               </option>
             ))}
           </select>
-
-          <button
-            onClick={() => navigate('/decks')}
-            className="btn btn-secondary"
-          >
-            Decks
-          </button>
         </div>
       </div>
 
@@ -1051,7 +1040,11 @@ const Flashcards = () => {
       <div className="flashcards-content">
         {/* Center - Card Area */}
         <div className="flashcard-area">
-          {cards.length === 0 ? (
+          {loading ? (
+            <div className="empty-state" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1rem' }}>
+              <FaHourglassHalf style={{ fontSize: '4rem', opacity: 0.6 }} />
+            </div>
+          ) : cards.length === 0 ? (
             <div className="empty-state">
               <p>No flashcards available. Select a deck from the dropdown above or create a new deck.</p>
             </div>
@@ -1282,92 +1275,92 @@ const Flashcards = () => {
                           <div className="card-sentence-container">
                             <p className="card-sentence">"{card.sampleSentenceEn}"</p>
                             <div className="card-sentence-controls">
-                              <div className="audio-controls-group">
-                                <button
-                                  onClick={(e) => { 
-                                    if (isTopCard) {
-                                      e.stopPropagation(); 
-                                      speakText(card.sampleSentenceEn);
-                                    }
-                                  }}
-                                  className={`audio-btn-inline ${isTopCard && animations.audioSentence ? 'animate-sound-wave' : ''}`}
-                                  title="Pronounce sentence"
-                                  disabled={!isTopCard}
-                                >
-                                  🔊
-                                </button>
-                                {isTopCard && (
-                                  <>
-                                    {!isRecordingSentence && !audioBlobSentence && (
+                            <div className="audio-controls-group">
+                              <button
+                                onClick={(e) => { 
+                                  if (isTopCard) {
+                                    e.stopPropagation(); 
+                                    speakText(card.sampleSentenceEn);
+                                  }
+                                }}
+                                className={`audio-btn-inline ${isTopCard && animations.audioSentence ? 'animate-sound-wave' : ''}`}
+                                title="Pronounce sentence"
+                                disabled={!isTopCard}
+                              >
+                                🔊
+                              </button>
+                              {isTopCard && (
+                                <>
+                                  {!isRecordingSentence && !audioBlobSentence && (
+                                    <button
+                                      onMouseDown={(e) => handleMicMouseDown(e, 'sentence')}
+                                      onMouseUp={handleMicMouseUp}
+                                      onMouseLeave={handleMicMouseUp}
+                                      onTouchStart={(e) => handleMicTouchStart(e, 'sentence')}
+                                      onTouchEnd={handleMicTouchEnd}
+                                      className="mic-btn-inline"
+                                      title="Hold to record sentence"
+                                      disabled={isRecording || isEvaluating}
+                                    >
+                                      🎤
+                                    </button>
+                                  )}
+                                  {isRecordingSentence && (
+                                    <button
+                                      onMouseUp={handleMicMouseUp}
+                                      onMouseLeave={handleMicMouseUp}
+                                      onTouchEnd={handleMicTouchEnd}
+                                      className="mic-btn-inline recording"
+                                      title="Recording... Release to stop"
+                                    >
+                                      <span className="recording-pulse"></span>
+                                    </button>
+                                  )}
+                                  {audioBlobSentence && !isRecordingSentence && (
+                                    <>
                                       <button
-                                        onMouseDown={(e) => handleMicMouseDown(e, 'sentence')}
-                                        onMouseUp={handleMicMouseUp}
-                                        onMouseLeave={handleMicMouseUp}
-                                        onTouchStart={(e) => handleMicTouchStart(e, 'sentence')}
-                                        onTouchEnd={handleMicTouchEnd}
-                                        className="mic-btn-inline"
-                                        title="Hold to record sentence"
-                                        disabled={isRecording || isEvaluating}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          if (audioUrlSentence) {
+                                            const audio = new Audio(audioUrlSentence);
+                                            audio.play();
+                                          }
+                                        }}
+                                        className="play-btn-inline"
+                                        title="Play recording"
                                       >
-                                        🎤
+                                        ▶️
                                       </button>
-                                    )}
-                                    {isRecordingSentence && (
                                       <button
-                                        onMouseUp={handleMicMouseUp}
-                                        onMouseLeave={handleMicMouseUp}
-                                        onTouchEnd={handleMicTouchEnd}
-                                        className="mic-btn-inline recording"
-                                        title="Recording... Release to stop"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleRecordAgain('sentence');
+                                        }}
+                                        className="record-again-btn-inline"
+                                        title="Record again"
+                                        disabled={isEvaluating}
                                       >
-                                        <span className="recording-pulse"></span>
+                                        🔄
                                       </button>
-                                    )}
-                                    {audioBlobSentence && !isRecordingSentence && (
-                                      <>
-                                        <button
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            if (audioUrlSentence) {
-                                              const audio = new Audio(audioUrlSentence);
-                                              audio.play();
-                                            }
-                                          }}
-                                          className="play-btn-inline"
-                                          title="Play recording"
-                                        >
-                                          ▶️
-                                        </button>
-                                        <button
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleRecordAgain('sentence');
-                                          }}
-                                          className="record-again-btn-inline"
-                                          title="Record again"
-                                          disabled={isEvaluating}
-                                        >
-                                          🔄
-                                        </button>
-                                        <button
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleEvaluate('sentence');
-                                          }}
-                                          className="evaluate-btn-inline"
-                                          title="Send for evaluation"
-                                          disabled={isEvaluating}
-                                        >
-                                          {isEvaluating && evaluationType === 'sentence' ? (
-                                            <span className="spinner-small"></span>
-                                          ) : (
-                                            '📊'
-                                          )}
-                                        </button>
-                                      </>
-                                    )}
-                                  </>
-                                )}
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleEvaluate('sentence');
+                                        }}
+                                        className="evaluate-btn-inline"
+                                        title="Send for evaluation"
+                                        disabled={isEvaluating}
+                                      >
+                                        {isEvaluating && evaluationType === 'sentence' ? (
+                                          <span className="spinner-small"></span>
+                                        ) : (
+                                          '📊'
+                                        )}
+                                      </button>
+                                    </>
+                                  )}
+                                </>
+                              )}
                               </div>
                             </div>
                           </div>
@@ -1398,19 +1391,19 @@ const Flashcards = () => {
                             <p className="card-sentence">"{card.sampleSentenceTr}"</p>
                             <div className="card-sentence-controls">
                               <div className="audio-controls-group">
-                                <button
-                                  onClick={(e) => { 
-                                    if (isTopCard) {
-                                      e.stopPropagation(); 
-                                      speakText(card.sampleSentenceTr, 'tr-TR');
-                                    }
-                                  }}
-                                  className="audio-btn-inline"
-                                  title="Cümleyi telaffuz et"
-                                  disabled={!isTopCard}
-                                >
-                                  🔊
-                                </button>
+                            <button
+                              onClick={(e) => { 
+                                if (isTopCard) {
+                                  e.stopPropagation(); 
+                                  speakText(card.sampleSentenceTr, 'tr-TR');
+                                }
+                              }}
+                              className="audio-btn-inline"
+                              title="Cümleyi telaffuz et"
+                              disabled={!isTopCard}
+                            >
+                              🔊
+                            </button>
                               </div>
                             </div>
                           </div>
@@ -1633,21 +1626,21 @@ const Flashcards = () => {
               </div>
             </div>
           ) : (
-            <div className="stats-grid">
-              <div className="stat-card stat-correct">
-                <p className="stat-label">Known</p>
-                <p className="stat-value">{progressStats.known}</p>
-              </div>
+          <div className="stats-grid">
+            <div className="stat-card stat-correct">
+              <p className="stat-label">Known</p>
+              <p className="stat-value">{progressStats.known}</p>
+            </div>
 
-              <div className="stat-card stat-incorrect">
-                <p className="stat-label">Unknown</p>
-                <p className="stat-value">{progressStats.unknown}</p>
-              </div>
+            <div className="stat-card stat-incorrect">
+              <p className="stat-label">Unknown</p>
+              <p className="stat-value">{progressStats.unknown}</p>
+            </div>
 
-              <div className="stat-card stat-remaining">
-                <p className="stat-label">Remaining</p>
-                <p className="stat-value">{progressStats.remaining}</p>
-              </div>
+            <div className="stat-card stat-remaining">
+              <p className="stat-label">Remaining</p>
+              <p className="stat-value">{progressStats.remaining}</p>
+            </div>
             </div>
           )}
         </div>

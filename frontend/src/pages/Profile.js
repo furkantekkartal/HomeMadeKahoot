@@ -13,7 +13,6 @@ const Profile = () => {
   
   // Profile form
   const [username, setUsername] = useState('');
-  const [email, setEmail] = useState('');
   
   // Password form
   const [currentPassword, setCurrentPassword] = useState('');
@@ -32,7 +31,6 @@ const Profile = () => {
   useEffect(() => {
     if (user) {
       setUsername(user.username || '');
-      setEmail(user.email || '');
       setPreview(user.profilePictureUrl || null);
     }
   }, [user]);
@@ -43,7 +41,7 @@ const Profile = () => {
     setMessage({ type: '', text: '' });
 
     try {
-      const response = await authAPI.updateProfile({ username, email });
+      const response = await authAPI.updateProfile({ username });
       setUser(response.data);
       setMessage({ type: 'success', text: 'Profile updated successfully!' });
     } catch (error) {
@@ -257,15 +255,16 @@ const Profile = () => {
 
   return (
     <div className="profile-page">
-      <h1>My Profile</h1>
+      <div className="profile-header">
+        <h1>My Profile</h1>
+      </div>
 
+      <div className="profile-content">
       {message.text && (
         <div className={`message ${message.type}`}>
           {message.text}
         </div>
       )}
-
-      <div className="profile-content">
         {/* Profile Picture Section */}
         <div className="profile-section">
           <h2>Profile Picture</h2>
@@ -362,16 +361,6 @@ const Profile = () => {
                 required
                 minLength={3}
                 maxLength={20}
-                className="form-input"
-              />
-            </div>
-            <div className="form-group">
-              <label>Email</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
                 className="form-input"
               />
             </div>
