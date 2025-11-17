@@ -15,7 +15,7 @@ const CONSTANTS = {
   AUDIO_ANIMATION_DURATION: 500,
   SWIPE_RESET_DELAY: 100,
   DEFAULT_IMAGE_URL: 'https://img.freepik.com/free-vector/illustration-gallery-icon_53876-27002.jpg?semt=ais_hybrid&w=740&q=80',
-  WORDS_LIMIT: 1000
+  WORDS_LIMIT: 10000
 };
 
 const Flashcards = () => {
@@ -677,6 +677,7 @@ const Flashcards = () => {
         setShowKnownText(true);
         playSuccessSound();
         setTimeout(() => setShowKnownText(false), 300);
+        goToNextCard();
       }
     } else {
       triggerAnimation('unknown');
@@ -685,6 +686,7 @@ const Flashcards = () => {
         setShowUnknownText(true);
         playUnknownSound();
         setTimeout(() => setShowUnknownText(false), 300);
+        goToNextCard();
       }
     }
 
