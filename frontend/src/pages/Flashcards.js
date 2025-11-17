@@ -122,23 +122,14 @@ const Flashcards = () => {
 
     // Listen for any user interaction (click, touch, keydown)
     // This is required for speech synthesis to work due to browser autoplay policies
-    // Use capture phase and don't use once:true to catch all interactions
-    const options = { passive: true, capture: true };
-    window.addEventListener('click', handleUserInteraction, options);
-    window.addEventListener('touchstart', handleUserInteraction, options);
-    window.addEventListener('keydown', handleUserInteraction, options);
-    // Also listen on document to catch interactions anywhere
-    document.addEventListener('click', handleUserInteraction, options);
-    document.addEventListener('touchstart', handleUserInteraction, options);
-    document.addEventListener('keydown', handleUserInteraction, options);
+    window.addEventListener('click', handleUserInteraction, { once: true, passive: true });
+    window.addEventListener('touchstart', handleUserInteraction, { once: true, passive: true });
+    window.addEventListener('keydown', handleUserInteraction, { once: true, passive: true });
 
     return () => {
-      window.removeEventListener('click', handleUserInteraction, { capture: true });
-      window.removeEventListener('touchstart', handleUserInteraction, { capture: true });
-      window.removeEventListener('keydown', handleUserInteraction, { capture: true });
-      document.removeEventListener('click', handleUserInteraction, { capture: true });
-      document.removeEventListener('touchstart', handleUserInteraction, { capture: true });
-      document.removeEventListener('keydown', handleUserInteraction, { capture: true });
+      window.removeEventListener('click', handleUserInteraction);
+      window.removeEventListener('touchstart', handleUserInteraction);
+      window.removeEventListener('keydown', handleUserInteraction);
     };
   }, []);
 
@@ -683,40 +674,22 @@ const Flashcards = () => {
       triggerAnimation('known');
       // Show text animation overlay for known
       if (!showKnownText) {
-      setShowKnownText(true);
-      playSuccessSound();
-      setTimeout(() => setShowKnownText(false), 300);
+        setShowKnownText(true);
+        playSuccessSound();
+        setTimeout(() => setShowKnownText(false), 300);
       }
     } else {
       triggerAnimation('unknown');
       // Show text animation overlay for unknown
       if (!showUnknownText) {
-      setShowUnknownText(true);
-      playUnknownSound();
-      setTimeout(() => setShowUnknownText(false), 300);
+        setShowUnknownText(true);
+        playUnknownSound();
+        setTimeout(() => setShowUnknownText(false), 300);
       }
     }
 
-    // Automatically advance to next card after animation completes
-    // Wait for text overlay animation (300ms) + small buffer (50ms) = 350ms
-    setTimeout(() => {
-      if (cards.length > 0 && currentIndex < cards.length) {
-        // Check if we're not on the last card before advancing
-        if (currentIndex < cards.length - 1) {
-          goToNextCard();
-        } else {
-          // If on last card, show results instead
-          if (!showResults) {
-            setShowResults(true);
-            setTimerActive(false);
-          }
-        }
-      }
-    }, 350);
-
     try {
-      const wasKnown = targetCard.isKnown === true;
-      
+      // STEP 1: Mark as known/unknown (update status first)
       await wordAPI.toggleWordStatus(targetCard._id, isKnown);
       
       // Update local card state - this will trigger deckStats recalculation via useMemo
@@ -729,11 +702,24 @@ const Flashcards = () => {
         await flashcardAPI.updateLastStudied(currentDeck._id);
       }
       
-      // Reset flag after a delay to allow normal operation
-      // Reset earlier to ensure auto-read can work when card changes
+      // STEP 2: After status is updated, automatically advance to next card
+      // Wait for text overlay animation (300ms) + small buffer (50ms) = 350ms
       setTimeout(() => {
+        if (cards.length > 0 && currentIndex < cards.length) {
+          // Check if we're not on the last card before advancing
+          if (currentIndex < cards.length - 1) {
+            goToNextCard();
+          } else {
+            // If on last card, show results instead
+            if (!showResults) {
+              setShowResults(true);
+              setTimerActive(false);
+            }
+          }
+        }
+        // Reset flag after advancing to next card
         isUpdatingStatusRef.current = false;
-      }, 400); // Reduced from 500ms to ensure it's reset before auto-read (which happens at ~700ms: 350ms + 300ms + 50ms)
+      }, 350);
     } catch (error) {
       console.error('Failed to update card status:', error);
       // Reset flag on error
@@ -746,102 +732,49 @@ const Flashcards = () => {
   };
 
   const speakText = (text, lang = 'en-US', animationType = null) => {
-    if (!('speechSynthesis' in window)) {
-      // If speech synthesis is not available, still show animation for consistency
-      if (animationType) {
-        setAnimations(prev => ({ ...prev, [animationType]: true }));
-        setTimeout(() => setAnimations(prev => ({ ...prev, [animationType]: false })), CONSTANTS.AUDIO_ANIMATION_DURATION);
+    if ('speechSynthesis' in window) {
+      try {
+        // Trigger animation immediately for visual feedback
+        if (animationType) {
+          setAnimations(prev => ({ ...prev, [animationType]: true }));
+          setTimeout(() => setAnimations(prev => ({ ...prev, [animationType]: false })), CONSTANTS.AUDIO_ANIMATION_DURATION);
+        }
+        
+        // Cancel any ongoing speech before starting new one
+        speechSynthesis.cancel();
+        
+        // Small delay to ensure speech synthesis is ready after cancel
+        setTimeout(() => {
+          try {
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = lang;
+            utterance.rate = 0.9;
+            
+            utterance.onend = () => {
+              // Speech completed
+            };
+            
+            utterance.onerror = (error) => {
+              console.debug('Speech synthesis error:', error);
+            };
+            
+            speechSynthesis.speak(utterance);
+          } catch (error) {
+            console.debug('Error creating/speaking utterance:', error);
+          }
+        }, 50);
+      } catch (error) {
+        console.debug('Error in speakText:', error);
+        // Still trigger animation even if speech fails
+        if (animationType) {
+          setAnimations(prev => ({ ...prev, [animationType]: true }));
+          setTimeout(() => setAnimations(prev => ({ ...prev, [animationType]: false })), CONSTANTS.AUDIO_ANIMATION_DURATION);
+        }
       }
-      return;
-    }
-
-    // Trigger animation immediately for visual feedback
-    if (animationType) {
+    } else if (animationType) {
+      // If speech synthesis is not available, still show animation for consistency
       setAnimations(prev => ({ ...prev, [animationType]: true }));
       setTimeout(() => setAnimations(prev => ({ ...prev, [animationType]: false })), CONSTANTS.AUDIO_ANIMATION_DURATION);
-    }
-
-    try {
-      // Cancel any ongoing speech before starting new one
-      speechSynthesis.cancel();
-      
-      // Wait for speech synthesis to be ready and ensure voices are loaded
-      let retryCount = 0;
-      const maxRetries = 2;
-      const attemptSpeak = () => {
-        try {
-          // Check if speech synthesis is available
-          if (!speechSynthesis) {
-            return;
-          }
-
-          // If still speaking or pending, cancel and try again after a short delay
-          // But limit retries to avoid infinite loops
-          if ((speechSynthesis.speaking || speechSynthesis.pending) && retryCount < maxRetries) {
-            speechSynthesis.cancel();
-            retryCount++;
-            setTimeout(attemptSpeak, 150);
-            return;
-          }
-          
-          // Reset retry count for next attempt
-          retryCount = 0;
-
-          // Ensure voices are loaded (some browsers need this)
-          const voices = speechSynthesis.getVoices();
-          if (voices.length === 0) {
-            // Voices not loaded yet, wait for them
-            speechSynthesis.onvoiceschanged = () => {
-              speechSynthesis.onvoiceschanged = null; // Remove handler after use
-              attemptSpeak();
-            };
-            return;
-          }
-
-          const utterance = new SpeechSynthesisUtterance(text);
-          utterance.lang = lang;
-          utterance.rate = 0.9;
-          
-          // Add error handlers
-          utterance.onerror = (error) => {
-            console.debug('Speech synthesis error:', error);
-            // Try to recover - sometimes the queue gets stuck
-            if (error.error === 'not-allowed' || error.error === 'network') {
-              // These errors might be recoverable
-              console.debug('Speech synthesis error, will retry on next attempt');
-            }
-          };
-          
-          utterance.onstart = () => {
-            // Speech actually started
-            console.debug('Speech synthesis started');
-          };
-          
-          utterance.onend = () => {
-            // Speech completed
-            console.debug('Speech synthesis ended');
-          };
-          
-          // Actually speak
-          speechSynthesis.speak(utterance);
-          
-          // Verify it actually started (some browsers silently fail)
-          setTimeout(() => {
-            if (!speechSynthesis.speaking && !speechSynthesis.pending) {
-              // It didn't start, might be a browser issue
-              console.debug('Speech synthesis did not start, may be blocked by browser');
-            }
-          }, 100);
-        } catch (error) {
-          console.debug('Error creating/speaking utterance:', error);
-        }
-      };
-
-      // Small delay to ensure speech synthesis is ready after cancel
-      // This fixes issues where speak() doesn't work immediately after cancel()
-      setTimeout(attemptSpeak, 100); // Increased delay for better reliability
-    } catch (error) {
-      console.debug('Error in speakText:', error);
     }
   };
   
