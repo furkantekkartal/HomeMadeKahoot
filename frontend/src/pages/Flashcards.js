@@ -91,6 +91,7 @@ const Flashcards = () => {
   const cardDisplayStartTimeRef = useRef(null);
   const wasAutoPausedRef = useRef(false);
   const isUpdatingStatusRef = useRef(false);
+  const hasUserInteractedRef = useRef(false); // Track if user has interacted (required for speech synthesis autoplay policy)
 
   // Study timer
   const [timerActive, setTimerActive] = useState(true);
@@ -112,6 +113,25 @@ const Flashcards = () => {
   const audioRecorderRef = useRef(null);
   const recordingTypeRef = useRef(null); // Track which recording type is active
   const evaluationResultsRef = useRef(null); // Ref for speech evaluation results pane
+
+  // Track user interaction to enable speech synthesis (required by browser autoplay policies)
+  useEffect(() => {
+    const handleUserInteraction = () => {
+      hasUserInteractedRef.current = true;
+    };
+
+    // Listen for any user interaction (click, touch, keydown)
+    // This is required for speech synthesis to work due to browser autoplay policies
+    window.addEventListener('click', handleUserInteraction, { once: true, passive: true });
+    window.addEventListener('touchstart', handleUserInteraction, { once: true, passive: true });
+    window.addEventListener('keydown', handleUserInteraction, { once: true, passive: true });
+
+    return () => {
+      window.removeEventListener('click', handleUserInteraction);
+      window.removeEventListener('touchstart', handleUserInteraction);
+      window.removeEventListener('keydown', handleUserInteraction);
+    };
+  }, []);
 
   useEffect(() => {
     const initializeFlashcards = async () => {
@@ -222,11 +242,17 @@ const Flashcards = () => {
       return;
     }
     
+    // Only auto-read if user has interacted with the page (required by browser autoplay policies)
+    // This ensures speech synthesis works on remote deployments
+    if (!hasUserInteractedRef.current) {
+      return;
+    }
+    
     if (currentCard && currentCard.englishWord && !loading) {
       // Small delay to ensure card is fully loaded and speech synthesis is ready
       const timer = setTimeout(() => {
         // Double-check the flag in case it changed during the delay
-        if (!isUpdatingStatusRef.current) {
+        if (!isUpdatingStatusRef.current && hasUserInteractedRef.current) {
           speakText(currentCard.englishWord, 'en-US', 'audioWord');
         }
       }, 400); // Increased delay to ensure speech synthesis is ready
