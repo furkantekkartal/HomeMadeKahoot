@@ -236,18 +236,7 @@ const Flashcards = () => {
   const currentCard = cards.length > 0 && currentIndex < cards.length ? cards[currentIndex] : null;
 
   // Auto-read word when card changes (only when currentIndex changes, not when cards array updates)
-  useEffect(() => {
-    // Don't auto-read if we're in the middle of a status update
-    if (isUpdatingStatusRef.current) {
-      return;
-    }
-    
-    // Only auto-read if user has interacted with the page (required by browser autoplay policies)
-    // This ensures speech synthesis works on remote deployments
-    if (!hasUserInteractedRef.current) {
-      return;
-    }
-    
+  useEffect(() => {  
     if (currentCard && currentCard.englishWord && !loading) {
       // Small delay to ensure card is fully loaded and speech synthesis is ready
       const timer = setTimeout(() => {
