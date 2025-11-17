@@ -223,15 +223,18 @@ const Flashcards = () => {
     }
     
     if (currentCard && currentCard.englishWord && !loading) {
-      // Delay to ensure card is fully loaded and rendered (300ms card transition + 70ms buffer)
+      // Small delay to ensure card is fully loaded and speech synthesis is ready
       const timer = setTimeout(() => {
-        speakText(currentCard.englishWord, 'en-US', 'audioWord');
-      }, 500);
+        // Double-check the flag in case it changed during the delay
+        if (!isUpdatingStatusRef.current) {
+          speakText(currentCard.englishWord, 'en-US', 'audioWord');
+        }
+      }, 400); // Increased delay to ensure speech synthesis is ready
       return () => clearTimeout(timer);
     }
     // Only depend on currentIndex and loading - not cards array to avoid triggering on status updates
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentIndex, loading]);
+  }, [currentIndex, loading, currentCard?.englishWord]);
 
   // Track card display time and auto-pause timer after 60 seconds
   useEffect(() => {
@@ -692,9 +695,10 @@ const Flashcards = () => {
       }
       
       // Reset flag after a delay to allow normal operation
+      // Reset earlier to ensure auto-read can work when card changes
       setTimeout(() => {
         isUpdatingStatusRef.current = false;
-      }, 500);
+      }, 400); // Reduced from 500ms to ensure it's reset before auto-read (which happens at ~700ms: 350ms + 300ms + 50ms)
     } catch (error) {
       console.error('Failed to update card status:', error);
       // Reset flag on error
@@ -708,23 +712,50 @@ const Flashcards = () => {
 
   const speakText = (text, lang = 'en-US', animationType = null) => {
     if ('speechSynthesis' in window) {
-      // Cancel any ongoing speech before starting new one
-      speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = lang;
-      utterance.rate = 0.9;
-      
-      // Store utterance end time to help with timing
-      utterance.onend = () => {
-        // Speech completed
-      };
-      
-      speechSynthesis.speak(utterance);
-      
-      if (animationType) {
-        setAnimations(prev => ({ ...prev, [animationType]: true }));
-        setTimeout(() => setAnimations(prev => ({ ...prev, [animationType]: false })), CONSTANTS.AUDIO_ANIMATION_DURATION);
+      try {
+        // Trigger animation immediately for visual feedback
+        if (animationType) {
+          setAnimations(prev => ({ ...prev, [animationType]: true }));
+          setTimeout(() => setAnimations(prev => ({ ...prev, [animationType]: false })), CONSTANTS.AUDIO_ANIMATION_DURATION);
+        }
+        
+        // Cancel any ongoing speech before starting new one
+        speechSynthesis.cancel();
+        
+        // Small delay to ensure speech synthesis is ready after cancel
+        // This fixes issues where speak() doesn't work immediately after cancel()
+        setTimeout(() => {
+          try {
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = lang;
+            utterance.rate = 0.9;
+            
+            // Store utterance end time to help with timing
+            utterance.onend = () => {
+              // Speech completed
+            };
+            
+            utterance.onerror = (error) => {
+              console.debug('Speech synthesis error:', error);
+            };
+            
+            speechSynthesis.speak(utterance);
+          } catch (error) {
+            console.debug('Error creating/speaking utterance:', error);
+          }
+        }, 50); // Small delay to ensure speech synthesis is ready
+      } catch (error) {
+        console.debug('Error in speakText:', error);
+        // Still trigger animation even if speech fails
+        if (animationType) {
+          setAnimations(prev => ({ ...prev, [animationType]: true }));
+          setTimeout(() => setAnimations(prev => ({ ...prev, [animationType]: false })), CONSTANTS.AUDIO_ANIMATION_DURATION);
+        }
       }
+    } else if (animationType) {
+      // If speech synthesis is not available, still show animation for consistency
+      setAnimations(prev => ({ ...prev, [animationType]: true }));
+      setTimeout(() => setAnimations(prev => ({ ...prev, [animationType]: false })), CONSTANTS.AUDIO_ANIMATION_DURATION);
     }
   };
   
