@@ -226,7 +226,7 @@ const Flashcards = () => {
       // Delay to ensure card is fully loaded and rendered (300ms card transition + 70ms buffer)
       const timer = setTimeout(() => {
         speakText(currentCard.englishWord, 'en-US', 'audioWord');
-      }, 370);
+      }, 500);
       return () => clearTimeout(timer);
     }
     // Only depend on currentIndex and loading - not cards array to avoid triggering on status updates
