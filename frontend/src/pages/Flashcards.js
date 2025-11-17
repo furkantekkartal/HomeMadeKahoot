@@ -677,6 +677,7 @@ const Flashcards = () => {
         setShowKnownText(true);
         playSuccessSound();
         setTimeout(() => setShowKnownText(false), 300);
+        goToNextCard();
       }
     } else {
       triggerAnimation('unknown');
@@ -685,6 +686,7 @@ const Flashcards = () => {
         setShowUnknownText(true);
         playUnknownSound();
         setTimeout(() => setShowUnknownText(false), 300);
+        goToNextCard();
       }
     }
 
