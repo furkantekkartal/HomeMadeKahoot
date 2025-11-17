@@ -122,14 +122,23 @@ const Flashcards = () => {
 
     // Listen for any user interaction (click, touch, keydown)
     // This is required for speech synthesis to work due to browser autoplay policies
-    window.addEventListener('click', handleUserInteraction, { once: true, passive: true });
-    window.addEventListener('touchstart', handleUserInteraction, { once: true, passive: true });
-    window.addEventListener('keydown', handleUserInteraction, { once: true, passive: true });
+    // Use capture phase and don't use once:true to catch all interactions
+    const options = { passive: true, capture: true };
+    window.addEventListener('click', handleUserInteraction, options);
+    window.addEventListener('touchstart', handleUserInteraction, options);
+    window.addEventListener('keydown', handleUserInteraction, options);
+    // Also listen on document to catch interactions anywhere
+    document.addEventListener('click', handleUserInteraction, options);
+    document.addEventListener('touchstart', handleUserInteraction, options);
+    document.addEventListener('keydown', handleUserInteraction, options);
 
     return () => {
-      window.removeEventListener('click', handleUserInteraction);
-      window.removeEventListener('touchstart', handleUserInteraction);
-      window.removeEventListener('keydown', handleUserInteraction);
+      window.removeEventListener('click', handleUserInteraction, { capture: true });
+      window.removeEventListener('touchstart', handleUserInteraction, { capture: true });
+      window.removeEventListener('keydown', handleUserInteraction, { capture: true });
+      document.removeEventListener('click', handleUserInteraction, { capture: true });
+      document.removeEventListener('touchstart', handleUserInteraction, { capture: true });
+      document.removeEventListener('keydown', handleUserInteraction, { capture: true });
     };
   }, []);
 
@@ -737,51 +746,102 @@ const Flashcards = () => {
   };
 
   const speakText = (text, lang = 'en-US', animationType = null) => {
-    if ('speechSynthesis' in window) {
-      try {
-        // Trigger animation immediately for visual feedback
-        if (animationType) {
-          setAnimations(prev => ({ ...prev, [animationType]: true }));
-          setTimeout(() => setAnimations(prev => ({ ...prev, [animationType]: false })), CONSTANTS.AUDIO_ANIMATION_DURATION);
-        }
-        
-        // Cancel any ongoing speech before starting new one
-        speechSynthesis.cancel();
-        
-        // Small delay to ensure speech synthesis is ready after cancel
-        // This fixes issues where speak() doesn't work immediately after cancel()
-        setTimeout(() => {
-          try {
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = lang;
-            utterance.rate = 0.9;
-            
-            // Store utterance end time to help with timing
-            utterance.onend = () => {
-              // Speech completed
-            };
-            
-            utterance.onerror = (error) => {
-              console.debug('Speech synthesis error:', error);
-            };
-            
-            speechSynthesis.speak(utterance);
-          } catch (error) {
-            console.debug('Error creating/speaking utterance:', error);
-          }
-        }, 50); // Small delay to ensure speech synthesis is ready
-      } catch (error) {
-        console.debug('Error in speakText:', error);
-        // Still trigger animation even if speech fails
-        if (animationType) {
-          setAnimations(prev => ({ ...prev, [animationType]: true }));
-          setTimeout(() => setAnimations(prev => ({ ...prev, [animationType]: false })), CONSTANTS.AUDIO_ANIMATION_DURATION);
-        }
-      }
-    } else if (animationType) {
+    if (!('speechSynthesis' in window)) {
       // If speech synthesis is not available, still show animation for consistency
+      if (animationType) {
+        setAnimations(prev => ({ ...prev, [animationType]: true }));
+        setTimeout(() => setAnimations(prev => ({ ...prev, [animationType]: false })), CONSTANTS.AUDIO_ANIMATION_DURATION);
+      }
+      return;
+    }
+
+    // Trigger animation immediately for visual feedback
+    if (animationType) {
       setAnimations(prev => ({ ...prev, [animationType]: true }));
       setTimeout(() => setAnimations(prev => ({ ...prev, [animationType]: false })), CONSTANTS.AUDIO_ANIMATION_DURATION);
+    }
+
+    try {
+      // Cancel any ongoing speech before starting new one
+      speechSynthesis.cancel();
+      
+      // Wait for speech synthesis to be ready and ensure voices are loaded
+      let retryCount = 0;
+      const maxRetries = 2;
+      const attemptSpeak = () => {
+        try {
+          // Check if speech synthesis is available
+          if (!speechSynthesis) {
+            return;
+          }
+
+          // If still speaking or pending, cancel and try again after a short delay
+          // But limit retries to avoid infinite loops
+          if ((speechSynthesis.speaking || speechSynthesis.pending) && retryCount < maxRetries) {
+            speechSynthesis.cancel();
+            retryCount++;
+            setTimeout(attemptSpeak, 150);
+            return;
+          }
+          
+          // Reset retry count for next attempt
+          retryCount = 0;
+
+          // Ensure voices are loaded (some browsers need this)
+          const voices = speechSynthesis.getVoices();
+          if (voices.length === 0) {
+            // Voices not loaded yet, wait for them
+            speechSynthesis.onvoiceschanged = () => {
+              speechSynthesis.onvoiceschanged = null; // Remove handler after use
+              attemptSpeak();
+            };
+            return;
+          }
+
+          const utterance = new SpeechSynthesisUtterance(text);
+          utterance.lang = lang;
+          utterance.rate = 0.9;
+          
+          // Add error handlers
+          utterance.onerror = (error) => {
+            console.debug('Speech synthesis error:', error);
+            // Try to recover - sometimes the queue gets stuck
+            if (error.error === 'not-allowed' || error.error === 'network') {
+              // These errors might be recoverable
+              console.debug('Speech synthesis error, will retry on next attempt');
+            }
+          };
+          
+          utterance.onstart = () => {
+            // Speech actually started
+            console.debug('Speech synthesis started');
+          };
+          
+          utterance.onend = () => {
+            // Speech completed
+            console.debug('Speech synthesis ended');
+          };
+          
+          // Actually speak
+          speechSynthesis.speak(utterance);
+          
+          // Verify it actually started (some browsers silently fail)
+          setTimeout(() => {
+            if (!speechSynthesis.speaking && !speechSynthesis.pending) {
+              // It didn't start, might be a browser issue
+              console.debug('Speech synthesis did not start, may be blocked by browser');
+            }
+          }, 100);
+        } catch (error) {
+          console.debug('Error creating/speaking utterance:', error);
+        }
+      };
+
+      // Small delay to ensure speech synthesis is ready after cancel
+      // This fixes issues where speak() doesn't work immediately after cancel()
+      setTimeout(attemptSpeak, 100); // Increased delay for better reliability
+    } catch (error) {
+      console.debug('Error in speakText:', error);
     }
   };
   
