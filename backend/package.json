@@ -14,7 +14,9 @@
     "reset-prod-db": "node scripts/resetProductionDatabase.js",
     "reset-game-performance": "node scripts/resetGamePerformance.js",
     "generate-all-images": "node scripts/generateAllWordImages.js",
-    "reset-and-import": "node scripts/resetAndImportDatabase.js"
+    "reset-and-import": "node scripts/resetAndImportDatabase.js",
+    "sync-images-to-prod": "node scripts/syncImagesToProduction.js",
+    "clone-dev-to-prod": "node scripts/cloneDevToProduction.js"
   },
   "keywords": [
     "quiz",
