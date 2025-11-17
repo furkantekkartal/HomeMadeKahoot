@@ -1072,75 +1072,188 @@
 /* Responsive */
 @media (max-width: 768px) {
   .performance-container {
-    padding: 1rem;
+    padding: 0.5rem;
   }
 
   .performance-header {
     flex-direction: column;
     align-items: flex-start;
+    padding: 1rem;
+    gap: 0.75rem;
   }
 
   .performance-header h1 {
-    font-size: 1.75rem;
+    font-size: 1.5rem;
+    width: 100%;
   }
 
-  .summary-cards {
-    grid-template-columns: 1fr;
+  .performance-content-wrapper {
+    flex-direction: column;
+  }
+
+  .performance-sidebar {
+    width: 100%;
+    border-left: none;
+    border-top: 2px solid #e2e8f0;
+    padding: 1rem;
+  }
+
+  .summary-cards-simple {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+  }
+
+  .summary-card-simple {
+    padding: 1rem 0.75rem;
+  }
+
+  .summary-card-simple .card-icon {
+    font-size: 1.5rem;
+    width: 40px;
+    height: 40px;
+  }
+
+  .summary-card-simple .card-value {
+    font-size: 1.25rem;
+  }
+
+  .summary-card-simple .card-label {
+    font-size: 0.7rem;
   }
 
   .filters-panel {
-    padding: 1.5rem;
+    padding: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .filters-panel h2 {
+    font-size: 1.1rem;
+    margin-bottom: 0.75rem;
   }
 
   .filters-grid {
     grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .filter-group {
+    margin-bottom: 0;
+  }
+
+  .filter-group label {
+    font-size: 0.85rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .filter-group input,
+  .filter-group select {
+    padding: 0.6rem;
+    font-size: 0.9rem;
   }
 
   .performance-table-container {
-    padding: 1rem;
+    padding: 0.5rem;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .performance-table {
-    font-size: 0.85rem;
+    font-size: 0.75rem;
+    min-width: 600px;
   }
 
-.performance-table th.group-separator,
-.performance-table td.group-separator {
-  border-left: 2px solid rgba(102, 126, 234, 0.3);
-  padding-left: 1.5rem;
-}
+  .performance-table th.group-separator,
+  .performance-table td.group-separator {
+    border-left: 2px solid rgba(102, 126, 234, 0.3);
+    padding-left: 1rem;
+  }
 
-/* Stacked cell for count and score */
-.stacked-cell {
-  padding: 0.75rem 1rem;
-  vertical-align: middle;
-}
+  .performance-table th,
+  .performance-table td {
+    padding: 0.5rem 0.35rem;
+  }
 
-.stacked-top {
-  font-size: 1rem;
-  font-weight: 600;
-  color: #4a5568;
-  line-height: 1.2;
-  margin-bottom: 0.2rem;
-}
+  .stacked-cell {
+    padding: 0.5rem 0.75rem;
+  }
 
-.stacked-bottom {
-  font-size: 0.9rem;
-  line-height: 1.2;
-}
+  .stacked-top {
+    font-size: 0.9rem;
+    margin-bottom: 0.15rem;
+  }
 
-.performance-table th,
-.performance-table td {
-  padding: 0.75rem 0.5rem;
+  .stacked-bottom {
+    font-size: 0.8rem;
   }
 
   .session-header {
     flex-direction: column;
     align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .session-header h4 {
+    font-size: 1rem;
+    min-width: auto;
   }
 
   .session-stats {
     grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .session-stats .stat {
+    padding: 0.6rem;
+  }
+
+  .quiz-performance-container,
+  .game-stats-container,
+  .pronunciation-stats-container {
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+  }
+
+  .quiz-performance-container h2,
+  .game-stats-container h2,
+  .pronunciation-stats-container h2 {
+    font-size: 1.25rem;
+    margin-bottom: 1rem;
+  }
+
+  .game-stats-table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .game-stats-table {
+    min-width: 500px;
+    font-size: 0.75rem;
+  }
+
+  .pronunciation-type-section {
+    padding: 1rem;
+  }
+
+  .pronunciation-summary {
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 0.75rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .summary-cards-simple {
+    grid-template-columns: 1fr;
+  }
+
+  .performance-table {
+    font-size: 0.7rem;
+  }
+
+  .performance-table th,
+  .performance-table td {
+    padding: 0.4rem 0.25rem;
   }
 }
 

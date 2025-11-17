@@ -95,13 +95,47 @@ const getDatabaseURI = () => {
 
 /**
  * Get Unsplash key number and position within key's range for a word index
+ * 
+ * Range logic:
+ * - Each key processes 50 words per hour
+ * - Hour 0: Key1: 1-50, Key2: 51-100, Key3: 101-150, Key4: 151-200, Key5: 201-250
+ * - Hour 1: Key1: 251-300, Key2: 301-350, Key3: 351-400, Key4: 401-450, Key5: 451-500
+ * - Hour 2: Key1: 501-550, Key2: 551-600, Key3: 601-650, Key4: 651-700, Key5: 701-750
+ * - And so on, incrementing by 250 per hour
  */
 function getKeyInfo(wordIndex) {
-  const WORDS_PER_KEY = 2600;
-  const keyIndex = Math.floor(wordIndex / WORDS_PER_KEY);
-  const keyNumber = keyIndex + 1; // 1-based for display
-  const positionInKey = (wordIndex % WORDS_PER_KEY) + 1; // 1-based position within key's range
-  return { keyNumber, positionInKey };
+  const WORDS_PER_KEY_PER_HOUR = 50; // Each key processes 50 words per hour
+  const WORDS_PER_HOUR = 250; // Total words per hour (5 keys × 50 words)
+  
+  // Convert to 1-based for calculations
+  const wordId = wordIndex + 1;
+  
+  // Determine which hour this word belongs to (0-based)
+  const hour = Math.floor((wordId - 1) / WORDS_PER_HOUR);
+  
+  // Determine position within the hour (0-249)
+  const positionInHour = (wordId - 1) % WORDS_PER_HOUR;
+  
+  // Determine which key within this hour (0-based, 0-4)
+  const keyIndex = Math.floor(positionInHour / WORDS_PER_KEY_PER_HOUR);
+  
+  // Key number is 1-based for display
+  const keyNumber = keyIndex + 1;
+  
+  // Calculate the range for this key in this hour
+  const rangeStart = hour * WORDS_PER_HOUR + keyIndex * WORDS_PER_KEY_PER_HOUR + 1;
+  const rangeEnd = hour * WORDS_PER_HOUR + (keyIndex + 1) * WORDS_PER_KEY_PER_HOUR;
+  
+  // Position within key's range (1-based)
+  const positionInKey = (wordId - rangeStart) + 1;
+  
+  return { 
+    keyNumber, 
+    positionInKey,
+    rangeStart,
+    rangeEnd,
+    hour: hour + 1 // 1-based hour for display
+  };
 }
 
 /**
@@ -269,14 +303,10 @@ async function generateAllWordImages() {
       
       for (let i = 0; i < wordsForKey.length; i++) {
         const { word, wordIndex } = wordsForKey[i];
-        // Calculate the range for this key (1-based wordIndex)
-        const WORDS_PER_KEY = 2600;
+        // Get key info with range information
+        const keyInfo = getKeyInfo(wordIndex);
         const actualWordIndex = wordIndex + 1; // Convert to 1-based for display
-        const keyStart = (keyNumber - 1) * WORDS_PER_KEY + 1;
-        const keyEnd = keyNumber * WORDS_PER_KEY;
-        // For the last key, use total words count instead of calculated end
-        const maxIndex = (keyNumber === UNSPLASH_KEY_COUNT) ? totalWordsCount : keyEnd;
-        const progress = `${actualWordIndex} / ${maxIndex}`; // Show actual word index and max for this key
+        const progress = `${actualWordIndex} / ${keyInfo.rangeEnd} (Range: ${keyInfo.rangeStart}-${keyInfo.rangeEnd}, Hour ${keyInfo.hour})`;
         
         try {
           // Generate image using Unsplash service

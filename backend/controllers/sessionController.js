@@ -127,13 +127,45 @@ exports.getMyPerformance = async (req, res) => {
   try {
     const { studentName, quizName, level, skill, task, dateFrom, dateTo } = req.query;
     
+    // Get User model
+    const User = require('../models/User');
+    
+    // Step 1: Get ALL registered users from User collection
+    let allUsers = await User.find({}).select('username _id');
+    
+    // Step 2: Get ALL unique usernames from StudentResult (who joined quizzes by username)
+    const allStudentResultUsernames = await StudentResult.distinct('username');
+    
+    // Step 3: Combine all usernames (registered users + quiz attendees)
+    const allUsernamesSet = new Set();
+    
+    // Add all registered user usernames
+    allUsers.forEach(user => {
+      if (user.username) {
+        allUsernamesSet.add(user.username);
+      }
+    });
+    
+    // Add all usernames from StudentResult (who joined quizzes)
+    allStudentResultUsernames.forEach(username => {
+      if (username) {
+        allUsernamesSet.add(username);
+      }
+    });
+    
+    // Step 4: Apply student name filter if provided
+    let filteredUsernames = Array.from(allUsernamesSet);
+    if (studentName && studentName.trim() !== '') {
+      const searchTerm = studentName.trim().toLowerCase();
+      filteredUsernames = filteredUsernames.filter(username => 
+        username.toLowerCase().includes(searchTerm)
+      );
+    }
+    
     // Build query for StudentResult (all students, not filtered by user)
     const studentResultQuery = {};
 
-    // Apply filters to StudentResult query
-    if (studentName && studentName.trim() !== '') {
-      studentResultQuery.username = { $regex: studentName.trim(), $options: 'i' };
-    }
+    // Apply filters to StudentResult query (but don't filter by username here - we'll filter results later)
     // Handle quiz name filter - also search deck names
     let matchingDeckIds = [];
     if (quizName && quizName.trim() !== '') {
@@ -202,38 +234,17 @@ exports.getMyPerformance = async (req, res) => {
       .populate('userId', 'username')
       .sort({ completedAt: -1 });
 
-    // Get User model to map userIds to usernames
-    const User = require('../models/User');
+    // Create map of userId to username for all registered users
     const userIdToUsername = new Map();
-    const allUserIds = new Set();
-    
-    // Collect all user IDs
-    studentResults.forEach(result => {
-      if (result.userId) {
-        const userId = result.userId._id ? result.userId._id.toString() : result.userId.toString();
-        if (userId) allUserIds.add(userId);
-      }
+    allUsers.forEach(user => {
+      userIdToUsername.set(user._id.toString(), user.username);
     });
-    loggedInResults.forEach(result => {
-      if (result.userId) {
-        const userId = result.userId._id ? result.userId._id.toString() : result.userId.toString();
-        if (userId) allUserIds.add(userId);
-      }
-    });
-
-    // Fetch all users to get usernames
-    if (allUserIds.size > 0) {
-      const userIdArray = Array.from(allUserIds).map(id => {
-        return mongoose.Types.ObjectId.isValid(id) ? new mongoose.Types.ObjectId(id) : id;
-      });
-      const users = await User.find({ _id: { $in: userIdArray } });
-      users.forEach(user => {
-        userIdToUsername.set(user._id.toString(), user.username);
-      });
-    }
 
     // Combine and normalize results
     const allResults = [];
+    
+    // Create a Set for fast lookup of filtered usernames
+    const filteredUsernamesSet = new Set(filteredUsernames);
     
     // Add StudentResult entries
     studentResults.forEach(result => {
@@ -242,6 +253,11 @@ exports.getMyPerformance = async (req, res) => {
       if (!username && result.userId) {
         const userId = result.userId._id ? result.userId._id.toString() : result.userId.toString();
         username = userIdToUsername.get(userId) || 'Unknown';
+      }
+      
+      // Only include results for filtered usernames
+      if (!filteredUsernamesSet.has(username)) {
+        return;
       }
       
       allResults.push({
@@ -290,11 +306,9 @@ exports.getMyPerformance = async (req, res) => {
       if (task && task.trim() !== '' && quiz.task !== task.trim()) {
         return;
       }
-      // Check student name filter
-      if (studentName && studentName.trim() !== '') {
-        if (!username.toLowerCase().includes(studentName.toLowerCase().trim())) {
-          return;
-        }
+      // Only include results for filtered usernames
+      if (!filteredUsernamesSet.has(username)) {
+        return;
       }
 
       const totalQuestions = result.totalQuestions || 0;
@@ -319,23 +333,30 @@ exports.getMyPerformance = async (req, res) => {
       });
     });
 
-    // Aggregate by student name
+    // Initialize student map with ALL filtered usernames (including those with no results)
     const studentMap = new Map();
+    
+    // Initialize all students with zero stats
+    filteredUsernames.forEach(username => {
+      studentMap.set(username, {
+        studentName: username,
+        totalQuizzes: new Set(),
+        totalSessions: 0,
+        totalQuestions: 0,
+        totalPoints: 0,
+        totalCorrect: 0,
+        totalWrong: 0,
+        sessions: []
+      });
+    });
 
+    // Now populate with actual results
     allResults.forEach(result => {
       const studentKey = result.studentName;
       
+      // Only process results for filtered usernames
       if (!studentMap.has(studentKey)) {
-        studentMap.set(studentKey, {
-          studentName: studentKey,
-          totalQuizzes: new Set(),
-          totalSessions: 0,
-          totalQuestions: 0,
-          totalPoints: 0,
-          totalCorrect: 0,
-          totalWrong: 0,
-          sessions: []
-        });
+        return;
       }
 
       const student = studentMap.get(studentKey);

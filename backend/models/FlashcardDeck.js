@@ -35,7 +35,7 @@ const flashcardDeckSchema = new mongoose.Schema({
   deckType: {
     type: String,
     enum: ['static', 'dynamic'],
-    default: 'static'
+    default: 'dynamic'
   },
   wordIds: [{
     type: mongoose.Schema.Types.ObjectId,

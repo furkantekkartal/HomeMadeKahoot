@@ -9,7 +9,10 @@ const GOOGLE_DAILY_LIMIT = parseInt(process.env.GOOGLE_DAILY_LIMIT) || 100; // D
 const UNSPLASH_ACCESS_KEY = process.env.UNSPLASH_ACCESS_KEY || process.env.UNSPLASH_API_KEY;
 
 // Multiple Unsplash API keys for parallel processing
-// Split 13,000 words across 5 keys: 0-2600, 2601-5200, 5201-7800, 7801-10400, 10401+
+// New range logic: Each key processes 50 words per hour, ranges increment by 250 per hour
+// Hour 0: Key1: 1-50, Key2: 51-100, Key3: 101-150, Key4: 151-200, Key5: 201-250
+// Hour 1: Key1: 251-300, Key2: 301-350, Key3: 351-400, Key4: 401-450, Key5: 451-500
+// And so on...
 const UNSPLASH_KEYS = [
   process.env.UNSPLASH_ACCESS_KEY_1 || process.env.UNSPLASH_ACCESS_KEY,
   process.env.UNSPLASH_ACCESS_KEY_2,
@@ -17,8 +20,6 @@ const UNSPLASH_KEYS = [
   process.env.UNSPLASH_ACCESS_KEY_4,
   process.env.UNSPLASH_ACCESS_KEY_5
 ].filter(key => key); // Remove undefined keys
-
-const WORDS_PER_KEY = 2600; // Split words evenly across keys
 
 // Path to store daily usage counter
 const USAGE_FILE_PATH = path.join(__dirname, '../data/google_search_usage.json');
@@ -283,6 +284,14 @@ async function fetchImageFromGoogle(query, page = null, fallbackQueries = []) {
 
 /**
  * Get Unsplash API key based on word index for load balancing
+ * 
+ * Range logic:
+ * - Each key processes 50 words per hour
+ * - Hour 0: Key1: 1-50, Key2: 51-100, Key3: 101-150, Key4: 151-200, Key5: 201-250
+ * - Hour 1: Key1: 251-300, Key2: 301-350, Key3: 351-400, Key4: 401-450, Key5: 451-500
+ * - Hour 2: Key1: 501-550, Key2: 551-600, Key3: 601-650, Key4: 651-700, Key5: 701-750
+ * - And so on, incrementing by 250 per hour
+ * 
  * @param {number} wordIndex - Index of the word (0-based)
  * @returns {string} - Unsplash API key to use
  */
@@ -296,9 +305,22 @@ function getUnsplashKeyForWord(wordIndex) {
     return UNSPLASH_KEYS[0];
   }
   
-  // Distribute words across keys based on index
-  // Key 1: words 0-2599, Key 2: 2600-5199, Key 3: 5200-7799, Key 4: 7800-10399, Key 5: 10400+
-  const keyIndex = Math.floor(wordIndex / WORDS_PER_KEY);
+  // New range logic: 50 words per key per hour, incrementing by 250 per hour
+  const WORDS_PER_KEY_PER_HOUR = 50; // Each key processes 50 words per hour
+  const WORDS_PER_HOUR = 250; // Total words per hour (5 keys × 50 words)
+  
+  // Convert to 1-based for calculations
+  const wordId = wordIndex + 1;
+  
+  // Determine which hour this word belongs to (0-based)
+  const hour = Math.floor((wordId - 1) / WORDS_PER_HOUR);
+  
+  // Determine position within the hour (0-249)
+  const positionInHour = (wordId - 1) % WORDS_PER_HOUR;
+  
+  // Determine which key within this hour (0-based, 0-4)
+  const keyIndex = Math.floor(positionInHour / WORDS_PER_KEY_PER_HOUR);
+  
   // Ensure we don't exceed available keys (cap at last key)
   const cappedKeyIndex = Math.min(keyIndex, UNSPLASH_KEYS.length - 1);
   const selectedKey = UNSPLASH_KEYS[cappedKeyIndex];

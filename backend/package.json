@@ -13,7 +13,8 @@
     "migrate-to-prod": "node scripts/migrateDataToProduction.js",
     "reset-prod-db": "node scripts/resetProductionDatabase.js",
     "reset-game-performance": "node scripts/resetGamePerformance.js",
-    "generate-all-images": "node scripts/generateAllWordImages.js"
+    "generate-all-images": "node scripts/generateAllWordImages.js",
+    "reset-and-import": "node scripts/resetAndImportDatabase.js"
   },
   "keywords": [
     "quiz",

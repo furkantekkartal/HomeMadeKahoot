@@ -18,7 +18,7 @@ const CreateDeck = () => {
   const [level, setLevel] = useState('');
   const [skill, setSkill] = useState('');
   const [task, setTask] = useState('');
-  const [deckType, setDeckType] = useState('static');
+  const [deckType, setDeckType] = useState('dynamic');
   const [questionNumber, setQuestionNumber] = useState(20);
   const [creating, setCreating] = useState(false);
   const [filters, setFilters] = useState({
