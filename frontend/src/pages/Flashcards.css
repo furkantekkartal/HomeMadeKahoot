@@ -187,12 +187,12 @@
 /* Card Stack Container */
 .card-stack-container {
   position: relative;
-  width: 384px; /* 20% smaller than image (480px * 0.8 = 384px) */
-  max-width: 384px;
-  min-width: 384px;
-  height: 240px; /* 20% smaller than image (300px * 0.8 = 240px) */
-  max-height: 240px;
-  min-height: 240px;
+  width: 480px; /* Same width as image */
+  max-width: 480px;
+  min-width: 480px;
+  height: 200px; /* Narrower height */
+  max-height: 200px;
+  min-height: 200px;
   margin-left: auto;
   margin-right: auto;
   margin-bottom: 0.75rem;
@@ -404,12 +404,12 @@
 }
 
 .flashcard {
-  width: 384px; /* 20% smaller than image (480px * 0.8 = 384px) */
-  max-width: 384px;
-  min-width: 384px;
-  height: 240px; /* 20% smaller than image (300px * 0.8 = 240px) */
-  max-height: 240px;
-  min-height: 240px;
+  width: 480px; /* Same width as image */
+  max-width: 480px;
+  min-width: 480px;
+  height: 200px; /* Narrower height */
+  max-height: 200px;
+  min-height: 200px;
   perspective: 1000px;
   cursor: pointer;
   margin-bottom: 0.75rem;
@@ -612,8 +612,8 @@
   flex-wrap: nowrap !important;
   justify-content: center;
   align-items: center;
-  width: 384px; /* Match card width */
-  max-width: 384px;
+  width: 480px; /* Match card width */
+  max-width: 480px;
   margin-left: auto;
   margin-right: auto;
 }
@@ -1193,8 +1193,8 @@
   }
 
   .card-stack-container {
-    width: 80%; /* 20% smaller than container */
-    max-width: 384px;
+    width: 100%; /* Match image width */
+    max-width: 100%;
     min-width: 0;
     height: auto;
     aspect-ratio: 480 / 300;
@@ -1249,8 +1249,8 @@
   }
 
   .flashcard {
-    width: 80% !important; /* 20% smaller than container */
-    max-width: 384px !important;
+    width: 100% !important; /* Match image width */
+    max-width: 100% !important;
     min-width: 0 !important;
     height: auto !important;
     aspect-ratio: 480 / 300 !important;
@@ -1289,8 +1289,8 @@
     flex-direction: row;
     flex-wrap: nowrap;
     gap: 0.5rem;
-    width: 80%; /* Match card width */
-    max-width: 384px;
+    width: 100%; /* Match card width */
+    max-width: 100%;
     padding: 0 0.5rem;
     justify-content: center;
     align-items: center;
@@ -1466,8 +1466,8 @@
   }
 
   .card-stack-container {
-    width: 80% !important; /* 20% smaller than container */
-    max-width: 384px !important;
+    width: 100% !important; /* Match image width */
+    max-width: 100% !important;
     min-width: 0 !important;
     height: auto !important;
     aspect-ratio: 480 / 300 !important;
@@ -1498,8 +1498,8 @@
   }
 
   .flashcard {
-    width: 80% !important; /* 20% smaller than container */
-    max-width: 384px !important;
+    width: 100% !important; /* Match image width */
+    max-width: 100% !important;
     min-width: 0 !important;
     height: auto !important;
     aspect-ratio: 480 / 300 !important;
@@ -1509,8 +1509,8 @@
   }
 
   .card-navigation {
-    width: 80% !important; /* Match card width */
-    max-width: 384px !important;
+    width: 100% !important; /* Match card width */
+    max-width: 100% !important;
     margin: 0 auto !important;
   }
 

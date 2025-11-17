@@ -24,7 +24,7 @@ const Flashcards = () => {
   // Deck state
   const [decks, setDecks] = useState([]);
   const [currentDeck, setCurrentDeck] = useState(null);
-  const [deckStats, setDeckStats] = useState({ totalWords: 0, masteredWords: 0, remainingWords: 0 });
+  const [deckTotalWords, setDeckTotalWords] = useState(0); // Store only total from backend
 
   // Card state
   const [cards, setCards] = useState([]);
@@ -84,6 +84,8 @@ const Flashcards = () => {
   const [touchEnd, setTouchEnd] = useState({ x: null, y: null });
   const swipeDetectedRef = useRef(false);
   const isUpdatingDeckTypeRef = useRef(false);
+  const isEdgeTouchRef = useRef(false); // Track if touch started in edge area
+  const cardElementRef = useRef(null); // Reference to the card element
 
   // Auto-pause timer state
   const cardDisplayStartTimeRef = useRef(null);
@@ -359,19 +361,13 @@ const Flashcards = () => {
       setCards(response.data.words || []);
       setCurrentIndex(0);
       setIsFlipped(false);
-      // Store deck statistics
+      // Store deck total words (mastered and remaining will be calculated dynamically)
       if (response.data.stats) {
-        setDeckStats({
-          totalWords: response.data.stats.totalWords || 0,
-          masteredWords: response.data.stats.masteredWords || 0,
-          remainingWords: response.data.stats.remainingWords || 0
-        });
+        setDeckTotalWords(response.data.stats.totalWords || 0);
       } else {
-        // Fallback: calculate from cards
+        // Fallback: use wordIds length or words length
         const total = response.data.wordIds?.length || response.data.words?.length || 0;
-        const mastered = response.data.words?.filter(w => w.isKnown === true).length || 0;
-        const remaining = response.data.words?.length || 0;
-        setDeckStats({ totalWords: total, masteredWords: mastered, remainingWords: remaining });
+        setDeckTotalWords(total);
       }
       // Update currentDeck with deckType if available and different (prevent infinite loop)
       if (response.data.deckType && currentDeck && currentDeck.deckType !== response.data.deckType) {
@@ -386,7 +382,7 @@ const Flashcards = () => {
     } catch (error) {
       console.error('Failed to load deck cards:', error);
       setCards([]);
-      setDeckStats({ totalWords: 0, masteredWords: 0, remainingWords: 0 });
+      setDeckTotalWords(0);
     } finally {
       setLoading(false);
     }
@@ -663,12 +659,29 @@ const Flashcards = () => {
       }
     }
 
+    // Automatically advance to next card after animation completes
+    // Wait for text overlay animation (300ms) + small buffer (50ms) = 350ms
+    setTimeout(() => {
+      if (cards.length > 0 && currentIndex < cards.length) {
+        // Check if we're not on the last card before advancing
+        if (currentIndex < cards.length - 1) {
+          goToNextCard();
+        } else {
+          // If on last card, show results instead
+          if (!showResults) {
+            setShowResults(true);
+            setTimerActive(false);
+          }
+        }
+      }
+    }, 350);
+
     try {
       const wasKnown = targetCard.isKnown === true;
       
       await wordAPI.toggleWordStatus(targetCard._id, isKnown);
       
-      // Update local card state
+      // Update local card state - this will trigger deckStats recalculation via useMemo
       setCards(prevCards => prevCards.map(c => 
         c._id === targetCard._id ? { ...c, isKnown } : c
       ));
@@ -676,23 +689,6 @@ const Flashcards = () => {
       // Update last studied if using a deck
       if (currentDeck) {
         await flashcardAPI.updateLastStudied(currentDeck._id);
-        
-        // Update stats only if status actually changed
-        if (isKnown && !wasKnown) {
-          // Marked as known: increase mastered, decrease remaining
-          setDeckStats(prev => ({
-            ...prev,
-            masteredWords: prev.masteredWords + 1,
-            remainingWords: Math.max(0, prev.remainingWords - 1)
-          }));
-        } else if (!isKnown && wasKnown) {
-          // Marked as unknown: decrease mastered, increase remaining
-          setDeckStats(prev => ({
-            ...prev,
-            masteredWords: Math.max(0, prev.masteredWords - 1),
-            remainingWords: prev.remainingWords + 1
-          }));
-          }
       }
       
       // Reset flag after a delay to allow normal operation
@@ -739,17 +735,42 @@ const Flashcards = () => {
 
   // Touch gesture handlers
   const minSwipeDistance = CONSTANTS.MIN_SWIPE_DISTANCE;
+  const EDGE_THRESHOLD = 0.15; // 15% of card width from each edge
 
   const handleTouchStart = (e) => {
     const touch = e.targetTouches[0];
-    setTouchStart({ x: touch.clientX, y: touch.clientY });
+    const touchX = touch.clientX;
+    
+    // Check if touch is in edge area (left or right 15% of card)
+    if (cardElementRef.current) {
+      const cardRect = cardElementRef.current.getBoundingClientRect();
+      const cardWidth = cardRect.width;
+      const relativeX = touchX - cardRect.left;
+      const edgeWidth = cardWidth * EDGE_THRESHOLD;
+      
+      // Check if touch is in left or right edge
+      if (relativeX < edgeWidth || relativeX > (cardWidth - edgeWidth)) {
+        // Touch is in edge area - allow page scrolling
+        isEdgeTouchRef.current = true;
+        return; // Don't prevent default, allow scrolling
+      }
+    }
+    
+    // Touch is in center area - handle gesture
+    isEdgeTouchRef.current = false;
+    setTouchStart({ x: touchX, y: touch.clientY });
     setTouchEnd({ x: null, y: null });
     swipeDetectedRef.current = false;
-    // Prevent scrolling when touching the card
+    // Prevent scrolling when touching the card center
     e.preventDefault();
   };
 
   const handleTouchMove = (e) => {
+    // If touch started in edge area, don't interfere with scrolling
+    if (isEdgeTouchRef.current) {
+      return;
+    }
+    
     const touch = e.targetTouches[0];
     setTouchEnd({ x: touch.clientX, y: touch.clientY });
     // Prevent scrolling during swipe gesture
@@ -757,6 +778,12 @@ const Flashcards = () => {
   };
 
   const handleTouchEnd = async (e) => {
+    // If touch started in edge area, don't process gestures
+    if (isEdgeTouchRef.current) {
+      isEdgeTouchRef.current = false;
+      return;
+    }
+    
     if (!touchStart.x || !touchStart.y || !touchEnd.x || !touchEnd.y) {
       // If no swipe detected, allow click to flip
       return;
@@ -784,7 +811,7 @@ const Flashcards = () => {
       }
     } else if (absDeltaY > absDeltaX && absDeltaY > minSwipeDistance) {
       swipeDetectedRef.current = true;
-      // Vertical swipe
+      // Vertical swipe - only process if not in edge area
       if (deltaY > 0) {
         // Swipe up - known word
         if (cards.length > 0 && currentIndex < cards.length) {
@@ -999,11 +1026,22 @@ const Flashcards = () => {
 
   // Memoized progress stats (must be called before any early returns)
   const progressStats = useMemo(() => ({
-    known: cards.filter(card => card.isKnown).length,
-    unknown: cards.filter(card => !card.isKnown).length,
-    // Remaining = cards left AFTER current card (so last card shows remaining = 0, but we still show it)
-    remaining: Math.max(0, cards.length - currentIndex - 1)
-  }), [cards, currentIndex]);
+    known: cards.filter(card => card.isKnown === true).length,
+    unknown: cards.filter(card => card.isKnown !== true).length,
+    // Remaining = total unknown words (not cards left to study)
+    remaining: cards.filter(card => card.isKnown !== true).length
+  }), [cards]);
+
+  // Memoized deck stats - calculated dynamically from cards array
+  const deckStats = useMemo(() => {
+    if (!currentDeck || cards.length === 0) {
+      return { totalWords: 0, masteredWords: 0, remainingWords: 0 };
+    }
+    const totalWords = deckTotalWords || cards.length;
+    const masteredWords = cards.filter(card => card.isKnown === true).length;
+    const remainingWords = cards.filter(card => card.isKnown !== true).length;
+    return { totalWords, masteredWords, remainingWords };
+  }, [cards, currentDeck, deckTotalWords]);
 
   // Check if deck is completed - only show results when user tries to advance past last card
   // We don't check remaining === 0 here because that would trigger on the last card itself
@@ -1144,6 +1182,7 @@ const Flashcards = () => {
                 <div key={`${card._id}-${cardIndex}`} className="card-stack-wrapper">
                   {/* Flashcard */}
                   <div
+                    ref={isTopCard ? cardElementRef : null}
                     className={`flashcard card-stack-item ${isFlipped && isTopCard ? 'flipped' : ''} ${
                       isTopCard ? 'card-stack-top' : ''
                     }`}
