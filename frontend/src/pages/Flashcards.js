@@ -778,20 +778,22 @@ const Flashcards = () => {
     const currentX = touch.clientX;
     const currentY = touch.clientY;
     
+    // Always update touchEnd to track position for gesture detection
+    setTouchEnd({ x: currentX, y: currentY });
+    
     // Check if this is primarily a vertical movement (scrolling)
     if (touchStart.x !== null && touchStart.y !== null) {
       const deltaX = Math.abs(currentX - touchStart.x);
       const deltaY = Math.abs(currentY - touchStart.y);
       
-      // If vertical movement is greater, allow scrolling
+      // If vertical movement is greater, allow scrolling (don't prevent default)
       if (deltaY > deltaX) {
-        // This is a vertical scroll - don't prevent default
+        // This is a vertical scroll - don't prevent default to allow scrolling
         return;
       }
     }
     
-    setTouchEnd({ x: currentX, y: currentY });
-    // Prevent scrolling during horizontal swipe gesture in center area
+    // For horizontal movements, prevent default to enable swipe gestures
     e.preventDefault();
   };
 
