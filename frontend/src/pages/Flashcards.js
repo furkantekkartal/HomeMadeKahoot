@@ -750,9 +750,10 @@ const Flashcards = () => {
       
       // Check if touch is in left or right edge
       if (relativeX < edgeWidth || relativeX > (cardWidth - edgeWidth)) {
-        // Touch is in edge area - allow page scrolling
+        // Touch is in edge area - allow page scrolling by not preventing default
         isEdgeTouchRef.current = true;
-        return; // Don't prevent default, allow scrolling
+        // Don't prevent default - allow native scrolling behavior
+        return;
       }
     }
     
@@ -766,21 +767,23 @@ const Flashcards = () => {
   };
 
   const handleTouchMove = (e) => {
-    // If touch started in edge area, don't interfere with scrolling
+    // If touch started in edge area, don't interfere with scrolling at all
     if (isEdgeTouchRef.current) {
+      // Don't prevent default - allow native scrolling
       return;
     }
     
     const touch = e.targetTouches[0];
     setTouchEnd({ x: touch.clientX, y: touch.clientY });
-    // Prevent scrolling during swipe gesture
+    // Prevent scrolling during swipe gesture in center area
     e.preventDefault();
   };
 
   const handleTouchEnd = async (e) => {
-    // If touch started in edge area, don't process gestures
+    // If touch started in edge area, don't process gestures and allow normal behavior
     if (isEdgeTouchRef.current) {
       isEdgeTouchRef.current = false;
+      // Don't prevent default - allow normal touch end behavior
       return;
     }
     
@@ -1625,7 +1628,49 @@ const Flashcards = () => {
 
         {/* Right Sidebar - Mark As */}
         <div className="flashcard-sidebar">
-          {/* Mark as Section */}
+          {/* Progress Section - First in mobile view */}
+          <div className="progress-section">
+            <h3>Progress</h3>
+            
+            {/* Progress Stats - Now showing Deck Statistics */}
+            {currentDeck ? (
+              <div className="stats-grid">
+                <div className="stat-card stat-incorrect">
+                  <p className="stat-label">Total Words</p>
+                  <p className="stat-value">{deckStats.totalWords}</p>
+                </div>
+
+                <div className="stat-card stat-correct">
+                  <p className="stat-label">Mastered</p>
+                  <p className="stat-value">{deckStats.masteredWords}</p>
+                </div>
+
+                <div className="stat-card stat-remaining">
+                  <p className="stat-label">Remaining</p>
+                  <p className="stat-value">{deckStats.remainingWords}</p>
+                </div>
+              </div>
+            ) : (
+            <div className="stats-grid">
+              <div className="stat-card stat-correct">
+                <p className="stat-label">Known</p>
+                <p className="stat-value">{progressStats.known}</p>
+              </div>
+
+              <div className="stat-card stat-incorrect">
+                <p className="stat-label">Unknown</p>
+                <p className="stat-value">{progressStats.unknown}</p>
+              </div>
+
+              <div className="stat-card stat-remaining">
+                <p className="stat-label">Remaining</p>
+                <p className="stat-value">{progressStats.remaining}</p>
+              </div>
+              </div>
+            )}
+          </div>
+
+          {/* Mark as Section - Second in mobile view */}
           <div className="mark-as-section">
             <h3 className="mark-as-title">Mark as</h3>
             <div className="status-buttons">
@@ -1643,45 +1688,6 @@ const Flashcards = () => {
               </button>
             </div>
           </div>
-
-          <h3>Progress</h3>
-          
-          {/* Progress Stats - Now showing Deck Statistics */}
-          {currentDeck ? (
-            <div className="stats-grid">
-              <div className="stat-card stat-incorrect">
-                <p className="stat-label">Total Words</p>
-                <p className="stat-value">{deckStats.totalWords}</p>
-              </div>
-
-              <div className="stat-card stat-correct">
-                <p className="stat-label">Mastered</p>
-                <p className="stat-value">{deckStats.masteredWords}</p>
-              </div>
-
-              <div className="stat-card stat-remaining">
-                <p className="stat-label">Remaining</p>
-                <p className="stat-value">{deckStats.remainingWords}</p>
-              </div>
-            </div>
-          ) : (
-          <div className="stats-grid">
-            <div className="stat-card stat-correct">
-              <p className="stat-label">Known</p>
-              <p className="stat-value">{progressStats.known}</p>
-            </div>
-
-            <div className="stat-card stat-incorrect">
-              <p className="stat-label">Unknown</p>
-              <p className="stat-value">{progressStats.unknown}</p>
-            </div>
-
-            <div className="stat-card stat-remaining">
-              <p className="stat-label">Remaining</p>
-              <p className="stat-value">{progressStats.remaining}</p>
-            </div>
-            </div>
-          )}
         </div>
       </div>
 
