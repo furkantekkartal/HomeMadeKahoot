@@ -727,7 +727,7 @@ const WordDatabase = () => {
               checked={filters.showKnown}
               onChange={(e) => handleFilterChange('showKnown', e.target.checked)}
             />
-            <label htmlFor="show-known">Show Known</label>
+            <label htmlFor="show-known">Known</label>
           </div>
           <div className="filter-checkbox">
             <input
@@ -736,7 +736,7 @@ const WordDatabase = () => {
               checked={filters.showUnknown}
               onChange={(e) => handleFilterChange('showUnknown', e.target.checked)}
             />
-            <label htmlFor="show-unknown">Show Unknown</label>
+            <label htmlFor="show-unknown">Unknown</label>
           </div>
           <button
             onClick={handleApplyFilters}

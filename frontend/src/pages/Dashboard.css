@@ -27,8 +27,10 @@
   color: #2d3748;
   margin: 0;
   margin-left: 0;
-  padding-left: 0;
+  padding-left: 4rem;
   flex: 0 0 auto;
+  position: relative;
+  z-index: 1;
 }
 
 .dashboard-content-wrapper {
@@ -511,6 +513,23 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
+/* Known Total Chart Card */
+.known-total-card {
+  background: white;
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  margin-bottom: 2rem;
+}
+
+.known-total-chart-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 300px;
+  color: #9ca3af;
+}
+
 /* Responsive */
 @media (max-width: 992px) {
   .badges-grid {
@@ -569,15 +588,20 @@
   }
 
   .dashboard-header {
-    padding: 1rem 0.75rem;
+    padding: 0.75rem 0.75rem 0.75rem 4rem;
     flex-wrap: wrap;
     gap: 0.5rem;
+    position: relative;
   }
 
   .dashboard-header h1 {
     font-size: 1.5rem;
     width: 100%;
     margin-bottom: 0.25rem;
+    padding-left: 0.75rem;
+    margin-left: 0;
+    position: relative;
+    z-index: 1;
   }
 
   .stats-grid {
@@ -594,7 +618,7 @@
     min-width: 140px;
     padding: 0.75rem;
   }
-
+  
   .stat-card .stat-icon {
     font-size: 1.5rem;
     width: 35px;
@@ -608,20 +632,20 @@
 
   .stat-card .stat-label {
     font-size: 0.7rem;
-  }
+    }
 
   .stat-card .stat-sublabel {
     font-size: 0.65rem;
   }
 
   .badges-grid {
-    grid-template-columns: 1fr !important;
-    gap: 1rem;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.75rem;
   }
 
   .level-charts-grid {
-    grid-template-columns: 1fr;
-    gap: 1rem;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
   }
 
   .module-time-grid {
@@ -652,14 +676,16 @@
   .badges-card,
   .module-time-card,
   .level-progress-card,
-  .categories-card {
+  .categories-card,
+  .known-total-card {
     padding: 1rem;
   }
 
   .badges-card h3,
   .module-time-card h3,
   .level-progress-card h3,
-  .categories-card h3 {
+  .categories-card h3,
+  .known-total-card h2 {
     font-size: 1.1rem;
     margin-bottom: 0.75rem;
   }

@@ -225,7 +225,7 @@
 
 .filter-input {
   flex: 1;
-  min-width: 200px;
+  min-width: 100px;
 }
 
 .filter-select {
@@ -529,7 +529,7 @@
   }
 
   .word-filters {
-    flex-direction: column;
+    flex-direction: row;
   }
 
   .filter-input,

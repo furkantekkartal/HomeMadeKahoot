@@ -216,13 +216,13 @@ const DeckQuiz = () => {
   return (
     <div className="deck-quiz-container">
       <div className="deck-quiz-header">
-        <h1>Deck/Quiz</h1>
-        <div className="header-controls">
+        <div className="header-title-section">
+          <h1>Deck/Quiz</h1>
           <button
             onClick={() => navigate(activeTab === 'decks' ? '/create-deck' : '/create-quiz')}
-            className="btn btn-primary"
+            className="btn btn-primary new-deck-btn"
           >
-            <FaPlus /> {activeTab === 'decks' ? 'New Deck' : 'New Quiz'}
+            +
           </button>
           <div className="deck-quiz-tabs">
             <button
@@ -238,6 +238,8 @@ const DeckQuiz = () => {
               <FaQuestionCircle /> Quizzes
             </button>
           </div>
+        </div>
+        <div className="header-controls">
           <div className="filters">
             <select
               className="filter-select"
@@ -275,7 +277,7 @@ const DeckQuiz = () => {
                 checked={showHidden}
                 onChange={(e) => setShowHidden(e.target.checked)}
               />
-              Show Hidden
+              Hide?
             </label>
           </div>
         </div>

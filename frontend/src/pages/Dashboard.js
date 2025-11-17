@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { statisticsAPI } from '../services/api';
+import { statisticsAPI, wordAPI } from '../services/api';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { FaAward, FaBullseye, FaBook, FaArrowUp, FaClock, FaHourglassHalf } from 'react-icons/fa';
 import './Dashboard.css';
@@ -7,6 +7,7 @@ import './Dashboard.css';
 const Dashboard = () => {
   const [stats, setStats] = useState(null);
   const [badges, setBadges] = useState(null);
+  const [wordDatabases, setWordDatabases] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -22,10 +23,117 @@ const Dashboard = () => {
       
       setStats(statsResponse.data.data);
       setBadges(badgesResponse.data.data);
+      
+      // Load word database statistics
+      await loadWordDatabaseStats();
     } catch (error) {
       console.error('Failed to load dashboard data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadWordDatabaseStats = async () => {
+    try {
+      // Get all sources
+      const sourcesResponse = await wordAPI.getSources();
+      const allSources = sourcesResponse.data.sources || [];
+      
+      // Log sources for debugging
+      console.log('All sources:', allSources.map(s => s.sourceName));
+      
+      // Define the databases we want to track with flexible matching
+      const databaseConfig = {
+        'Kaggle -10000': {
+          patterns: ['kaggle', '10000'],
+          sourceIds: []
+        },
+        'Gemini': {
+          patterns: ['gemini'],
+          sourceIds: []
+        },
+        'Oxford-3000': {
+          patterns: ['oxford', '3000'],
+          sourceIds: []
+        },
+        'Oxford-5000': {
+          patterns: ['oxford', '5000'],
+          sourceIds: []
+        }
+      };
+      
+      // Find matching sources for each database
+      for (const [dbName, config] of Object.entries(databaseConfig)) {
+        const matchingSources = allSources.filter(s => {
+          if (!s.sourceName) return false;
+          const sourceNameLower = s.sourceName.toLowerCase();
+          return config.patterns.every(pattern => 
+            sourceNameLower.includes(pattern.toLowerCase())
+          );
+        });
+        
+        config.sourceIds = matchingSources.map(s => s._id);
+        console.log(`${dbName} matched sources:`, matchingSources.map(s => s.sourceName));
+      }
+      
+      // Fetch all words and calculate stats
+      const databaseStats = {};
+      
+      for (const [dbName, config] of Object.entries(databaseConfig)) {
+        let totalWords = 0;
+        let knownWords = 0;
+        
+        if (config.sourceIds.length > 0) {
+          // Fetch all words for matching sources
+          for (const sourceId of config.sourceIds) {
+            try {
+              let currentPage = 1;
+              let hasMore = true;
+              
+              while (hasMore) {
+                const response = await wordAPI.getWordsWithStatus({
+                  page: currentPage,
+                  limit: 1000,
+                  sourceId: sourceId,
+                  showKnown: 'true',
+                  showUnknown: 'true'
+                });
+                
+                const words = response.data.words || [];
+                totalWords += words.length;
+                knownWords += words.filter(w => w.isKnown === true).length;
+                
+                const totalPages = response.data.pagination?.pages || 1;
+                if (currentPage >= totalPages || words.length === 0) {
+                  hasMore = false;
+                } else {
+                  currentPage++;
+                }
+              }
+            } catch (error) {
+              console.error(`Error loading words for ${dbName} (sourceId: ${sourceId}):`, error);
+            }
+          }
+        }
+        
+        databaseStats[dbName] = {
+          known: knownWords,
+          total: totalWords
+        };
+        
+        console.log(`${dbName} stats:`, databaseStats[dbName]);
+      }
+      
+      setWordDatabases(databaseStats);
+    } catch (error) {
+      console.error('Failed to load word database stats:', error);
+      // Set default empty stats
+      setWordDatabases({
+        'Kaggle -10000': { known: 0, total: 0 },
+        'Gemini': { known: 0, total: 0 },
+        'Oxford-3000': { known: 0, total: 0 },
+        'Oxford-5000': { known: 0, total: 0 }
+      });
     }
   };
 
@@ -65,22 +173,6 @@ const Dashboard = () => {
     ].filter(item => item.value > 0);
   };
 
-  // Prepare category bar chart data
-  const prepareCategoryData = () => {
-    if (!stats || !stats.categories) return [];
-
-    return Object.entries(stats.categories)
-      .map(([name, data]) => ({
-        name,
-        total: data.total || 0,
-        known: data.known || 0,
-        unknown: (data.total || 0) - (data.known || 0)
-      }))
-      .sort((a, b) => b.total - a.total) // Sort by total descending
-      .slice(0, 10); // Top 10 categories
-  };
-
-  const categoryData = prepareCategoryData();
 
   // Badge level thresholds
   const getLevelBadge = (knownWords) => {
@@ -287,31 +379,53 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Top Categories - Bar Chart */}
-      {loading ? (
-        <div className="categories-card">
-          <h2 className="section-title">Top Categories</h2>
-          <div style={{ height: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6b7280' }}>
-            <FaHourglassHalf style={{ fontSize: '3rem', opacity: 0.5 }} />
+      {/* Known Total Chart - Word Databases */}
+      <div className="known-total-card">
+        <h2 className="section-title">Known Total</h2>
+        {loading || !wordDatabases ? (
+          <div className="known-total-chart-loading">
+            <FaHourglassHalf style={{ fontSize: '2rem', opacity: 0.6 }} />
           </div>
-        </div>
-      ) : categoryData.length > 0 && (
-        <div className="categories-card">
-          <h2 className="section-title">Top Categories</h2>
-          <ResponsiveContainer width="100%" height={400}>
-            <BarChart data={categoryData} layout="horizontal">
+        ) : (
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart
+              data={[
+                { 
+                  name: 'Kaggle -10000', 
+                  Known: wordDatabases['Kaggle -10000']?.known || 0, 
+                  Total: (wordDatabases['Kaggle -10000']?.total || 0) - (wordDatabases['Kaggle -10000']?.known || 0)
+                },
+                { 
+                  name: 'Gemini', 
+                  Known: wordDatabases['Gemini']?.known || 0, 
+                  Total: (wordDatabases['Gemini']?.total || 0) - (wordDatabases['Gemini']?.known || 0)
+                },
+                { 
+                  name: 'Oxford-3000', 
+                  Known: wordDatabases['Oxford-3000']?.known || 0, 
+                  Total: (wordDatabases['Oxford-3000']?.total || 0) - (wordDatabases['Oxford-3000']?.known || 0)
+                },
+                { 
+                  name: 'Oxford-5000', 
+                  Known: wordDatabases['Oxford-5000']?.known || 0, 
+                  Total: (wordDatabases['Oxford-5000']?.total || 0) - (wordDatabases['Oxford-5000']?.known || 0)
+                }
+              ]}
+              layout="vertical"
+              margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+            >
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis type="number" />
-              <YAxis dataKey="name" type="category" width={100} />
+              <XAxis type="number" domain={[0, 'dataMax']} />
+              <YAxis dataKey="name" type="category" width={120} />
               <Tooltip />
               <Legend />
-              <Bar dataKey="total" fill="#3b82f6" name="Total" />
-              <Bar dataKey="known" fill="#10b981" name="Known" />
-              <Bar dataKey="unknown" fill="#f59e0b" name="Unknown" />
+              <Bar dataKey="Known" stackId="a" fill="#10b981" />
+              <Bar dataKey="Total" stackId="a" fill="#3b82f6" />
             </BarChart>
           </ResponsiveContainer>
-        </div>
-      )}
+        )}
+      </div>
+
         </div>
         
         {/* Right Sidebar - Quick Stats */}

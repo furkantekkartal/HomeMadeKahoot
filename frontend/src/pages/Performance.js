@@ -56,7 +56,6 @@ const Performance = () => {
   const [expandedPronunciationRows, setExpandedPronunciationRows] = useState(new Set());
   const [expandedWordDetails, setExpandedWordDetails] = useState(new Set());
   const [expandedSentenceDetails, setExpandedSentenceDetails] = useState(new Set());
-  const [resettingGameStats, setResettingGameStats] = useState(false);
 
   useEffect(() => {
     loadAllData();
@@ -174,27 +173,6 @@ const Performance = () => {
     setAppliedFilters(emptyFilters);
   };
 
-  const handleResetGamePerformance = async () => {
-    if (!window.confirm('Are you sure you want to reset all game performance statistics? This will delete all Flashcards and Spelling session data. This action cannot be undone.')) {
-      return;
-    }
-
-    try {
-      setResettingGameStats(true);
-      const response = await sessionAPI.resetGamePerformance();
-      
-      if (response.data.success) {
-        alert(`Successfully reset game performance statistics. Deleted ${response.data.deletedCount} sessions.`);
-        // Reload game stats to show empty state
-        await loadGameStats();
-      }
-    } catch (error) {
-      console.error('Error resetting game performance:', error);
-      alert('Failed to reset game performance: ' + (error.response?.data?.message || error.message));
-    } finally {
-      setResettingGameStats(false);
-    }
-  };
 
 
   const loadPronunciationStats = async () => {
@@ -284,9 +262,6 @@ const Performance = () => {
     <div className="performance-container">
       <div className="performance-header">
         <h1>Student Performance</h1>
-        <Link to="/quiz" className="btn btn-secondary">
-          Back to Quiz
-        </Link>
       </div>
 
       <div className="performance-content-wrapper">
@@ -564,28 +539,7 @@ const Performance = () => {
 
         {/* Game Stats Section */}
         <div className="game-stats-container">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <h2>Game Performance</h2>
-            <button
-              onClick={handleResetGamePerformance}
-              disabled={resettingGameStats}
-              style={{
-                padding: '0.5rem 1rem',
-                backgroundColor: '#dc2626',
-                color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: resettingGameStats ? 'not-allowed' : 'pointer',
-                fontSize: '0.875rem',
-                fontWeight: '600',
-                opacity: resettingGameStats ? 0.6 : 1,
-                transition: 'opacity 0.2s'
-              }}
-              title="Reset all game performance statistics (DEV only)"
-            >
-              {resettingGameStats ? 'Resetting...' : 'Reset Game Stats'}
-            </button>
-          </div>
+          <h2>Game Performance</h2>
           
           {/* Game Stats Table */}
           {gameStats.length === 0 ? (

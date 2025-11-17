@@ -19,6 +19,13 @@
   gap: 1rem;
 }
 
+.header-title-section {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex: 0 0 auto;
+}
+
 .flashcards-header h1 {
   font-size: 2rem;
   font-weight: 700;
@@ -27,6 +34,11 @@
   margin-left: 0;
   padding-left: 0;
   flex: 0 0 auto;
+}
+
+.flashcards-header .study-timer {
+  width: 120px;
+  flex-shrink: 0;
 }
 
 .header-controls {
@@ -75,11 +87,13 @@
   font-size: 1rem;
   background: white;
   cursor: pointer;
-  min-width: 200px;
+  min-width: 180px; /* 10% less than 200px */
+  width: 180px; /* Fixed width, 10% less than original */
   height: 40px;
   box-sizing: border-box;
   display: flex;
   align-items: center;
+  flex-shrink: 0;
 }
 
 .deck-select:focus {
@@ -1107,7 +1121,7 @@
 
 @media (max-width: 768px) {
   .flashcards-header {
-    padding: 0.75rem 0.75rem 0.75rem 4rem;
+    padding: 0.75rem 0.75rem 0.75rem 2.5rem;
     gap: 0.5rem;
     position: relative;
     flex-direction: row;
@@ -1116,15 +1130,31 @@
     justify-content: space-between;
   }
 
-  .flashcards-header h1 {
-    font-size: 1.25rem;
-    margin-left: 0.75rem;
-    padding-left: 0;
-    white-space: nowrap;
-    flex-shrink: 0;
-    margin-right: auto;
+  .header-title-section {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
     width: 100%;
     margin-bottom: 0.25rem;
+    margin-left: 0.75rem;
+  }
+
+  .flashcards-header h1 {
+    font-size: 1.25rem;
+    margin: 0;
+    padding: 0;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .flashcards-header .study-timer {
+    width: 100px;
+    flex-shrink: 0;
+    height: 40px;
+    padding: 0.5rem 0.75rem;
+    display: flex;
+    align-items: center;
+    box-sizing: border-box;
   }
 
   .header-controls {
@@ -1144,23 +1174,17 @@
     box-sizing: border-box;
   }
 
-  .study-timer {
-    height: 40px;
-    padding: 0.5rem 0.75rem;
-    display: flex;
-    align-items: center;
-    flex-shrink: 0;
-  }
-
   .deck-select {
     font-size: 0.85rem;
     padding: 0.5rem 0.75rem;
-    min-width: 144px;
-    max-width: 180px;
+    min-width: 130px; /* 10% less than 144px */
+    width: 130px; /* Fixed width, 10% less */
+    max-width: 162px; /* 10% less than 180px */
     height: 40px;
     display: flex;
     align-items: center;
     flex-shrink: 0;
+    box-sizing: border-box;
   }
 
   .header-buttons {

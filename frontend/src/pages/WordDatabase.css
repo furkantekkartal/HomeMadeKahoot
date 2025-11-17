@@ -20,13 +20,15 @@
 }
 
 .word-database-header h1 {
-  font-size: 2rem;
+  font-size: 3rem;
   font-weight: 700;
   color: #2d3748;
   margin: 0;
   margin-left: 0;
-  padding-left: 0;
+  padding-left: 2.5rem;
   flex: 0 0 auto;
+  position: relative;
+  z-index: 1;
 }
 
 .word-database-content {
@@ -479,12 +481,21 @@
 
   .import-export-buttons {
     width: 100%;
-    flex-direction: column;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0.5rem;
   }
 
   .import-export-buttons .btn {
-    width: 100%;
+    flex: 1 1 calc(33.333% - 0.5rem);
+    min-width: 0;
+    max-width: 100%;
     justify-content: center;
+    font-size: 0.85rem;
+    padding: 0.5rem 0.75rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .word-database-content {
@@ -498,22 +509,22 @@
   .word-stats {
     width: 100%;
     justify-content: space-between;
-    gap: 0.75rem;
-    flex-wrap: wrap;
+    gap: 0.5rem;
+    flex-wrap: nowrap;
   }
 
   .stat-item {
-    flex: 1 1 calc(50% - 0.375rem);
+    flex: 1 1 calc(25% - 0.375rem);
     min-width: 0;
     padding: 0.75rem 0.5rem;
   }
 
   .stat-label {
-    font-size: 0.7rem;
+    font-size: 0.65rem;
   }
 
   .stat-value {
-    font-size: 1.25rem;
+    font-size: 1.1rem;
   }
 
   .manual-creation-section {
@@ -541,32 +552,41 @@
   }
 
   .word-filters {
-    flex-direction: column;
-    gap: 0.75rem;
-    width: 100%;
-  }
-
-  .filter-row {
-    flex-direction: column;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
     gap: 0.5rem;
     width: 100%;
+    align-items: center;
   }
 
-  .filter-input,
+  .filter-input {
+    flex: 0 0 100px;
+    min-width: 100px;
+    max-width: 100px;
+    padding: 0.5rem 0.5rem;
+    font-size: 0.8rem;
+  }
+
   .filter-select {
-    width: 100%;
-    padding: 0.75rem;
-    font-size: 0.9rem;
+    flex: 0 0 calc(18% - 0.3rem);
+    min-width: 80px;
+    padding: 0.5rem 0.5rem;
+    font-size: 0.8rem;
   }
 
-  .filter-checkboxes {
-    flex-direction: column;
-    gap: 0.5rem;
-    width: 100%;
+  .word-filters > .btn-primary {
+    flex: 0 0 auto;
+    min-width: 100px;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8rem;
+    white-space: nowrap;
   }
 
   .filter-checkbox {
-    width: 100%;
+    flex: 0 0 auto;
+    white-space: nowrap;
+    font-size: 0.8rem;
   }
 
   .words-table-container {
@@ -623,7 +643,16 @@
   }
 
   .stat-item {
-    flex: 1 1 100%;
+    flex: 1 1 calc(25% - 0.375rem);
+    min-width: 0;
+  }
+  
+  .stat-label {
+    font-size: 0.6rem;
+  }
+  
+  .stat-value {
+    font-size: 1rem;
   }
 
   .words-table {

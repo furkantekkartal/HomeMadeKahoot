@@ -1071,14 +1071,8 @@ const Flashcards = () => {
     <div className="flashcards-container">
       {/* Top Bar */}
       <div className="flashcards-header">
+        <div className="header-title-section">
         <h1>Flashcards</h1>
-        <div className="header-controls">
-          <StudyTimer 
-            durationFormatted={durationFormatted}
-            isActive={timerActive}
-            onToggle={() => setTimerActive(!timerActive)}
-          />
-          
           <select
             value={currentDeck?._id || ''}
             onChange={(e) => handleDeckSelect(e.target.value)}
@@ -1091,6 +1085,13 @@ const Flashcards = () => {
               </option>
             ))}
           </select>
+          <StudyTimer 
+            durationFormatted={durationFormatted}
+            isActive={timerActive}
+            onToggle={() => setTimerActive(!timerActive)}
+          />
+        </div>
+        <div className="header-controls">
         </div>
       </div>
 
@@ -1647,44 +1648,44 @@ const Flashcards = () => {
         <div className="flashcard-sidebar">
           {/* Progress Section - First in mobile view */}
           <div className="progress-section">
-            <h3>Progress</h3>
-            
-            {/* Progress Stats - Now showing Deck Statistics */}
-            {currentDeck ? (
-              <div className="stats-grid">
-                <div className="stat-card stat-incorrect">
-                  <p className="stat-label">Total Words</p>
-                  <p className="stat-value">{deckStats.totalWords}</p>
-                </div>
-
-                <div className="stat-card stat-correct">
-                  <p className="stat-label">Mastered</p>
-                  <p className="stat-value">{deckStats.masteredWords}</p>
-                </div>
-
-                <div className="stat-card stat-remaining">
-                  <p className="stat-label">Remaining</p>
-                  <p className="stat-value">{deckStats.remainingWords}</p>
-                </div>
-              </div>
-            ) : (
+          <h3>Progress</h3>
+          
+          {/* Progress Stats - Now showing Deck Statistics */}
+          {currentDeck ? (
             <div className="stats-grid">
-              <div className="stat-card stat-correct">
-                <p className="stat-label">Known</p>
-                <p className="stat-value">{progressStats.known}</p>
+              <div className="stat-card stat-incorrect">
+                <p className="stat-label">Total Words</p>
+                <p className="stat-value">{deckStats.totalWords}</p>
               </div>
 
-              <div className="stat-card stat-incorrect">
-                <p className="stat-label">Unknown</p>
-                <p className="stat-value">{progressStats.unknown}</p>
+              <div className="stat-card stat-correct">
+                <p className="stat-label">Mastered</p>
+                <p className="stat-value">{deckStats.masteredWords}</p>
               </div>
 
               <div className="stat-card stat-remaining">
                 <p className="stat-label">Remaining</p>
-                <p className="stat-value">{progressStats.remaining}</p>
+                <p className="stat-value">{deckStats.remainingWords}</p>
               </div>
-              </div>
-            )}
+            </div>
+          ) : (
+          <div className="stats-grid">
+            <div className="stat-card stat-correct">
+              <p className="stat-label">Known</p>
+              <p className="stat-value">{progressStats.known}</p>
+            </div>
+
+            <div className="stat-card stat-incorrect">
+              <p className="stat-label">Unknown</p>
+              <p className="stat-value">{progressStats.unknown}</p>
+            </div>
+
+            <div className="stat-card stat-remaining">
+              <p className="stat-label">Remaining</p>
+              <p className="stat-value">{progressStats.remaining}</p>
+            </div>
+            </div>
+          )}
           </div>
 
           {/* Mark as Section - Second in mobile view */}

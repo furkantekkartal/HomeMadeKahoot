@@ -756,14 +756,8 @@ const Spelling = () => {
     <div className="spelling-container">
       {/* Top Bar */}
       <div className="spelling-header">
-        <h1>Spelling</h1>
-        <div className="header-controls">
-          <StudyTimer 
-            durationFormatted={durationFormatted}
-            isActive={timerActive}
-            onToggle={() => setTimerActive(!timerActive)}
-          />
-          
+        <div className="header-title-section">
+          <h1>Spelling</h1>
           <select
             value={currentDeck?._id || ''}
             onChange={(e) => handleDeckSelect(e.target.value)}
@@ -776,6 +770,13 @@ const Spelling = () => {
               </option>
             ))}
           </select>
+          <StudyTimer 
+            durationFormatted={durationFormatted}
+            isActive={timerActive}
+            onToggle={() => setTimerActive(!timerActive)}
+          />
+        </div>
+        <div className="header-controls">
         </div>
       </div>
 
