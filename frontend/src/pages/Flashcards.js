@@ -667,6 +667,18 @@ const Flashcards = () => {
         playSuccessSound();
         setTimeout(() => setShowKnownText(false), 300);
         goToNextCard();
+        // Manually trigger speaker button to pronounce the NEW card's word after navigation
+        // Wait 400ms to ensure the card has changed (goToNextCard updates index after 300ms)
+        setTimeout(() => {
+          // Access the current card after navigation - use functional update to get latest state
+          setCurrentIndex((prevIndex) => {
+            const newCard = cards[prevIndex];
+            if (newCard && newCard.englishWord) {
+              speakText(newCard.englishWord, 'en-US', 'audioWord');
+            }
+            return prevIndex; // Don't actually change the index, just use this to access current state
+          });
+        }, 400);
       }
     } else {
       triggerAnimation('unknown');
@@ -676,6 +688,18 @@ const Flashcards = () => {
         playUnknownSound();
         setTimeout(() => setShowUnknownText(false), 300);
         goToNextCard();
+        // Manually trigger speaker button to pronounce the NEW card's word after navigation
+        // Wait 400ms to ensure the card has changed (goToNextCard updates index after 300ms)
+        setTimeout(() => {
+          // Access the current card after navigation - use functional update to get latest state
+          setCurrentIndex((prevIndex) => {
+            const newCard = cards[prevIndex];
+            if (newCard && newCard.englishWord) {
+              speakText(newCard.englishWord, 'en-US', 'audioWord');
+            }
+            return prevIndex; // Don't actually change the index, just use this to access current state
+          });
+        }, 400);
       }
     }
 
