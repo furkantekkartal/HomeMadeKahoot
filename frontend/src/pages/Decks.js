@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaEdit, FaTrash } from 'react-icons/fa';
+import { FaEdit, FaTrash, FaHourglassHalf } from 'react-icons/fa';
 import { flashcardAPI } from '../services/api';
 import { DECK_LEVELS, DECK_SKILLS, DECK_TASKS, formatLevel, formatSkill, formatTask } from '../constants/deckConstants';
 import './Decks.css';
@@ -58,14 +58,6 @@ const Decks = () => {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="decks-container">
-        <div className="loading">Loading decks...</div>
-      </div>
-    );
-  }
-
   return (
     <div className="decks-container">
       <div className="decks-header">
@@ -88,7 +80,11 @@ const Decks = () => {
         </div>
       </div>
 
-      {decks.length === 0 ? (
+      {loading ? (
+        <div className="decks-empty" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1rem', minHeight: '400px' }}>
+          <FaHourglassHalf style={{ fontSize: '4rem', opacity: 0.6 }} />
+        </div>
+      ) : decks.length === 0 ? (
         <div className="decks-empty">
           <p>No decks found. Create your first deck to get started!</p>
           <button

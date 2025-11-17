@@ -9,10 +9,12 @@ const path = require('path');
 const fs = require('fs').promises;
 const os = require('os');
 
-// Get all decks for all users
+// Get all decks for all users - Optimized version
 exports.getMyDecks = async (req, res) => {
   try {
     const userId = req.user.userId;
+    const mongoose = require('mongoose');
+    const userIdObj = new mongoose.Types.ObjectId(userId);
     const { includeHidden } = req.query; // Optional query param to include hidden decks
     
     // Allow all logged-in users to see all decks (no userId filter)
@@ -23,26 +25,63 @@ exports.getMyDecks = async (req, res) => {
       query.isVisible = { $ne: false }; // Show visible decks (true or undefined/null)
     }
     
+    // Get decks without populating wordIds (much faster)
     const decks = await FlashcardDeck.find(query)
       .sort({ updatedAt: -1 })
-      .populate('wordIds', 'englishWord turkishMeaning wordType englishLevel category1 sampleSentenceEn sampleSentenceTr imageUrl')
-      .populate('userId', 'username'); // Populate creator info
+      .populate('userId', 'username') // Populate creator info
+      .select('name description level skill task deckType wordIds userId createdAt updatedAt isVisible'); // Only select needed fields
     
-    // Calculate mastered cards for each deck (based on current user's progress)
-    const decksWithStats = await Promise.all(decks.map(async (deck) => {
-      const wordIds = deck.wordIds.map(w => w._id);
-      const knownWords = await UserWord.countDocuments({
-        userId,
-        wordId: { $in: wordIds },
-        isKnown: true
+    // Get all deck IDs and word IDs in one go
+    const allWordIds = [];
+    const deckWordMap = {}; // Map deck ID to word IDs
+    
+    decks.forEach(deck => {
+      const wordIds = (deck.wordIds || []).map(id => {
+        // Convert to ObjectId if it's a string, otherwise use as is
+        return id instanceof mongoose.Types.ObjectId ? id : new mongoose.Types.ObjectId(id);
       });
+      deckWordMap[deck._id.toString()] = wordIds.map(id => id.toString());
+      allWordIds.push(...wordIds);
+    });
+    
+    // Get mastered word counts for all decks at once using aggregation
+    // Only query if there are word IDs
+    let masteredCounts = [];
+    if (allWordIds.length > 0) {
+      masteredCounts = await UserWord.aggregate([
+        {
+          $match: {
+            userId: userIdObj,
+            wordId: { $in: allWordIds },
+            isKnown: true
+          }
+        },
+        {
+          $group: {
+            _id: '$wordId',
+            count: { $sum: 1 }
+          }
+        }
+      ]);
+    }
+    
+    // Create a map of wordId to count for quick lookup
+    const masteredWordMap = {};
+    masteredCounts.forEach(item => {
+      masteredWordMap[item._id.toString()] = item.count;
+    });
+    
+    // Calculate stats for each deck
+    const decksWithStats = decks.map(deck => {
+      const wordIds = deckWordMap[deck._id.toString()] || [];
+      const masteredCards = wordIds.filter(wordId => masteredWordMap[wordId]).length;
       
       return {
         ...deck.toObject(),
-        masteredCards: knownWords,
-        totalCards: deck.wordIds.length
+        masteredCards,
+        totalCards: wordIds.length
       };
-    }));
+    });
     
     res.json(decksWithStats);
   } catch (error) {
@@ -72,18 +111,75 @@ exports.getDeck = async (req, res) => {
     
     const userWordMap = {};
     userWords.forEach(uw => {
-      userWordMap[uw.wordId.toString()] = uw.isKnown;
+      userWordMap[uw.wordId.toString()] = {
+        isKnown: uw.isKnown,
+        isSpelled: uw.isSpelled
+      };
     });
     
     // Add status to each word
-    const wordsWithStatus = deck.wordIds.map(word => ({
-      ...word.toObject(),
-      isKnown: userWordMap[word._id.toString()] || null
-    }));
+    let wordsWithStatus = deck.wordIds.map(word => {
+      const userWord = userWordMap[word._id.toString()];
+      return {
+        ...word.toObject(),
+        isKnown: userWord ? userWord.isKnown : null,
+        isSpelled: userWord ? userWord.isSpelled : null
+      };
+    });
+    
+    // For dynamic decks, filter based on the page/module requesting the deck
+    // filterType: 'flashcards' = filter out words where isKnown === true
+    // filterType: 'spelling' = filter out words where isSpelled === true
+    // filterType not provided or 'all' = show all words (for backward compatibility)
+    if (deck.deckType === 'dynamic') {
+      const filterType = req.query.filterType || 'all';
+      
+      if (filterType === 'flashcards') {
+        // For Flashcards page: show words that are NOT known (no info, unknown, or false)
+        wordsWithStatus = wordsWithStatus.filter(word => 
+          word.isKnown !== true
+        );
+      } else if (filterType === 'spelling') {
+        // For Spelling page: show words that are NOT spelled correctly (no info, not spelled, or false)
+        wordsWithStatus = wordsWithStatus.filter(word => 
+          word.isSpelled !== true
+        );
+      }
+      // If filterType is 'all' or not provided, show all words (for other pages like DeckQuiz, etc.)
+    }
+    
+    // Calculate statistics
+    const totalWords = deck.wordIds.length; // Total words in deck (always the same for dynamic decks)
+    
+    let masteredWords = 0;
+    let remainingWords = wordsWithStatus.length;
+    
+    if (deck.deckType === 'dynamic') {
+      const filterType = req.query.filterType || 'all';
+      
+      if (filterType === 'flashcards') {
+        // For flashcards: mastered = words where isKnown === true
+        masteredWords = deck.wordIds.length - remainingWords;
+      } else if (filterType === 'spelling') {
+        // For spelling: mastered = words where isSpelled === true
+        masteredWords = deck.wordIds.length - remainingWords;
+      } else {
+        // For 'all' or no filter: calculate normally
+        masteredWords = wordsWithStatus.filter(w => w.isKnown === true).length;
+      }
+    } else {
+      // Static deck: calculate normally
+      masteredWords = wordsWithStatus.filter(w => w.isKnown === true).length;
+    }
     
     res.json({
       ...deck.toObject(),
-      words: wordsWithStatus
+      words: wordsWithStatus,
+      stats: {
+        totalWords,
+        masteredWords,
+        remainingWords
+      }
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -94,7 +190,7 @@ exports.getDeck = async (req, res) => {
 exports.createDeck = async (req, res) => {
   try {
     const userId = req.user.userId;
-    const { name, description, level, skill, task, wordIds } = req.body;
+    const { name, description, level, skill, task, deckType, wordIds } = req.body;
     
     if (!name || !wordIds || !Array.isArray(wordIds) || wordIds.length === 0) {
       return res.status(400).json({ message: 'Deck name and word IDs are required' });
@@ -113,6 +209,7 @@ exports.createDeck = async (req, res) => {
       level: level || null,
       skill: skill || null,
       task: task || null,
+      deckType: deckType || 'static',
       wordIds,
       totalCards: wordIds.length
     });

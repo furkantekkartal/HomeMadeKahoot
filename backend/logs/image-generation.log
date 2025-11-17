@@ -1,0 +1,26 @@
+Image Generation Started: 2025-11-17T08:14:51.641Z
+
+[2025-11-17T08:14:51.643Z] Connecting to: homemadekahoot.gfbwla5.mongodb.net/homemadekahoot_dev?appName=homemadekahoot
+[2025-11-17T08:14:51.845Z] Connected to MongoDB successfully
+[2025-11-17T08:14:53.720Z] Found 13151 words that need images
+[2025-11-17T08:14:53.721Z] Starting image generation for 13151 words (parallel processing with 5 keys)
+[2025-11-17T08:14:54.269Z] Key1 | 2 / 50 (Range: 1-50, Hour 1) | Image Added | (amazing)
+[2025-11-17T08:14:54.777Z] Key3 | 101 / 150 (Range: 101-150, Hour 1) | Image Added | (short)
+[2025-11-17T08:14:54.835Z] Key2 | 51 / 100 (Range: 51-100, Hour 1) | Image Added | (grey)
+[2025-11-17T08:14:54.940Z] Key4 | 151 / 200 (Range: 151-200, Hour 1) | Image Added | (quickly)
+[2025-11-17T08:14:55.151Z] Key5 | 201 / 250 (Range: 201-250, Hour 1) | Image Added | (much)
+[2025-11-17T08:16:08.256Z] Key1 | 3 / 50 (Range: 1-50, Hour 1) | Image Added | (angry)
+[2025-11-17T08:16:08.284Z] Key3 | 102 / 150 (Range: 101-150, Hour 1) | Image Added | (sick)
+[2025-11-17T08:16:08.379Z] Key2 | 52 / 100 (Range: 51-100, Hour 1) | Image Added | (happy)
+[2025-11-17T08:16:08.657Z] Key5 | 202 / 250 (Range: 201-250, Hour 1) | Image Added | (my)
+[2025-11-17T08:16:08.953Z] Key4 | 152 / 200 (Range: 151-200, Hour 1) | Image Added | (quite)
+[2025-11-17T08:17:21.765Z] Key3 | 103 / 150 (Range: 101-150, Hour 1) | Image Added | (similar)
+[2025-11-17T08:17:21.919Z] Key2 | 53 / 100 (Range: 51-100, Hour 1) | Image Added | (hard)
+[2025-11-17T08:17:21.937Z] Key1 | 4 / 50 (Range: 1-50, Hour 1) | Image Added | (bad)
+[2025-11-17T08:17:22.165Z] Key5 | 203 / 250 (Range: 201-250, Hour 1) | Image Added | (no)
+[2025-11-17T08:17:22.828Z] Key4 | 153 / 200 (Range: 151-200, Hour 1) | Image Added | (really)
+[2025-11-17T08:18:35.180Z] Key3 | 104 / 150 (Range: 101-150, Hour 1) | Image Added | (slow)
+[2025-11-17T08:18:35.519Z] Key1 | 5 / 50 (Range: 1-50, Hour 1) | Image Added | (beautiful)
+[2025-11-17T08:18:35.599Z] Key5 | 204 / 250 (Range: 201-250, Hour 1) | Image Added | (one)
+[2025-11-17T08:18:35.614Z] Key2 | 54 / 100 (Range: 51-100, Hour 1) | Image Added | (healthy)
+[2025-11-17T08:18:36.352Z] Key4 | 154 / 200 (Range: 151-200, Hour 1) | Image Added | (sometimes)

@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { wordAPI, flashcardAPI, pronunciationAPI } from '../services/api';
 import { useStudyTimer } from '../hooks/useStudyTimer';
 import StudyTimer from '../components/Common/StudyTimer';
 import { AudioRecorder } from '../utils/audioRecorder';
+import { FaHourglassHalf } from 'react-icons/fa';
 import './Flashcards.css';
 
 // Constants
@@ -18,12 +19,12 @@ const CONSTANTS = {
 };
 
 const Flashcards = () => {
-  const navigate = useNavigate();
   const location = useLocation();
   
   // Deck state
   const [decks, setDecks] = useState([]);
   const [currentDeck, setCurrentDeck] = useState(null);
+  const [deckStats, setDeckStats] = useState({ totalWords: 0, masteredWords: 0, remainingWords: 0 });
 
   // Card state
   const [cards, setCards] = useState([]);
@@ -82,6 +83,12 @@ const Flashcards = () => {
   const [touchStart, setTouchStart] = useState({ x: null, y: null });
   const [touchEnd, setTouchEnd] = useState({ x: null, y: null });
   const swipeDetectedRef = useRef(false);
+  const isUpdatingDeckTypeRef = useRef(false);
+
+  // Auto-pause timer state
+  const cardDisplayStartTimeRef = useRef(null);
+  const wasAutoPausedRef = useRef(false);
+  const isUpdatingStatusRef = useRef(false);
 
   // Study timer
   const [timerActive, setTimerActive] = useState(true);
@@ -102,16 +109,40 @@ const Flashcards = () => {
   const [evaluationType, setEvaluationType] = useState(null); // 'word' or 'sentence'
   const audioRecorderRef = useRef(null);
   const recordingTypeRef = useRef(null); // Track which recording type is active
+  const evaluationResultsRef = useRef(null); // Ref for speech evaluation results pane
 
   useEffect(() => {
     const initializeFlashcards = async () => {
       // First, load decks
-      await loadDecks();
+      const loadedDecks = await loadDecks();
+      
+      // Auto-select first deck if available
+      if (loadedDecks && loadedDecks.length > 0) {
+        // Check if deckId was passed from navigation
+        const deckIdFromState = location.state?.deckId;
+        if (deckIdFromState) {
+          const deck = loadedDecks.find(d => d._id === deckIdFromState);
+          if (deck) {
+            setCurrentDeck(deck);
+            // Clear the state to avoid re-selecting on re-renders
+            window.history.replaceState({}, document.title);
+            setLoading(false);
+            return;
+          }
+        }
+        // Otherwise, automatically select the first deck
+        setCurrentDeck(loadedDecks[0]);
+        setLoading(false);
+      } else {
+        // No decks available, load default cards
+        await loadDefaultCards();
+      }
     };
     initializeFlashcards();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Auto-select deck from navigation state or first deck when decks are loaded
+  // Auto-select deck from navigation state or first deck when decks are loaded (fallback)
   useEffect(() => {
     if (decks.length > 0 && !currentDeck) {
       // Check if deckId was passed from navigation
@@ -139,7 +170,7 @@ const Flashcards = () => {
   }, [decks.length, cards.length, loading, currentDeck]);
 
   useEffect(() => {
-    if (currentDeck) {
+    if (currentDeck && !isUpdatingDeckTypeRef.current) {
       // Reset timer when a new deck is selected and start it
       resetSession();
       setTimerActive(true);
@@ -178,6 +209,61 @@ const Flashcards = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentIndex]);
+
+  // Calculate currentCard for use in effects (same approach as Spelling page)
+  const currentCard = cards.length > 0 && currentIndex < cards.length ? cards[currentIndex] : null;
+
+  // Auto-read word when card changes (only when currentIndex changes, not when cards array updates)
+  useEffect(() => {
+    // Don't auto-read if we're in the middle of a status update
+    if (isUpdatingStatusRef.current) {
+      return;
+    }
+    
+    if (currentCard && currentCard.englishWord && !loading) {
+      // Small delay to ensure card is fully loaded
+      const timer = setTimeout(() => {
+        speakText(currentCard.englishWord, 'en-US', 'audioWord');
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+    // Only depend on currentIndex and loading - not cards array to avoid triggering on status updates
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentIndex, loading]);
+
+  // Track card display time and auto-pause timer after 60 seconds
+  useEffect(() => {
+    if (cards.length > 0 && currentIndex < cards.length && !loading) {
+      // Reset card display start time when card changes
+      cardDisplayStartTimeRef.current = Date.now();
+      
+      // Resume timer if it was auto-paused
+      if (wasAutoPausedRef.current) {
+        setTimerActive(true);
+        wasAutoPausedRef.current = false;
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentIndex, cards.length, loading]);
+
+  // Check every second if card has been displayed for more than 60 seconds
+  useEffect(() => {
+    if (!timerActive || loading || cards.length === 0) return;
+
+    const checkInterval = setInterval(() => {
+      if (cardDisplayStartTimeRef.current && timerActive) {
+        const timeDisplayed = (Date.now() - cardDisplayStartTimeRef.current) / 1000; // in seconds
+        
+        if (timeDisplayed > 60) {
+          // Auto-pause timer if card shown for more than 60 seconds
+          setTimerActive(false);
+          wasAutoPausedRef.current = true;
+        }
+      }
+    }, 1000); // Check every second
+
+    return () => clearInterval(checkInterval);
+  }, [timerActive, loading, cards.length]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -252,11 +338,13 @@ const Flashcards = () => {
   const loadDecks = async () => {
     try {
       const response = await flashcardAPI.getMyDecks();
-      const loadedDecks = response.data || [];
+      // Backend returns array directly, not wrapped in data property
+      const loadedDecks = Array.isArray(response.data) ? response.data : [];
       setDecks(loadedDecks);
       return loadedDecks;
     } catch (error) {
       console.error('Failed to load decks:', error);
+      setDecks([]);
       return [];
     }
   };
@@ -267,15 +355,38 @@ const Flashcards = () => {
     try {
       setLoading(true);
       setShowResults(false); // Reset results when loading new deck
-      const response = await flashcardAPI.getDeck(currentDeck._id);
+      const response = await flashcardAPI.getDeck(currentDeck._id, 'flashcards');
       setCards(response.data.words || []);
       setCurrentIndex(0);
       setIsFlipped(false);
+      // Store deck statistics
+      if (response.data.stats) {
+        setDeckStats({
+          totalWords: response.data.stats.totalWords || 0,
+          masteredWords: response.data.stats.masteredWords || 0,
+          remainingWords: response.data.stats.remainingWords || 0
+        });
+      } else {
+        // Fallback: calculate from cards
+        const total = response.data.wordIds?.length || response.data.words?.length || 0;
+        const mastered = response.data.words?.filter(w => w.isKnown === true).length || 0;
+        const remaining = response.data.words?.length || 0;
+        setDeckStats({ totalWords: total, masteredWords: mastered, remainingWords: remaining });
+      }
+      // Update currentDeck with deckType if available and different (prevent infinite loop)
+      if (response.data.deckType && currentDeck && currentDeck.deckType !== response.data.deckType) {
+        isUpdatingDeckTypeRef.current = true;
+        setCurrentDeck(prev => prev ? { ...prev, deckType: response.data.deckType } : prev);
+        setTimeout(() => {
+          isUpdatingDeckTypeRef.current = false;
+        }, 0);
+      }
       // Ensure timer is active when cards are loaded
       setTimerActive(true);
     } catch (error) {
       console.error('Failed to load deck cards:', error);
       setCards([]);
+      setDeckStats({ totalWords: 0, masteredWords: 0, remainingWords: 0 });
     } finally {
       setLoading(false);
     }
@@ -507,25 +618,54 @@ const Flashcards = () => {
     }
   };
 
-  // Shared function for status updates (used by keyboard, touch, and buttons)
+  // Shared function for status updates
   const handleStatusUpdate = async (isKnown, card = null) => {
     const targetCard = card || cards[currentIndex];
     if (!targetCard || !targetCard._id) return;
 
-    triggerAnimation(isKnown ? 'known' : 'unknown');
+    // If already in the desired state, don't do anything
+    if (isKnown && targetCard.isKnown === true) {
+      return;
+    }
+    if (!isKnown && targetCard.isKnown === false) {
+      return;
+    }
 
-    // Show text animation overlay
+    // Prevent multiple simultaneous status updates
+    if (isUpdatingStatusRef.current) {
+      return;
+    }
+
+    // Cancel any ongoing speech
+    if ('speechSynthesis' in window) {
+      speechSynthesis.cancel();
+    }
+
+    // Set flag to prevent auto-read during status update
+    isUpdatingStatusRef.current = true;
+
+    // Show animation and sound for both known and unknown
     if (isKnown) {
+      triggerAnimation('known');
+      // Show text animation overlay for known
+      if (!showKnownText) {
       setShowKnownText(true);
       playSuccessSound();
       setTimeout(() => setShowKnownText(false), 300);
+      }
     } else {
+      triggerAnimation('unknown');
+      // Show text animation overlay for unknown
+      if (!showUnknownText) {
       setShowUnknownText(true);
       playUnknownSound();
       setTimeout(() => setShowUnknownText(false), 300);
+      }
     }
 
     try {
+      const wasKnown = targetCard.isKnown === true;
+      
       await wordAPI.toggleWordStatus(targetCard._id, isKnown);
       
       // Update local card state
@@ -536,23 +676,33 @@ const Flashcards = () => {
       // Update last studied if using a deck
       if (currentDeck) {
         await flashcardAPI.updateLastStudied(currentDeck._id);
-      }
-
-      // Auto-advance to next card, or show results if on last card
-      setTimeout(() => {
-        setIsFlipped(false);
-        if (currentIndex >= cards.length - 1) {
-          // On last card, show results when trying to advance
-          if (!showResults) {
-            setShowResults(true);
-            setTimerActive(false);
+        
+        // Update stats only if status actually changed
+        if (isKnown && !wasKnown) {
+          // Marked as known: increase mastered, decrease remaining
+          setDeckStats(prev => ({
+            ...prev,
+            masteredWords: prev.masteredWords + 1,
+            remainingWords: Math.max(0, prev.remainingWords - 1)
+          }));
+        } else if (!isKnown && wasKnown) {
+          // Marked as unknown: decrease mastered, increase remaining
+          setDeckStats(prev => ({
+            ...prev,
+            masteredWords: Math.max(0, prev.masteredWords - 1),
+            remainingWords: prev.remainingWords + 1
+          }));
           }
-        } else {
-          setCurrentIndex((prevIndex) => prevIndex + 1);
-        }
-      }, CONSTANTS.AUTO_ADVANCE_DELAY);
+      }
+      
+      // Reset flag after a delay to allow normal operation
+      setTimeout(() => {
+        isUpdatingStatusRef.current = false;
+      }, 500);
     } catch (error) {
       console.error('Failed to update card status:', error);
+      // Reset flag on error
+      isUpdatingStatusRef.current = false;
     }
   };
 
@@ -562,10 +712,17 @@ const Flashcards = () => {
 
   const speakText = (text, lang = 'en-US', animationType = null) => {
     if ('speechSynthesis' in window) {
+      // Cancel any ongoing speech before starting new one
       speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = lang;
       utterance.rate = 0.9;
+      
+      // Store utterance end time to help with timing
+      utterance.onend = () => {
+        // Speech completed
+      };
+      
       speechSynthesis.speak(utterance);
       
       if (animationType) {
@@ -811,6 +968,20 @@ const Flashcards = () => {
     };
   }, [audioUrlWord, audioUrlSentence]);
 
+  // Auto-scroll to evaluation results when they become visible
+  useEffect(() => {
+    if (evaluationResults && evaluationType && evaluationResultsRef.current) {
+      // Small delay to ensure the element is rendered
+      setTimeout(() => {
+        evaluationResultsRef.current?.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'start',
+          inline: 'nearest'
+        });
+      }, 100);
+    }
+  }, [evaluationResults, evaluationType]);
+
 
   const handleDeckSelect = async (deckId) => {
     if (!deckId) {
@@ -838,12 +1009,6 @@ const Flashcards = () => {
   // We don't check remaining === 0 here because that would trigger on the last card itself
   // Instead, we check in goToNextCard and handleStatusUpdate when trying to go past the last card
 
-  if (loading) {
-    return <div className="loading">Loading cards...</div>;
-  }
-
-  const currentCard = cards.length > 0 && currentIndex < cards.length ? cards[currentIndex] : null;
-
   return (
     <div className="flashcards-container">
       {/* Top Bar */}
@@ -868,13 +1033,6 @@ const Flashcards = () => {
               </option>
             ))}
           </select>
-
-          <button
-            onClick={() => navigate('/decks')}
-            className="btn btn-secondary"
-          >
-            Decks
-          </button>
         </div>
       </div>
 
@@ -882,7 +1040,11 @@ const Flashcards = () => {
       <div className="flashcards-content">
         {/* Center - Card Area */}
         <div className="flashcard-area">
-          {cards.length === 0 ? (
+          {loading ? (
+            <div className="empty-state" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1rem' }}>
+              <FaHourglassHalf style={{ fontSize: '4rem', opacity: 0.6 }} />
+            </div>
+          ) : cards.length === 0 ? (
             <div className="empty-state">
               <p>No flashcards available. Select a deck from the dropdown above or create a new deck.</p>
             </div>
@@ -1112,6 +1274,7 @@ const Flashcards = () => {
                         {card.sampleSentenceEn && (
                           <div className="card-sentence-container">
                             <p className="card-sentence">"{card.sampleSentenceEn}"</p>
+                            <div className="card-sentence-controls">
                             <div className="audio-controls-group">
                               <button
                                 onClick={(e) => { 
@@ -1198,10 +1361,10 @@ const Flashcards = () => {
                                   )}
                                 </>
                               )}
+                              </div>
                             </div>
                           </div>
                         )}
-                        <p className="card-hint">Click to flip</p>
                       </div>
 
                       {/* Back */}
@@ -1226,6 +1389,8 @@ const Flashcards = () => {
                         {card.sampleSentenceTr && (
                           <div className="card-sentence-container">
                             <p className="card-sentence">"{card.sampleSentenceTr}"</p>
+                            <div className="card-sentence-controls">
+                              <div className="audio-controls-group">
                             <button
                               onClick={(e) => { 
                                 if (isTopCard) {
@@ -1239,9 +1404,10 @@ const Flashcards = () => {
                             >
                               🔊
                             </button>
+                              </div>
+                            </div>
                           </div>
                         )}
-                        <p className="card-hint">Click to flip back</p>
                       </div>
                     </div>
                   </div>
@@ -1252,7 +1418,7 @@ const Flashcards = () => {
 
           {/* Speech Evaluation Results Pane */}
           {evaluationResults && evaluationType && (
-            <div className="speech-evaluation-results">
+            <div ref={evaluationResultsRef} className="speech-evaluation-results">
               <div className="results-header">
                 <h3>Your Results <span className="ai-label">(AI Detection)</span></h3>
               </div>
@@ -1441,7 +1607,25 @@ const Flashcards = () => {
 
           <h3>Progress</h3>
           
-          {/* Progress Stats */}
+          {/* Progress Stats - Now showing Deck Statistics */}
+          {currentDeck ? (
+            <div className="stats-grid">
+              <div className="stat-card stat-incorrect">
+                <p className="stat-label">Total Words</p>
+                <p className="stat-value">{deckStats.totalWords}</p>
+              </div>
+
+              <div className="stat-card stat-correct">
+                <p className="stat-label">Mastered</p>
+                <p className="stat-value">{deckStats.masteredWords}</p>
+              </div>
+
+              <div className="stat-card stat-remaining">
+                <p className="stat-label">Remaining</p>
+                <p className="stat-value">{deckStats.remainingWords}</p>
+              </div>
+            </div>
+          ) : (
           <div className="stats-grid">
             <div className="stat-card stat-correct">
               <p className="stat-label">Known</p>
@@ -1457,16 +1641,6 @@ const Flashcards = () => {
               <p className="stat-label">Remaining</p>
               <p className="stat-value">{progressStats.remaining}</p>
             </div>
-          </div>
-
-          {/* Deck Info */}
-          {currentDeck && (
-            <div className="deck-info">
-              <p className="deck-info-title">Current Deck</p>
-              <p className="deck-info-name">{currentDeck.name}</p>
-              <p className="deck-info-stats">
-                {currentDeck.masteredCards || 0} / {currentDeck.totalCards} mastered
-              </p>
             </div>
           )}
         </div>

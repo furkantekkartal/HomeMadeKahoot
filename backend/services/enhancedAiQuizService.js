@@ -430,9 +430,15 @@ ${studySheet}
 Category: ${category}
 Difficulty: ${difficulty}
 
+- Your sentece structure and vocabulary should match with Difficulty level: ${difficulty}. 
+--I mean, if you are prepearing a quiz in A1 level, dont use long sentences and hard words. 
+--Write everything in A1 level if you are prepearing a1 level quiz. 
+--Same for other leves. If you work in B1, sentence hardness and vocabulary range shold be in B1 level.
+
 Generate:
 1. A short, simple title (3-6 words max). Make it clear and direct.
 2. A brief description (1-2 sentences max). Keep it simple and to the point.
+
 
 Return as JSON:
 {
@@ -504,6 +510,10 @@ Requirements:
 - Questions should test understanding of the study sheet content
 - Difficulty level: ${difficulty}
 - Focus on: ${category}
+- Your sentece structure and vocabulary should match with Difficulty level: ${difficulty}. 
+--I mean, if you are prepearing a quiz in A1 level, dont use long sentences and hard words. 
+--Write everything in A1 level if you are prepearing a1 level quiz. 
+--Same for other leves. If you work in B1, sentence hardness and vocabulary range shold be in B1 level.
 
 Return as JSON array:
 [

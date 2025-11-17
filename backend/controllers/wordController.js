@@ -197,7 +197,10 @@ exports.getWordsWithStatus = async (req, res) => {
 
     const userWordMap = {};
     userWords.forEach(uw => {
-      userWordMap[uw.wordId.toString()] = uw.isKnown;
+      userWordMap[uw.wordId.toString()] = {
+        isKnown: uw.isKnown,
+        isSpelled: uw.isSpelled
+      };
     });
 
     // Get source names for each word
@@ -223,11 +226,15 @@ exports.getWordsWithStatus = async (req, res) => {
     });
 
     // Filter based on known/unknown preference
-    let filteredWords = words.map(word => ({
-      ...word.toObject(),
-      isKnown: userWordMap[word._id.toString()] || null, // null means not tracked yet
-      sources: wordSourceMap[word._id.toString()] || [] // Array of source names
-    }));
+    let filteredWords = words.map(word => {
+      const userWord = userWordMap[word._id.toString()];
+      return {
+        ...word.toObject(),
+        isKnown: userWord ? userWord.isKnown : null, // null means not tracked yet
+        isSpelled: userWord ? userWord.isSpelled : null, // null means not tracked yet
+        sources: wordSourceMap[word._id.toString()] || [] // Array of source names
+      };
+    });
 
     if (showKnown === false) {
       filteredWords = filteredWords.filter(w => w.isKnown !== true);
@@ -268,15 +275,72 @@ exports.toggleWordStatus = async (req, res) => {
       return res.status(404).json({ message: 'Word not found' });
     }
 
-    // Update or create user word record
+    // Update or create user word record - ONLY update isKnown, NEVER touch isSpelled
+    // Use $set to ensure only isKnown is updated, preserving isSpelled
     const userWord = await UserWord.findOneAndUpdate(
       { userId, wordId },
-      { isKnown: isKnown !== undefined ? isKnown : true },
+      { 
+        $set: { 
+          isKnown: isKnown !== undefined ? isKnown : true,
+          updatedAt: Date.now()
+        }
+      },
       { upsert: true, new: true }
     );
 
     res.json({
       message: `Word marked as ${userWord.isKnown ? 'known' : 'unknown'}`,
+      userWord
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Mark word spelling status (correct/incorrect)
+exports.toggleSpellingStatus = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { wordId, isSpelled } = req.body;
+
+    if (!wordId) {
+      return res.status(400).json({ message: 'Word ID is required' });
+    }
+
+    if (isSpelled === undefined) {
+      return res.status(400).json({ message: 'isSpelled status is required' });
+    }
+
+    // Verify word exists
+    const word = await Word.findById(wordId);
+    if (!word) {
+      return res.status(404).json({ message: 'Word not found' });
+    }
+
+    // Update or create user word record - ONLY update isSpelled, NEVER touch isKnown
+    // Use findOneAndUpdate with $set to ensure only isSpelled is updated
+    // When creating new document (upsert), only set isSpelled, let isKnown use its default
+    const updateData = { 
+      $set: { 
+        isSpelled: isSpelled === true,
+        updatedAt: Date.now()
+      }
+    };
+    
+    // Only set isSpelled on insert, don't touch isKnown
+    const userWord = await UserWord.findOneAndUpdate(
+      { userId, wordId },
+      updateData,
+      { 
+        upsert: true, 
+        new: true,
+        // Don't use setDefaultsOnInsert - we only want to set isSpelled
+        // isKnown will use its schema default (false) for new documents
+      }
+    );
+
+    res.json({
+      message: `Word spelling marked as ${userWord.isSpelled ? 'correct' : 'incorrect'}`,
       userWord
     });
   } catch (error) {
@@ -1284,6 +1348,10 @@ exports.generateWordImage = async (req, res) => {
       return res.status(404).json({ message: 'Word not found' });
     }
 
+    // Use wordId (sequential ID) for key selection if using Unsplash
+    // This distributes words across multiple API keys
+    const wordIndex = word.wordId ? word.wordId - 1 : null; // wordId is 1-based, convert to 0-based
+
     // Generate image using the word's information
     // If custom keywords are provided, use them; otherwise use automatic extraction
     const result = await generateWordImage(
@@ -1291,7 +1359,8 @@ exports.generateWordImage = async (req, res) => {
       word.wordType,
       word.sampleSentenceEn,
       customKeywords,
-      service
+      service,
+      wordIndex
     );
 
     // Log the search query

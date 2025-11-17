@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { quizAPI, sessionAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useStudyTimer } from '../hooks/useStudyTimer';
 import './SelfPacedQuiz.css';
 
 const SelfPacedQuiz = () => {
@@ -15,6 +16,9 @@ const SelfPacedQuiz = () => {
   const [quizCompleted, setQuizCompleted] = useState(false);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
+  
+  // Study timer for tracking quiz time
+  const { durationFormatted, endSession } = useStudyTimer('Quiz', true);
 
   useEffect(() => {
     loadQuiz();
@@ -60,6 +64,15 @@ const SelfPacedQuiz = () => {
 
   const completeQuiz = async (finalAnswers) => {
     setQuizCompleted(true);
+    
+    // End the study session to save quiz time
+    if (endSession) {
+      try {
+        await endSession();
+      } catch (error) {
+        console.error('Error ending study session:', error);
+      }
+    }
     
     if (user) {
       try {
@@ -133,7 +146,12 @@ const SelfPacedQuiz = () => {
   return (
     <div className="self-paced-quiz">
       <div className="quiz-header">
-        <h1>{quiz.title}</h1>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+          <h1>{quiz.title}</h1>
+          <div style={{ fontSize: '1rem', color: '#666', fontWeight: '500' }}>
+            ⏱️ {durationFormatted}
+          </div>
+        </div>
         <div className="progress-bar">
           <div 
             className="progress-fill"

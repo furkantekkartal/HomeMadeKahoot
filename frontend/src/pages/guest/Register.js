@@ -6,7 +6,6 @@ import '../Home.css';
 
 const GuestRegister = () => {
   const [username, setUsername] = useState('');
-  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
@@ -27,7 +26,7 @@ const GuestRegister = () => {
     setLoading(true);
 
     try {
-      await register(username, email, password);
+      await register(username, password);
       navigate('/quiz');
     } catch (err) {
       setError(err.response?.data?.message || 'Registration failed');
@@ -62,16 +61,6 @@ const GuestRegister = () => {
               required
               minLength={3}
               maxLength={20}
-            />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Email</label>
-            <input
-              type="email"
-              className="form-input"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
             />
           </div>
           <div className="form-group">

@@ -25,7 +25,6 @@ import EditQuiz from './pages/EditQuiz';
 import HostQuiz from './pages/HostQuiz';
 import SelfPacedQuiz from './pages/SelfPacedQuiz';
 import Performance from './pages/Performance';
-import BrowseQuizzes from './pages/BrowseQuizzes';
 import Profile from './pages/Profile';
 import WordDatabase from './pages/WordDatabase';
 import Flashcards from './pages/Flashcards';
@@ -33,7 +32,7 @@ import Spelling from './pages/Spelling';
 import CreateDeck from './pages/CreateDeck';
 import EditDeck from './pages/EditDeck';
 import Decks from './pages/Decks';
-import New from './pages/New';
+import DeckQuiz from './pages/DeckQuiz';
 import './App.css';
 
 const PrivateRoute = ({ children }) => {
@@ -91,21 +90,20 @@ function AppContent() {
           <Route path="/play/:sessionId" element={user ? <LoggedInPlayQuiz /> : <GuestPlayQuiz />} />
           
           {/* Logged-in only routes */}
-          <Route path="/quiz" element={<PrivateRoute><Quiz /></PrivateRoute>} />
+          <Route path="/quiz" element={<PrivateRoute><Navigate to="/deck-quiz" replace /></PrivateRoute>} />
+          <Route path="/deck-quiz" element={<PrivateRoute><DeckQuiz /></PrivateRoute>} />
           <Route path="/create-quiz" element={<PrivateRoute><CreateQuiz /></PrivateRoute>} />
           <Route path="/edit-quiz/:id" element={<PrivateRoute><EditQuiz /></PrivateRoute>} />
           <Route path="/host/:sessionId" element={<PrivateRoute><HostQuiz /></PrivateRoute>} />
           <Route path="/quiz/:id/self-paced" element={<SelfPacedQuiz />} />
-          <Route path="/browse" element={<PrivateRoute><BrowseQuizzes /></PrivateRoute>} />
           <Route path="/performance" element={<PrivateRoute><Performance /></PrivateRoute>} />
           <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
           <Route path="/words" element={<PrivateRoute><WordDatabase /></PrivateRoute>} />
           <Route path="/flashcards" element={<PrivateRoute><Flashcards /></PrivateRoute>} />
           <Route path="/spelling" element={<PrivateRoute><Spelling /></PrivateRoute>} />
-          <Route path="/new" element={<PrivateRoute><New /></PrivateRoute>} />
           <Route path="/create-deck" element={<PrivateRoute><CreateDeck /></PrivateRoute>} />
           <Route path="/edit-deck/:id" element={<PrivateRoute><EditDeck /></PrivateRoute>} />
-          <Route path="/decks" element={<PrivateRoute><Decks /></PrivateRoute>} />
+          <Route path="/decks" element={<PrivateRoute><Navigate to="/deck-quiz" replace /></PrivateRoute>} />
         </Routes>
       </main>
     </>

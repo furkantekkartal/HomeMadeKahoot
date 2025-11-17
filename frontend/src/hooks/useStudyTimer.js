@@ -22,6 +22,7 @@ export const useStudyTimer = (module, timerActive = true) => {
   const sessionIdRef = useRef(null); // Keep track of sessionId in ref for unmount
 
   const pageActiveStartRef = useRef(null); // When this page became active
+  const isPageVisibleRef = useRef(true); // Track if page is visible
 
   // Start or resume session
   const startSession = async () => {
@@ -102,16 +103,21 @@ export const useStudyTimer = (module, timerActive = true) => {
     lastActivityRef.current = Date.now();
   };
 
-  // Effect for timer - only counts time when page is active
+  // Effect for timer - only counts time when page is active and visible
   useEffect(() => {
-    if (isActive && sessionId && timerActive) {
+    if (isActive && sessionId && timerActive && isPageVisibleRef.current) {
       intervalRef.current = setInterval(() => {
+        // Don't count time if page is not visible (tab in background, minimized, etc.)
+        if (!isPageVisibleRef.current) {
+          return;
+        }
+        
         // Check idle time (2 minutes = 120 seconds)
         const idleTime = (Date.now() - lastActivityRef.current) / 1000;
         
         if (idleTime < 120) {
           // User is active on THIS page, increment duration
-          // Only count time when this specific page is mounted
+          // Only count time when this specific page is mounted and visible
           setDuration((prev) => {
             const newDuration = prev + 1;
             durationRef.current = newDuration;
@@ -185,6 +191,56 @@ export const useStudyTimer = (module, timerActive = true) => {
       events.forEach(event => {
         window.removeEventListener(event, handleActivity);
       });
+    };
+  }, []);
+
+  // Listen for page visibility changes (pause timer when tab is in background)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      const isVisible = !document.hidden;
+      isPageVisibleRef.current = isVisible;
+      
+      // If page becomes visible again, update last activity to prevent idle detection
+      if (isVisible) {
+        updateActivity();
+      } else {
+        // Page is now hidden, save current duration to backend
+        const currentSessionId = sessionIdRef.current;
+        const currentDuration = durationRef.current;
+        
+        if (currentSessionId && currentDuration >= 0) {
+          pauseSession(currentSessionId, currentDuration).catch(console.error);
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    // Also handle when window loses focus (browser minimized, etc.)
+    const handleBlur = () => {
+      isPageVisibleRef.current = false;
+      const currentSessionId = sessionIdRef.current;
+      const currentDuration = durationRef.current;
+      
+      if (currentSessionId && currentDuration >= 0) {
+        pauseSession(currentSessionId, currentDuration).catch(console.error);
+      }
+    };
+    
+    const handleFocus = () => {
+      isPageVisibleRef.current = !document.hidden;
+      if (!document.hidden) {
+        updateActivity();
+      }
+    };
+
+    window.addEventListener('blur', handleBlur);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('blur', handleBlur);
+      window.removeEventListener('focus', handleFocus);
     };
   }, []);
 

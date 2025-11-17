@@ -10,16 +10,16 @@ const generateToken = (userId) => {
 // Register user
 exports.register = async (req, res) => {
   try {
-    const { username, email, password } = req.body;
+    const { username, password } = req.body;
 
     // Check if user exists
-    const existingUser = await User.findOne({ $or: [{ email }, { username }] });
+    const existingUser = await User.findOne({ username });
     if (existingUser) {
       return res.status(400).json({ message: 'User already exists' });
     }
 
     // Create user
-    const user = await User.create({ username, email, password });
+    const user = await User.create({ username, password });
     const token = generateToken(user._id);
 
     res.status(201).json({
@@ -27,7 +27,6 @@ exports.register = async (req, res) => {
       user: {
         id: user._id,
         username: user.username,
-        email: user.email,
         profilePictureUrl: user.profilePictureUrl
       }
     });
@@ -39,10 +38,10 @@ exports.register = async (req, res) => {
 // Login user
 exports.login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { username, password } = req.body;
 
     // Find user
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ username });
     if (!user) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
@@ -60,7 +59,6 @@ exports.login = async (req, res) => {
       user: {
         id: user._id,
         username: user.username,
-        email: user.email,
         profilePictureUrl: user.profilePictureUrl
       }
     });
@@ -85,14 +83,14 @@ exports.getMe = async (req, res) => {
 // Update profile
 exports.updateProfile = async (req, res) => {
   try {
-    const { username, email } = req.body;
+    const { username } = req.body;
     const user = await User.findById(req.user.userId);
 
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Check if username or email already exists (excluding current user)
+    // Check if username already exists (excluding current user)
     if (username && username !== user.username) {
       const existingUser = await User.findOne({ username });
       if (existingUser) {
@@ -101,20 +99,11 @@ exports.updateProfile = async (req, res) => {
       user.username = username;
     }
 
-    if (email && email !== user.email) {
-      const existingUser = await User.findOne({ email });
-      if (existingUser) {
-        return res.status(400).json({ message: 'Email already taken' });
-      }
-      user.email = email;
-    }
-
     await user.save();
 
     res.json({
       id: user._id,
       username: user.username,
-      email: user.email,
       profilePictureUrl: user.profilePictureUrl
     });
   } catch (error) {
@@ -164,7 +153,6 @@ exports.updateProfilePicture = async (req, res) => {
     res.json({
       id: user._id,
       username: user.username,
-      email: user.email,
       profilePictureUrl: user.profilePictureUrl
     });
   } catch (error) {

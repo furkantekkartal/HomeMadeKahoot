@@ -1,7 +1,7 @@
 .quiz-form-container {
   padding: 2rem;
   min-height: 100vh;
-  background: #f3f4f6;
+  background: linear-gradient(135deg, #e0e7ff 0%, #ddd6fe 100%);
 }
 
 .quiz-form {

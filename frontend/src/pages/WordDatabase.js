@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { wordAPI } from '../services/api';
+import { FaHourglassHalf } from 'react-icons/fa';
 import './WordDatabase.css';
 
 const WordDatabase = () => {
@@ -41,6 +42,16 @@ const WordDatabase = () => {
     categories3: []
   });
   const [selectedWords, setSelectedWords] = useState(new Set());
+  const [selectingAllFiltered, setSelectingAllFiltered] = useState(false);
+  const [allFilteredWordIds, setAllFilteredWordIds] = useState(new Set());
+  const [filteredStats, setFilteredStats] = useState({
+    totalWords: 0,
+    knownWords: 0,
+    unknownWords: 0,
+    spelledCorrectly: 0,
+    spelledIncorrectly: 0,
+    notSpelled: 0
+  });
   const [editingField, setEditingField] = useState(null);
   const [columnVisibility, setColumnVisibility] = useState({
     category1: true,
@@ -132,10 +143,62 @@ const WordDatabase = () => {
       setWords(wordsRes.data.words);
       setTotalPages(wordsRes.data.pagination.pages);
       setStats(statsRes.data);
+      
+      // Calculate filtered stats by fetching all filtered words
+      await calculateFilteredStats();
     } catch (error) {
       console.error('Error loading data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const calculateFilteredStats = async () => {
+    try {
+      // Fetch all words matching the current filters (without pagination)
+      const allFilteredWords = [];
+      let currentPage = 1;
+      let hasMore = true;
+
+      while (hasMore) {
+        const response = await wordAPI.getWordsWithStatus({
+          page: currentPage,
+          limit: 1000, // Large limit to reduce API calls
+          ...appliedFilters,
+          sourceId: appliedFilters.sourceId || undefined,
+          showKnown: appliedFilters.showKnown ? 'true' : 'false',
+          showUnknown: appliedFilters.showUnknown ? 'true' : 'false'
+        });
+
+        const pageWords = response.data.words || [];
+        allFilteredWords.push(...pageWords);
+
+        const totalPages = response.data.pagination?.pages || 1;
+        if (currentPage >= totalPages || pageWords.length === 0) {
+          hasMore = false;
+        } else {
+          currentPage++;
+        }
+      }
+
+      // Calculate stats from filtered words
+      const totalWords = allFilteredWords.length;
+      const knownWords = allFilteredWords.filter(w => w.isKnown === true).length;
+      const unknownWords = allFilteredWords.filter(w => w.isKnown === false).length;
+      const spelledCorrectly = allFilteredWords.filter(w => w.isSpelled === true).length;
+      const spelledIncorrectly = allFilteredWords.filter(w => w.isSpelled === false).length;
+      const notSpelled = allFilteredWords.filter(w => w.isSpelled === null || w.isSpelled === undefined).length;
+
+      setFilteredStats({
+        totalWords,
+        knownWords,
+        unknownWords,
+        spelledCorrectly,
+        spelledIncorrectly,
+        notSpelled
+      });
+    } catch (error) {
+      console.error('Error calculating filtered stats:', error);
     }
   };
 
@@ -149,12 +212,31 @@ const WordDatabase = () => {
           ? { ...word, isKnown: newStatus }
           : word
       ));
-      // Reload stats
+      // Reload stats and filtered stats
       const statsRes = await wordAPI.getUserWordStats();
       setStats(statsRes.data);
+      await calculateFilteredStats();
     } catch (error) {
       console.error('Error toggling word status:', error);
       alert('Failed to update word status');
+    }
+  };
+
+  const handleToggleSpelling = async (wordId, currentStatus) => {
+    try {
+      const newStatus = currentStatus === true ? false : true;
+      await wordAPI.toggleSpellingStatus(wordId, newStatus);
+      // Update local state
+      setWords(words.map(word => 
+        word._id === wordId 
+          ? { ...word, isSpelled: newStatus }
+          : word
+      ));
+      // Reload filtered stats
+      await calculateFilteredStats();
+    } catch (error) {
+      console.error('Error toggling spelling status:', error);
+      alert('Failed to update spelling status');
     }
   };
 
@@ -238,6 +320,66 @@ const WordDatabase = () => {
     }
   };
 
+  const handleSelectAllFiltered = async () => {
+    // Check if all filtered words are already selected
+    const allFilteredSelected = allFilteredWordIds.size > 0 && 
+      Array.from(allFilteredWordIds).every(id => selectedWords.has(id));
+
+    if (allFilteredSelected) {
+      // Deselect all filtered words
+      setSelectedWords(prev => {
+        const newSet = new Set(prev);
+        allFilteredWordIds.forEach(id => newSet.delete(id));
+        return newSet;
+      });
+      setAllFilteredWordIds(new Set());
+      return;
+    }
+
+    try {
+      setSelectingAllFiltered(true);
+      
+      // Fetch all words matching the current filters (without pagination)
+      const allWords = [];
+      let currentPage = 1;
+      let hasMore = true;
+
+      while (hasMore) {
+        const response = await wordAPI.getWordsWithStatus({
+          page: currentPage,
+          limit: 1000, // Large limit to reduce API calls
+          ...appliedFilters,
+          sourceId: appliedFilters.sourceId || undefined,
+          showKnown: appliedFilters.showKnown ? 'true' : 'false',
+          showUnknown: appliedFilters.showUnknown ? 'true' : 'false'
+        });
+
+        const pageWords = response.data.words || [];
+        allWords.push(...pageWords);
+
+        const totalPages = response.data.pagination?.pages || 1;
+        if (currentPage >= totalPages || pageWords.length === 0) {
+          hasMore = false;
+        } else {
+          currentPage++;
+        }
+      }
+
+      // Extract all word IDs
+      const allWordIds = allWords.map(word => word._id);
+      const allWordIdsSet = new Set(allWordIds);
+      setAllFilteredWordIds(allWordIdsSet);
+
+      // Select all filtered words
+      setSelectedWords(prev => new Set([...prev, ...allWordIds]));
+    } catch (error) {
+      console.error('Error selecting all filtered words:', error);
+      alert('Failed to select all filtered words: ' + (error.response?.data?.message || error.message));
+    } finally {
+      setSelectingAllFiltered(false);
+    }
+  };
+
   const handleFieldChange = async (wordId, field, value) => {
     try {
       await wordAPI.updateWord(wordId, { [field]: value });
@@ -268,6 +410,8 @@ const WordDatabase = () => {
   const handleApplyFilters = () => {
     setAppliedFilters({ ...filters });
     setPage(1);
+    // Clear all filtered words selection when filters change
+    setAllFilteredWordIds(new Set());
   };
 
   const handleExport = async (format = 'csv') => {
@@ -390,10 +534,6 @@ const WordDatabase = () => {
     return Array.from(values).sort();
   };
 
-  if (loading && !stats) {
-    return <div className="loading">Loading...</div>;
-  }
-
   return (
     <div className="word-database">
       <div className="word-database-header">
@@ -440,36 +580,84 @@ const WordDatabase = () => {
           </div>
         </div>
       </div>
+      
+      <div className="word-database-content">
       <div className="word-database-stats">
-        {stats && (
-          <div className="word-stats">
-            <div className="stat-item">
-              <span className="stat-label">Total Words:</span>
-              <span className="stat-value">{stats.totalWords}</span>
-            </div>
-            <div className="stat-item">
-              <span className="stat-label">Known:</span>
-              <span className="stat-value known">{stats.knownWords}</span>
-            </div>
-            <div className="stat-item">
-              <span className="stat-label">Unknown:</span>
-              <span className="stat-value unknown">{stats.unknownWords}</span>
-            </div>
-            <div className="stat-item">
-              <span className="stat-label">Progress:</span>
-              <span className="stat-value">
-                {stats.totalWords > 0 
-                  ? Math.round((stats.knownWords / stats.totalWords) * 100) 
-                  : 0}%
-              </span>
-            </div>
+        <div className="word-stats">
+          <div className="stat-item">
+            <span className="stat-label">Total Words:</span>
+            <span className="stat-value">
+              {loading && !filteredStats.totalWords ? <FaHourglassHalf style={{ fontSize: '1.2rem', opacity: 0.7 }} /> : (filteredStats.totalWords || 0)}
+            </span>
           </div>
-        )}
+          <div className="stat-item">
+            <span className="stat-label">Known:</span>
+            <span className="stat-value known">
+              {loading && !filteredStats.totalWords ? <FaHourglassHalf style={{ fontSize: '1.2rem', opacity: 0.7 }} /> : (filteredStats.knownWords || 0)}
+            </span>
+          </div>
+          <div className="stat-item">
+            <span className="stat-label">Unknown:</span>
+            <span className="stat-value unknown">
+              {loading && !filteredStats.totalWords ? <FaHourglassHalf style={{ fontSize: '1.2rem', opacity: 0.7 }} /> : (filteredStats.unknownWords || 0)}
+            </span>
+          </div>
+          <div className="stat-item">
+            <span className="stat-label">Progress:</span>
+            <span className="stat-value">
+              {loading && !filteredStats.totalWords ? (
+                <FaHourglassHalf style={{ fontSize: '1.2rem', opacity: 0.7 }} />
+              ) : (
+                filteredStats.totalWords > 0 
+                  ? `${Math.round((filteredStats.knownWords / filteredStats.totalWords) * 100)}%`
+                  : '0%'
+              )}
+            </span>
+          </div>
+        </div>
       </div>
 
       {/* Word List Section */}
       <div className="manual-creation-section">
         <h2>Word List</h2>
+
+        {/* Word Selection UI */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+          <div style={{ 
+            padding: '0.5rem 1rem', 
+            backgroundColor: '#e6f3ff', 
+            borderRadius: '8px',
+            fontSize: '0.9rem',
+            fontWeight: '600',
+            color: '#2563eb'
+          }}>
+            {selectedWords.size} word{selectedWords.size !== 1 ? 's' : ''} selected
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <input
+              type="checkbox"
+              id="select-all-filtered"
+              checked={allFilteredWordIds.size > 0 && Array.from(allFilteredWordIds).every(id => selectedWords.has(id))}
+              onChange={handleSelectAllFiltered}
+              disabled={selectingAllFiltered}
+              style={{ cursor: 'pointer' }}
+            />
+            <label 
+              htmlFor="select-all-filtered" 
+              style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem' }}
+            >
+              <span>Select All Filtered Words</span>
+              {allFilteredWordIds.size > 0 && (
+                <span style={{ fontSize: '0.85rem', color: '#666', fontWeight: 'normal' }}>
+                  ({allFilteredWordIds.size} words)
+                </span>
+              )}
+              {selectingAllFiltered && (
+                <span style={{ fontSize: '0.85rem', color: '#667eea' }}>Loading...</span>
+              )}
+            </label>
+          </div>
+        </div>
 
         {/* Filters */}
         <div className="word-filters">
@@ -570,7 +758,9 @@ const WordDatabase = () => {
         {/* Words Table */}
         <div className="words-table-container">
           {loading ? (
-            <div className="loading">Loading words...</div>
+            <div className="loading" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1rem', minHeight: '200px' }}>
+              <FaHourglassHalf style={{ fontSize: '3rem', opacity: 0.6 }} />
+            </div>
           ) : words.length === 0 ? (
             <div className="empty-state">
               <p>No words found matching your filters.</p>
@@ -660,7 +850,13 @@ const WordDatabase = () => {
                     onContextMenu={(e) => handleContextMenu(e, null)}
                     style={{ cursor: 'context-menu' }}
                   >
-                    Known/Unknown
+                    IsKnown?
+                  </th>
+                  <th 
+                    onContextMenu={(e) => handleContextMenu(e, null)}
+                    style={{ cursor: 'context-menu' }}
+                  >
+                    IsSpelled
                   </th>
                   <th 
                     onContextMenu={(e) => handleContextMenu(e, null)}
@@ -927,6 +1123,19 @@ const WordDatabase = () => {
                         {word.isKnown === true ? '✓ Known' : word.isKnown === false ? '✗ Unknown' : 'Not Set'}
                       </button>
                     </td>
+                    <td className="word-status-cell">
+                      <button
+                        onClick={() => handleToggleSpelling(word._id, word.isSpelled)}
+                        className={`btn btn-sm ${word.isSpelled === true ? 'btn-success' : word.isSpelled === false ? 'btn-warning' : 'btn-secondary'}`}
+                        style={{ 
+                          padding: '0.25rem 0.5rem',
+                          fontSize: '0.8rem',
+                          minWidth: '80px'
+                        }}
+                      >
+                        {word.isSpelled === true ? '✓ Yes' : word.isSpelled === false ? '✗ No' : 'Not Set'}
+                      </button>
+                    </td>
                     <td className="word-action-cell">
                       <button
                         onClick={() => handleDeleteWord(word._id, word.englishWord)}
@@ -1038,7 +1247,37 @@ const WordDatabase = () => {
               Previous
             </button>
             <span className="page-info">
-              Page {page} of {totalPages}
+              Page{' '}
+              <input
+                type="number"
+                min="1"
+                max={totalPages}
+                value={pageInput}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setPageInput(value);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    const pageNum = parseInt(pageInput);
+                    if (!isNaN(pageNum) && pageNum >= 1 && pageNum <= totalPages) {
+                      setPage(pageNum);
+                    } else {
+                      setPageInput(page.toString());
+                    }
+                  }
+                }}
+                onBlur={() => {
+                  const pageNum = parseInt(pageInput);
+                  if (!isNaN(pageNum) && pageNum >= 1 && pageNum <= totalPages) {
+                    setPage(pageNum);
+                  } else {
+                    setPageInput(page.toString());
+                  }
+                }}
+                className="page-input"
+              />
+              {' '}of {totalPages}
             </span>
             <button
               onClick={() => setPage(p => Math.min(totalPages, p + 1))}
@@ -1050,7 +1289,7 @@ const WordDatabase = () => {
           </div>
         )}
       </div>
-
+      </div>
     </div>
   );
 };

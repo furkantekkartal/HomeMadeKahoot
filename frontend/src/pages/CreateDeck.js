@@ -9,6 +9,8 @@ const CreateDeck = () => {
   const [words, setWords] = useState([]);
   const [selectedWords, setSelectedWords] = useState(new Set());
   const [loading, setLoading] = useState(true);
+  const [selectingAllFiltered, setSelectingAllFiltered] = useState(false);
+  const [allFilteredWordIds, setAllFilteredWordIds] = useState(new Set());
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [deckName, setDeckName] = useState('');
@@ -16,6 +18,7 @@ const CreateDeck = () => {
   const [level, setLevel] = useState('');
   const [skill, setSkill] = useState('');
   const [task, setTask] = useState('');
+  const [deckType, setDeckType] = useState('dynamic');
   const [questionNumber, setQuestionNumber] = useState(20);
   const [creating, setCreating] = useState(false);
   const [filters, setFilters] = useState({
@@ -100,6 +103,8 @@ const CreateDeck = () => {
   const handleApplyFilters = () => {
     setAppliedFilters({ ...filters });
     setPage(1);
+    // Clear all filtered words selection when filters change
+    setAllFilteredWordIds(new Set());
   };
 
   const handleSelectWord = (wordId) => {
@@ -129,6 +134,66 @@ const CreateDeck = () => {
       words.forEach(word => {
         setSelectedWords(prev => new Set([...prev, word._id]));
       });
+    }
+  };
+
+  const handleSelectAllFiltered = async () => {
+    // Check if all filtered words are already selected
+    const allFilteredSelected = allFilteredWordIds.size > 0 && 
+      Array.from(allFilteredWordIds).every(id => selectedWords.has(id));
+
+    if (allFilteredSelected) {
+      // Deselect all filtered words
+      setSelectedWords(prev => {
+        const newSet = new Set(prev);
+        allFilteredWordIds.forEach(id => newSet.delete(id));
+        return newSet;
+      });
+      setAllFilteredWordIds(new Set());
+      return;
+    }
+
+    try {
+      setSelectingAllFiltered(true);
+      
+      // Fetch all words matching the current filters (without pagination)
+      const allWords = [];
+      let currentPage = 1;
+      let hasMore = true;
+
+      while (hasMore) {
+        const response = await wordAPI.getWordsWithStatus({
+          page: currentPage,
+          limit: 1000, // Large limit to reduce API calls
+          ...appliedFilters,
+          sourceId: appliedFilters.sourceId || undefined,
+          showKnown: appliedFilters.showKnown ? 'true' : 'false',
+          showUnknown: appliedFilters.showUnknown ? 'true' : 'false'
+        });
+
+        const pageWords = response.data.words || [];
+        allWords.push(...pageWords);
+
+        const totalPages = response.data.pagination?.pages || 1;
+        if (currentPage >= totalPages || pageWords.length === 0) {
+          hasMore = false;
+        } else {
+          currentPage++;
+        }
+      }
+
+      // Extract all word IDs
+      const allWordIds = allWords.map(word => word._id);
+      const allWordIdsSet = new Set(allWordIds);
+      setAllFilteredWordIds(allWordIdsSet);
+
+      // Select all filtered words
+      setSelectedWords(prev => new Set([...prev, ...allWordIds]));
+    } catch (error) {
+      console.error('Error selecting all filtered words:', error);
+      alert('Failed to select all filtered words: ' + (error.response?.data?.message || error.message));
+    } finally {
+      setSelectingAllFiltered(false);
     }
   };
 
@@ -268,6 +333,7 @@ const CreateDeck = () => {
         level || null,
         skill || null,
         task || null,
+        deckType,
         Array.from(selectedWords)
       );
       alert('Deck created successfully!');
@@ -1042,6 +1108,40 @@ const CreateDeck = () => {
                 />
             </div>
 
+            <div className="form-group">
+              <label className="form-label">Deck Type *</label>
+              <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.5rem' }}>
+                <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                  <input
+                    type="radio"
+                    name="deckType"
+                    value="static"
+                    checked={deckType === 'static'}
+                    onChange={(e) => setDeckType(e.target.value)}
+                    style={{ marginRight: '0.5rem' }}
+                  />
+                  <span>Static</span>
+                  <span style={{ marginLeft: '0.5rem', fontSize: '0.85rem', color: '#666' }}>
+                    (All words always visible)
+                  </span>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                  <input
+                    type="radio"
+                    name="deckType"
+                    value="dynamic"
+                    checked={deckType === 'dynamic'}
+                    onChange={(e) => setDeckType(e.target.value)}
+                    style={{ marginRight: '0.5rem' }}
+                  />
+                  <span>Dynamic</span>
+                  <span style={{ marginLeft: '0.5rem', fontSize: '0.85rem', color: '#666' }}>
+                    (Known words hidden for you)
+                  </span>
+                </label>
+              </div>
+            </div>
+
             <div className="form-row">
               <div className="form-group">
                 <label className="form-label">Level *</label>
@@ -1118,8 +1218,34 @@ const CreateDeck = () => {
       <div className="manual-creation-section">
         <h2>Word List</h2>
         
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
         <div className="selected-count">
           {selectedWords.size} word{selectedWords.size !== 1 ? 's' : ''} selected
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <input
+              type="checkbox"
+              id="select-all-filtered"
+              checked={allFilteredWordIds.size > 0 && Array.from(allFilteredWordIds).every(id => selectedWords.has(id))}
+              onChange={handleSelectAllFiltered}
+              disabled={selectingAllFiltered}
+              style={{ cursor: 'pointer' }}
+            />
+            <label 
+              htmlFor="select-all-filtered" 
+              style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+            >
+              <span>Select All Filtered Words</span>
+              {allFilteredWordIds.size > 0 && (
+                <span style={{ fontSize: '0.85rem', color: '#666', fontWeight: 'normal' }}>
+                  ({allFilteredWordIds.size} words)
+                </span>
+              )}
+              {selectingAllFiltered && (
+                <span style={{ fontSize: '0.85rem', color: '#667eea' }}>Loading...</span>
+              )}
+            </label>
+          </div>
         </div>
 
         {/* Filters */}

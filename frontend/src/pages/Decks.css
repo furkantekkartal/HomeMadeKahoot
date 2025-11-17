@@ -3,7 +3,7 @@
   max-width: 1400px;
   margin: 0 auto;
   min-height: 100vh;
-  background: #f3f4f6;
+  background: linear-gradient(135deg, #e0e7ff 0%, #ddd6fe 100%);
 }
 
 .decks-header {

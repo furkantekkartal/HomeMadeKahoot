@@ -4,7 +4,6 @@ import { useAuth } from '../../context/AuthContext';
 import { 
   FaPlayCircle,
   FaHome,
-  FaSearch,
   FaTrophy,
   FaCog,
   FaSignOutAlt,
@@ -13,7 +12,8 @@ import {
   FaBook,
   FaIdCard,
   FaKeyboard,
-  FaPlus
+  FaPlus,
+  FaSpellCheck
 } from 'react-icons/fa';
 import './Sidebar.css';
 
@@ -76,17 +76,10 @@ const Sidebar = ({ isOpen, onClose }) => {
       <nav className="sidebar-nav">
         <Link 
           to="/" 
-          className={`nav-item ${isActive('/') && !isActive('/quiz') && !isActive('/join') && !isActive('/play') && !isActive('/new') ? 'active' : ''}`}
+          className={`nav-item ${isActive('/') && !isActive('/join') && !isActive('/play') && !isActive('/deck-quiz') ? 'active' : ''}`}
         >
           <FaHome className="nav-icon nav-icon-dashboard" />
           <span className="nav-text">Dashboard</span>
-        </Link>
-        <Link 
-          to="/new" 
-          className={`nav-item ${isActive('/new') ? 'active' : ''}`}
-        >
-          <FaPlus className="nav-icon nav-icon-create" />
-          <span className="nav-text">New</span>
         </Link>
         <Link 
           to="/join" 
@@ -96,32 +89,11 @@ const Sidebar = ({ isOpen, onClose }) => {
           <span className="nav-text">Game</span>
         </Link>
         <Link 
-          to="/quiz" 
-          className={`nav-item ${isActive('/quiz') ? 'active' : ''}`}
+          to="/deck-quiz" 
+          className={`nav-item ${isActive('/deck-quiz') || isActive('/create-deck') || isActive('/edit-deck') || isActive('/create-quiz') || isActive('/edit-quiz') ? 'active' : ''}`}
         >
-          <FaHome className="nav-icon nav-icon-dashboard" />
-          <span className="nav-text">Quiz</span>
-        </Link>
-        <Link 
-          to="/browse" 
-          className={`nav-item ${isActive('/browse') ? 'active' : ''}`}
-        >
-          <FaSearch className="nav-icon nav-icon-browse" />
-          <span className="nav-text">Browse</span>
-        </Link>
-        <Link 
-          to="/performance" 
-          className={`nav-item ${isActive('/performance') ? 'active' : ''}`}
-        >
-          <FaTrophy className="nav-icon nav-icon-performance" />
-          <span className="nav-text">Performance</span>
-        </Link>
-        <Link 
-          to="/words" 
-          className={`nav-item ${isActive('/words') ? 'active' : ''}`}
-        >
-          <FaBook className="nav-icon nav-icon-words" />
-          <span className="nav-text">Words</span>
+          <FaIdCard className="nav-icon nav-icon-deck-quiz" />
+          <span className="nav-text">Deck/Quiz</span>
         </Link>
         <Link 
           to="/flashcards" 
@@ -134,8 +106,22 @@ const Sidebar = ({ isOpen, onClose }) => {
           to="/spelling" 
           className={`nav-item ${isActive('/spelling') ? 'active' : ''}`}
         >
-          <FaKeyboard className="nav-icon nav-icon-spelling" />
+          <FaSpellCheck className="nav-icon nav-icon-spelling" />
           <span className="nav-text">Spelling</span>
+        </Link>
+        <Link 
+          to="/words" 
+          className={`nav-item ${isActive('/words') ? 'active' : ''}`}
+        >
+          <FaBook className="nav-icon nav-icon-words" />
+          <span className="nav-text">Words</span>
+        </Link>
+        <Link 
+          to="/performance" 
+          className={`nav-item ${isActive('/performance') ? 'active' : ''}`}
+        >
+          <FaTrophy className="nav-icon nav-icon-performance" />
+          <span className="nav-text">Performance</span>
         </Link>
       </nav>
 

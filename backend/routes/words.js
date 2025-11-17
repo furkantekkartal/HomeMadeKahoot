@@ -10,6 +10,7 @@ router.get('/', wordController.getWords);
 router.get('/user/stats', auth, wordController.getUserWordStats);
 router.get('/user/words', auth, wordController.getWordsWithStatus);
 router.post('/user/toggle', auth, wordController.toggleWordStatus);
+router.post('/user/toggle-spelling', auth, wordController.toggleSpellingStatus);
 router.post('/user/bulk-mark', auth, wordController.bulkMarkWords);
 router.get('/user/export', auth, wordController.exportWords);
 router.post('/user/import', auth, wordController.uploadFile, wordController.importWords);

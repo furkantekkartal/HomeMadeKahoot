@@ -10,13 +10,6 @@ const userSchema = new mongoose.Schema({
     minlength: 3,
     maxlength: 20
   },
-  email: {
-    type: String,
-    required: true,
-    unique: true,
-    trim: true,
-    lowercase: true
-  },
   password: {
     type: String,
     required: true,
@@ -44,5 +37,57 @@ userSchema.methods.comparePassword = async function(candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
 };
 
-module.exports = mongoose.model('User', userSchema);
+const User = mongoose.model('User', userSchema);
+
+// Remove email index if it exists (one-time migration)
+// This runs automatically when the model is first loaded and connection is ready
+let indexRemovalAttempted = false;
+
+async function removeEmailIndex() {
+  if (indexRemovalAttempted) return;
+  indexRemovalAttempted = true;
+  
+  try {
+    // Wait a bit to ensure connection is fully ready
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    if (!mongoose.connection.db) {
+      console.warn('Database not ready, skipping email index removal');
+      return;
+    }
+    
+    const collection = mongoose.connection.db.collection('users');
+    const indexes = await collection.indexes();
+    
+    // Check if email index exists
+    const emailIndex = indexes.find(idx => 
+      idx.name === 'email_1' || (idx.key && idx.key.email !== undefined)
+    );
+    
+    if (emailIndex) {
+      console.log(`Removing email index: ${emailIndex.name}`);
+      await collection.dropIndex(emailIndex.name);
+      console.log('✅ Email index removed successfully');
+    }
+  } catch (error) {
+    // Ignore errors (index might not exist or already removed)
+    if (error.code !== 27 && error.codeName !== 'IndexNotFound') {
+      console.warn('Warning: Could not remove email index:', error.message);
+    }
+    indexRemovalAttempted = false; // Allow retry on next connection
+  }
+}
+
+// Try to remove index when connection is ready
+if (mongoose.connection.readyState === 1) {
+  // Connection is already open
+  removeEmailIndex();
+} else {
+  // Wait for connection
+  mongoose.connection.once('open', () => {
+    removeEmailIndex();
+  });
+}
+
+module.exports = User;
 

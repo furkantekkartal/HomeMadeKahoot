@@ -1,15 +1,42 @@
 .profile-page {
-  padding: 2rem;
   min-height: 100vh;
-  background: #f3f4f6;
-  max-width: 800px;
-  margin: 0 auto;
+  background: linear-gradient(135deg, #e0e7ff 0%, #ddd6fe 100%);
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+  width: 100%;
+  box-sizing: border-box;
 }
 
-.profile-page h1 {
+.profile-header {
+  background: white;
+  padding: 1.5rem 2rem;
+  border-bottom: 2px solid #e2e8f0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.profile-header h1 {
   font-size: 2rem;
+  font-weight: 700;
   color: #2d3748;
-  margin-bottom: 2rem;
+  margin: 0;
+  margin-left: 0;
+  padding-left: 0;
+  flex: 0 0 auto;
+}
+
+.profile-content {
+  flex: 1;
+  padding: 2rem;
+  overflow-y: auto;
+  overflow-x: hidden;
+  max-width: 800px;
+  margin: 0 auto;
+  width: 100%;
 }
 
 .message {
