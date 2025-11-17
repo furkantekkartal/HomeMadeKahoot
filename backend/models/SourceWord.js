@@ -32,3 +32,4 @@ sourceWordSchema.index({ wordId: 1 });
 
 module.exports = mongoose.model('SourceWord', sourceWordSchema);
 
+
