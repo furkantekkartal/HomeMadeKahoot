@@ -750,9 +750,10 @@ const Flashcards = () => {
       
       // Check if touch is in left or right edge
       if (relativeX < edgeWidth || relativeX > (cardWidth - edgeWidth)) {
-        // Touch is in edge area - allow page scrolling by not preventing default
+        // Touch is in edge area - allow page scrolling
         isEdgeTouchRef.current = true;
         // Don't prevent default - allow native scrolling behavior
+        // Let event bubble naturally for scrolling
         return;
       }
     }
@@ -762,20 +763,35 @@ const Flashcards = () => {
     setTouchStart({ x: touchX, y: touch.clientY });
     setTouchEnd({ x: null, y: null });
     swipeDetectedRef.current = false;
-    // Prevent scrolling when touching the card center
-    e.preventDefault();
+    // Don't prevent default here - we'll check movement direction in handleTouchMove
   };
 
   const handleTouchMove = (e) => {
     // If touch started in edge area, don't interfere with scrolling at all
     if (isEdgeTouchRef.current) {
       // Don't prevent default - allow native scrolling
+      // Let event bubble naturally for scrolling
       return;
     }
     
     const touch = e.targetTouches[0];
-    setTouchEnd({ x: touch.clientX, y: touch.clientY });
-    // Prevent scrolling during swipe gesture in center area
+    const currentX = touch.clientX;
+    const currentY = touch.clientY;
+    
+    // Check if this is primarily a vertical movement (scrolling)
+    if (touchStart.x !== null && touchStart.y !== null) {
+      const deltaX = Math.abs(currentX - touchStart.x);
+      const deltaY = Math.abs(currentY - touchStart.y);
+      
+      // If vertical movement is greater, allow scrolling
+      if (deltaY > deltaX) {
+        // This is a vertical scroll - don't prevent default
+        return;
+      }
+    }
+    
+    setTouchEnd({ x: currentX, y: currentY });
+    // Prevent scrolling during horizontal swipe gesture in center area
     e.preventDefault();
   };
 
@@ -784,6 +800,7 @@ const Flashcards = () => {
     if (isEdgeTouchRef.current) {
       isEdgeTouchRef.current = false;
       // Don't prevent default - allow normal touch end behavior
+      // Let event bubble naturally
       return;
     }
     
