@@ -88,6 +88,7 @@ const Flashcards = () => {
   // Auto-pause timer state
   const cardDisplayStartTimeRef = useRef(null);
   const wasAutoPausedRef = useRef(false);
+  const isUpdatingStatusRef = useRef(false);
 
   // Study timer
   const [timerActive, setTimerActive] = useState(true);
@@ -212,8 +213,13 @@ const Flashcards = () => {
   // Calculate currentCard for use in effects (same approach as Spelling page)
   const currentCard = cards.length > 0 && currentIndex < cards.length ? cards[currentIndex] : null;
 
-  // Auto-read word when card changes (same approach as Spelling page)
+  // Auto-read word when card changes (only when currentIndex changes, not when cards array updates)
   useEffect(() => {
+    // Don't auto-read if we're in the middle of a status update
+    if (isUpdatingStatusRef.current) {
+      return;
+    }
+    
     if (currentCard && currentCard.englishWord && !loading) {
       // Small delay to ensure card is fully loaded
       const timer = setTimeout(() => {
@@ -221,8 +227,9 @@ const Flashcards = () => {
       }, 300);
       return () => clearTimeout(timer);
     }
+    // Only depend on currentIndex and loading - not cards array to avoid triggering on status updates
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentIndex, cards, loading]);
+  }, [currentIndex, loading]);
 
   // Track card display time and auto-pause timer after 60 seconds
   useEffect(() => {
@@ -611,25 +618,54 @@ const Flashcards = () => {
     }
   };
 
-  // Shared function for status updates (used by keyboard, touch, and buttons)
+  // Shared function for status updates
   const handleStatusUpdate = async (isKnown, card = null) => {
     const targetCard = card || cards[currentIndex];
     if (!targetCard || !targetCard._id) return;
 
-    triggerAnimation(isKnown ? 'known' : 'unknown');
+    // If already in the desired state, don't do anything
+    if (isKnown && targetCard.isKnown === true) {
+      return;
+    }
+    if (!isKnown && targetCard.isKnown === false) {
+      return;
+    }
 
-    // Show text animation overlay
+    // Prevent multiple simultaneous status updates
+    if (isUpdatingStatusRef.current) {
+      return;
+    }
+
+    // Cancel any ongoing speech
+    if ('speechSynthesis' in window) {
+      speechSynthesis.cancel();
+    }
+
+    // Set flag to prevent auto-read during status update
+    isUpdatingStatusRef.current = true;
+
+    // Show animation and sound for both known and unknown
     if (isKnown) {
-      setShowKnownText(true);
-      playSuccessSound();
-      setTimeout(() => setShowKnownText(false), 300);
+      triggerAnimation('known');
+      // Show text animation overlay for known
+      if (!showKnownText) {
+        setShowKnownText(true);
+        playSuccessSound();
+        setTimeout(() => setShowKnownText(false), 300);
+      }
     } else {
-      setShowUnknownText(true);
-      playUnknownSound();
-      setTimeout(() => setShowUnknownText(false), 300);
+      triggerAnimation('unknown');
+      // Show text animation overlay for unknown
+      if (!showUnknownText) {
+        setShowUnknownText(true);
+        playUnknownSound();
+        setTimeout(() => setShowUnknownText(false), 300);
+      }
     }
 
     try {
+      const wasKnown = targetCard.isKnown === true;
+      
       await wordAPI.toggleWordStatus(targetCard._id, isKnown);
       
       // Update local card state
@@ -641,62 +677,32 @@ const Flashcards = () => {
       if (currentDeck) {
         await flashcardAPI.updateLastStudied(currentDeck._id);
         
-        // For dynamic decks, reload deck to update stats and filter out known words
-        if (currentDeck.deckType === 'dynamic' && isKnown) {
-          // Reload deck to get updated stats and filtered cards
-          setTimeout(async () => {
-            try {
-              const response = await flashcardAPI.getDeck(currentDeck._id);
-              if (response.data.stats) {
-                setDeckStats({
-                  totalWords: response.data.stats.totalWords || 0,
-                  masteredWords: response.data.stats.masteredWords || 0,
-                  remainingWords: response.data.stats.remainingWords || 0
-                });
-              }
-              // Update cards (known words will be filtered out)
-              setCards(response.data.words || []);
-              // Adjust current index if needed
-              if (currentIndex >= (response.data.words || []).length) {
-                setCurrentIndex(Math.max(0, (response.data.words || []).length - 1));
-              }
-            } catch (error) {
-              console.error('Failed to reload deck after status update:', error);
-            }
-          }, 500);
-        } else {
-          // For static decks, just update stats locally
-          if (isKnown) {
-            setDeckStats(prev => ({
-              ...prev,
-              masteredWords: prev.masteredWords + 1,
-              remainingWords: Math.max(0, prev.remainingWords - 1)
-            }));
-          } else {
-            setDeckStats(prev => ({
-              ...prev,
-              masteredWords: Math.max(0, prev.masteredWords - 1),
-              remainingWords: prev.remainingWords + 1
-            }));
-          }
+        // Update stats only if status actually changed
+        if (isKnown && !wasKnown) {
+          // Marked as known: increase mastered, decrease remaining
+          setDeckStats(prev => ({
+            ...prev,
+            masteredWords: prev.masteredWords + 1,
+            remainingWords: Math.max(0, prev.remainingWords - 1)
+          }));
+        } else if (!isKnown && wasKnown) {
+          // Marked as unknown: decrease mastered, increase remaining
+          setDeckStats(prev => ({
+            ...prev,
+            masteredWords: Math.max(0, prev.masteredWords - 1),
+            remainingWords: prev.remainingWords + 1
+          }));
         }
       }
-
-      // Auto-advance to next card, or show results if on last card
+      
+      // Reset flag after a delay to allow normal operation
       setTimeout(() => {
-        setIsFlipped(false);
-        if (currentIndex >= cards.length - 1) {
-          // On last card, show results when trying to advance
-          if (!showResults) {
-            setShowResults(true);
-            setTimerActive(false);
-          }
-        } else {
-          setCurrentIndex((prevIndex) => prevIndex + 1);
-        }
-      }, CONSTANTS.AUTO_ADVANCE_DELAY);
+        isUpdatingStatusRef.current = false;
+      }, 500);
     } catch (error) {
       console.error('Failed to update card status:', error);
+      // Reset flag on error
+      isUpdatingStatusRef.current = false;
     }
   };
 
@@ -706,10 +712,17 @@ const Flashcards = () => {
 
   const speakText = (text, lang = 'en-US', animationType = null) => {
     if ('speechSynthesis' in window) {
+      // Cancel any ongoing speech before starting new one
       speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = lang;
       utterance.rate = 0.9;
+      
+      // Store utterance end time to help with timing
+      utterance.onend = () => {
+        // Speech completed
+      };
+      
       speechSynthesis.speak(utterance);
       
       if (animationType) {

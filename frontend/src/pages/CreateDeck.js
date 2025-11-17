@@ -1219,8 +1219,8 @@ const CreateDeck = () => {
         <h2>Word List</h2>
         
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
-          <div className="selected-count">
-            {selectedWords.size} word{selectedWords.size !== 1 ? 's' : ''} selected
+        <div className="selected-count">
+          {selectedWords.size} word{selectedWords.size !== 1 ? 's' : ''} selected
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <input
