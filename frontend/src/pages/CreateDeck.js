@@ -4,91 +4,6 @@ import { wordAPI, flashcardAPI } from '../services/api';
 import { DECK_LEVELS, DECK_SKILLS, DECK_TASKS } from '../constants/deckConstants';
 import './CreateDeck.css';
 
-// Build AI prompt based on file type and content (moved outside component for better performance)
-const buildAIPrompt = (content, fileType) => {
-  if (!content) return '';
-  
-  const isPDF = fileType === 'pdf';
-  
-  if (isPDF) {
-    return `This content was converted from a PDF file or webpage. Your task has two steps:
-
-STEP 1: Clean the content
-- Remove unnecessary parts: table of contents, index, ISBN numbers, page numbers, headers, footers
-- Remove navigation elements: "click here" buttons, links to other pages, advertisement text
-- Remove metadata: publication info, copyright notices (unless relevant to content)
-- Keep only the main readable content about the primary topic
-- If it's a story book, keep only the story text (no index, ISBN, etc.)
-- If it's a newspaper webpage, keep only the news article (no buttons, links, other news)
-- If it's a document, keep only the main content (no headers, footers, page numbers)
-
-STEP 2: Extract vocabulary from the cleaned content
-Extract ONLY:
-1. Individual words (nouns, verbs, adjectives, adverbs) - extract each unique word
-2. Common/important idioms (e.g., "break the ice", "hit the nail on the head") - NOT regular phrases
-3. Phrasal verbs (e.g., "give up", "look after", "turn down") - verbs with prepositions that have special meaning
-4. Always basic form of a verb. For example; "swimming", "swim," "swam," and "swum" " should be swim in your output. Similarly looked, waiting, liked, etc should be lean like look, wait, like etc.
-5. Don't return persons names like "John", "Donna", "Smith", etc. Also don't return to city or state name like "Sydney", "NSW", "New York"
-6. Don't return the example in this prompt like "break the ice", "idiom example", etc. You should check the text given after "Content converted from... " part.
-
-
-DO NOT extract:
-- Regular phrases that are not idioms or phrasal verbs
-- Common everyday phrases like "going into", "gets three", "snap is good"
-- Simple word combinations that don't have special meaning
-- Only extract idioms/phrasal verbs that are actually idioms/phrasal verbs with special meanings
-
-IMPORTANT:
-- Return ONLY plain text, nothing else
-- No explanations, no conversational messages
-- No markdown formatting, no code blocks, no backticks
-- Each word, idiom, or phrasal verb should be on a new line
-- One item per line
-- Just the extracted items, nothing more
-
-Example format:
-word1
-word2
-idiom example
-phrasal verb
-
-Content converted from PDF or webpage:
-${content}`;
-  } else {
-    return `Extract vocabulary from the following text. Extract ONLY:
-
-1. Individual words (nouns, verbs, adjectives, adverbs) - extract each unique word
-2. Common/important idioms (e.g., "break the ice", "hit the nail on the head") - NOT regular phrases
-3. Phrasal verbs (e.g., "give up", "look after", "turn down") - verbs with prepositions that have special meaning
-4. Always basic form of a verb. For example; "swimming", "swim," "swam," and "swum" " should be swim in your output. Similarly looked, waiting, liked, etc should be lean like look, wait, like etc.
-5. Don't return persons names like "John", "Donna", "Smith", etc. Also don't return to city or state name like "Sydney", "NSW", "New York"
-6. Don't return the example in this prompt like "break the ice", "idiom example", etc. You should check the text given after "Text to extract from: " part.
-
-DO NOT extract:
-- Regular phrases that are not idioms or phrasal verbs
-- Common everyday phrases like "going into", "gets three", "snap is good"
-- Simple word combinations that don't have special meaning
-- Only extract idioms/phrasal verbs that are actually idioms/phrasal verbs with special meanings
-
-IMPORTANT:
-- Return ONLY plain text, nothing else
-- No explanations, no conversational messages
-- No markdown formatting, no code blocks, no backticks
-- Each word, idiom, or phrasal verb should be on a new line
-- One item per line
-- Just the extracted items, nothing more
-
-Example format:
-word1
-word2
-idiom example
-phrasal verb
-
-Text to extract from:
-${content}`;
-  }
-};
-
 const CreateDeck = () => {
   const navigate = useNavigate();
   const [words, setWords] = useState([]);
@@ -140,8 +55,6 @@ const CreateDeck = () => {
   const [debugLogs, setDebugLogs] = useState([]);
   const [debugAIResponse, setDebugAIResponse] = useState('');
   const [debugAIPrompt, setDebugAIPrompt] = useState('');
-  const [editableAIPrompt, setEditableAIPrompt] = useState('');
-  const [isPromptExpanded, setIsPromptExpanded] = useState(false);
   const [sendingToAI, setSendingToAI] = useState(false);
   const [addingWords, setAddingWords] = useState(false);
   const [fillingColumns, setFillingColumns] = useState(false);
@@ -469,6 +382,13 @@ const CreateDeck = () => {
     setDebugLogs(prev => [...prev, `${prefix} ${message}`]);
   };
 
+  // Helper function to count words in text
+  const countWords = (text) => {
+    if (!text || typeof text !== 'string') return 0;
+    // Split by whitespace and filter out empty strings
+    return text.trim().split(/\s+/).filter(word => word.length > 0).length;
+  };
+
   const handleDebugFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -512,7 +432,8 @@ const CreateDeck = () => {
         setDebugConvertedContent(mdContent);
         setOriginalFileContent(mdContent.substring(0, 200));
         setOriginalFileTimestamp(new Date());
-        addDebugLog(`Conversion completed: ${mdContent.length} characters`, true);
+        const wordCount = countWords(mdContent);
+        addDebugLog(`Conversion completed: ${mdContent.length} characters = ${wordCount} words`, true);
       } catch (error) {
         console.error('Error converting PDF:', error);
         addDebugLog(`❌ Error converting PDF: ${error.response?.data?.error || error.message}`);
@@ -527,7 +448,8 @@ const CreateDeck = () => {
         setDebugFileContent(content);
         setOriginalFileContent(content.substring(0, 200));
         setOriginalFileTimestamp(new Date());
-        addDebugLog(`File loaded: ${content.length} characters`, true);
+        const wordCount = countWords(content);
+        addDebugLog(`File loaded: ${content.length} characters = ${wordCount} words`, true);
       };
       reader.onerror = () => {
         addDebugLog('❌ Error reading file');
@@ -596,7 +518,8 @@ const CreateDeck = () => {
       setDebugFile(virtualFile);
       
       if (isYouTube) {
-        addDebugLog(`Conversion completed: ${mdContent.length} characters`, true);
+        const wordCount = countWords(mdContent);
+        addDebugLog(`Conversion completed: ${mdContent.length} characters = ${wordCount} words`, true);
         addDebugLog(`YouTube video converted successfully: ${fileName}`, true);
         if (pageTitle) {
           addDebugLog(`Video title: ${pageTitle}`, true);
@@ -605,7 +528,8 @@ const CreateDeck = () => {
           addDebugLog(`Transcript length: ${response.data.stats.transcriptLength} characters`, true);
         }
       } else {
-        addDebugLog(`Conversion completed: ${mdContent.length} characters`, true);
+        const wordCount = countWords(mdContent);
+        addDebugLog(`Conversion completed: ${mdContent.length} characters = ${wordCount} words`, true);
         addDebugLog(`Webpage converted successfully: ${fileName}`, true);
         if (pageTitle) {
           addDebugLog(`Page title extracted: ${pageTitle}`, true);
@@ -644,7 +568,8 @@ const CreateDeck = () => {
     const mdContent = `# ${debugFile?.name || 'Document'}\n\n${debugFileContent}`;
     
     setDebugConvertedContent(mdContent);
-    addDebugLog(`Conversion completed: ${mdContent.length} characters`, true);
+    const wordCount = countWords(mdContent);
+    addDebugLog(`Conversion completed: ${mdContent.length} characters = ${wordCount} words`, true);
   };
 
   const handleCleanSRT = () => {
@@ -734,7 +659,9 @@ const CreateDeck = () => {
     
     setDebugCleanedContent(cleaned);
     setCleanedFileTimestamp(new Date());
-    addDebugLog(`Cleaning completed: Original: ${debugConvertedContent.length} chars → Cleaned: ${cleaned.length} chars`, true);
+    const originalWordCount = countWords(debugConvertedContent);
+    const cleanedWordCount = countWords(cleaned);
+    addDebugLog(`Cleaning completed: Original: ${debugConvertedContent.length} chars (${originalWordCount} words) → Cleaned: ${cleaned.length} chars (${cleanedWordCount} words)`, true);
   };
 
   const handleTestTitle = async () => {
@@ -840,7 +767,8 @@ const CreateDeck = () => {
           cleaned = cleaned.trim();
           
           contentToUse = cleaned;
-          addDebugLog(`Cleaning completed: ${cleaned.length} characters`, true);
+          const wordCount = countWords(cleaned);
+          addDebugLog(`Cleaning completed: ${cleaned.length} characters = ${wordCount} words`, true);
         } else {
           contentToUse = debugCleanedContent || debugConvertedContent || debugFileContent || '';
         }
@@ -970,10 +898,31 @@ const CreateDeck = () => {
             });
           }
           
-          // Also track words that were skipped due to validation
-          // We need to identify which words in the batch were skipped
-          // Since the API doesn't return the exact skipped words, we'll track based on the count
-          // For now, we'll show the skipped count per batch
+          // Also check if API returns skippedWords array directly
+          if (results.skippedWords && Array.isArray(results.skippedWords)) {
+            results.skippedWords.forEach(word => {
+              if (word && !allSkippedWords.includes(word)) {
+                allSkippedWords.push(word);
+              }
+            });
+          }
+          
+          // Collect skipped words from this batch
+          const batchSkippedWords = [];
+          if (results.errors) {
+            results.errors.forEach(e => {
+              if (e.word && !batchSkippedWords.includes(e.word)) {
+                batchSkippedWords.push(e.word);
+              }
+            });
+          }
+          if (results.skippedWords && Array.isArray(results.skippedWords)) {
+            results.skippedWords.forEach(word => {
+              if (word && !batchSkippedWords.includes(word)) {
+                batchSkippedWords.push(word);
+              }
+            });
+          }
           
           batches.push({
             batchNumber,
@@ -982,7 +931,7 @@ const CreateDeck = () => {
             duplicates: results.duplicates || 0,
             skipped: results.skipped || 0,
             words: batch,
-            skippedWords: results.errors ? results.errors.map(e => e.word).filter(Boolean) : []
+            skippedWords: batchSkippedWords
           });
           
           addDebugLog(`Batch ${batchNumber} completed: ${results.added} added, ${results.duplicates} duplicates`, true);
@@ -1094,29 +1043,6 @@ const CreateDeck = () => {
     }
   };
 
-  // Update prompt when content changes
-  useEffect(() => {
-    if (!debugFile && !webpageUrl) {
-      setEditableAIPrompt('');
-      return;
-    }
-    
-    const ext = debugFile?.name.toLowerCase().split('.').pop() || 'webpage';
-    const isPDF = ext === 'pdf';
-    const isWebpage = webpageUrl && webpageUrl.trim() !== '';
-    
-    // For PDF and Webpage: use converted content directly (cleaning is done by AI)
-    // For SRT/TXT: prioritize cleaned content, then converted, then raw file
-    const contentToUse = (isPDF || isWebpage)
-      ? (debugConvertedContent || debugFileContent)
-      : (debugCleanedContent || debugConvertedContent || debugFileContent);
-    
-    if (contentToUse) {
-      const fileType = isWebpage ? 'pdf' : ext; // Treat webpage like PDF for prompt building
-      const prompt = buildAIPrompt(contentToUse, fileType);
-      setEditableAIPrompt(prompt);
-    }
-  }, [debugFile, debugConvertedContent, debugCleanedContent, debugFileContent, webpageUrl]);
 
   const handleSendToAI = async () => {
     // Determine file type
@@ -1135,9 +1061,8 @@ const CreateDeck = () => {
       return;
     }
 
-    // Use the editable prompt if available, otherwise build it
+    // Backend will build the prompt automatically based on file type
     const fileType = isWebpage ? 'pdf' : ext; // Treat webpage like PDF for AI processing
-    const promptToUse = editableAIPrompt.trim() || buildAIPrompt(contentToSend, fileType);
 
     setSendingToAI(true);
     addDebugLog('🤖 Sending content to AI...');
@@ -1148,7 +1073,8 @@ const CreateDeck = () => {
     }
     
     try {
-      const response = await flashcardAPI.processMarkdownWithAI(contentToSend, fileType || null, promptToUse);
+      // Backend builds the prompt automatically - no need to send custom prompt
+      const response = await flashcardAPI.processMarkdownWithAI(contentToSend, fileType || null, null);
       const aiResponse = response.data.response;
       const aiPrompt = response.data.prompt;
       
@@ -1158,7 +1084,8 @@ const CreateDeck = () => {
       setFirstAIResponseTimestamp(new Date());
       
       addDebugLog('Waiting for AI response...', true);
-      addDebugLog(`AI response received. (${aiResponse.length} characters)`, true);
+      const wordCount = countWords(aiResponse);
+      addDebugLog(`AI response received. (${aiResponse.length} characters = ${wordCount} words)`, true);
     } catch (error) {
       console.error('Error sending to AI:', error);
       let errorMessage = 'Failed to process with AI';
@@ -1351,55 +1278,13 @@ const CreateDeck = () => {
           </div>
         )}
 
-        {/* AI Prompt Preview Section - Collapsible */}
-        {editableAIPrompt && (
-          <div style={{ marginBottom: '1rem', padding: '1rem', backgroundColor: '#fff3cd', borderRadius: '8px', border: '1px solid #ffc107' }}>
-            <div 
-              style={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                alignItems: 'center', 
-                cursor: 'pointer',
-                marginBottom: isPromptExpanded ? '0.5rem' : '0'
-              }}
-              onClick={() => setIsPromptExpanded(!isPromptExpanded)}
-            >
-              <h3 style={{ margin: '0', fontSize: '0.9rem', color: '#856404', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span>{isPromptExpanded ? '▼' : '▶'}</span>
-                <span>AI Prompt Preview {isPromptExpanded ? '(Click to collapse)' : '(Click to expand and edit)'}</span>
-              </h3>
-              <span style={{ fontSize: '0.75rem', color: '#856404' }}>
-                {editableAIPrompt.length} characters
-              </span>
+        {/* AI Prompt Info */}
+        {(debugFile || webpageUrl) && (
+          <div style={{ marginBottom: '1rem', padding: '1rem', backgroundColor: '#e3f2fd', borderRadius: '8px', border: '1px solid #2196f3' }}>
+            <div style={{ fontSize: '0.85rem', color: '#1565c0' }}>
+              💡 <strong>Note:</strong> AI prompts are automatically generated by the backend based on file type. 
+              The prompt will be shown in the "Content Preview" section after sending to AI.
             </div>
-            {isPromptExpanded && (
-              <div style={{ marginTop: '0.5rem' }}>
-                <label style={{ fontSize: '0.85rem', color: '#856404', marginBottom: '0.25rem', display: 'block' }}>
-                  Edit the prompt before sending to AI (for debugging):
-                </label>
-                <textarea
-                  value={editableAIPrompt}
-                  onChange={(e) => setEditableAIPrompt(e.target.value)}
-                  style={{
-                    width: '100%',
-                    minHeight: '300px',
-                    padding: '0.75rem',
-                    fontSize: '0.85rem',
-                    fontFamily: 'monospace',
-                    border: '1px solid #ffc107',
-                    borderRadius: '4px',
-                    backgroundColor: '#fff',
-                    resize: 'vertical',
-                    whiteSpace: 'pre-wrap',
-                    wordBreak: 'break-word'
-                  }}
-                  placeholder="AI prompt will appear here..."
-                />
-                <div style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: '#856404' }}>
-                  💡 Tip: You can modify this prompt to debug or customize the AI extraction behavior.
-                </div>
-              </div>
-            )}
           </div>
         )}
 
@@ -1654,11 +1539,28 @@ const CreateDeck = () => {
                   <div><strong>New words added:</strong> {databaseResults.added}</div>
                   <div><strong>Repeated/duplicates:</strong> {databaseResults.duplicates}</div>
                   {databaseResults.skipped > 0 && (
-                    <div style={{ marginTop: '0.5rem' }}>
+                    <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid #c3e6cb' }}>
                       <div><strong>Skipped (invalid):</strong> {databaseResults.skipped}</div>
-                      {skippedWords.length > 0 && (
-                        <div style={{ marginTop: '0.25rem', fontSize: '0.65rem', color: '#d32f2f' }}>
-                          <strong>Skipped words:</strong> {skippedWords.join(', ')}
+                      {skippedWords.length > 0 ? (
+                        <div style={{ marginTop: '0.5rem', padding: '0.5rem', backgroundColor: '#fff3cd', borderRadius: '4px', border: '1px solid #ffc107' }}>
+                          <div style={{ fontSize: '0.7rem', color: '#856404', marginBottom: '0.25rem' }}>
+                            <strong>Skipped words ({skippedWords.length}):</strong>
+                          </div>
+                          <div style={{ 
+                            fontSize: '0.65rem', 
+                            color: '#d32f2f',
+                            maxHeight: '150px',
+                            overflowY: 'auto',
+                            wordBreak: 'break-word',
+                            lineHeight: '1.5',
+                            fontFamily: 'monospace'
+                          }}>
+                            {skippedWords.join(', ')}
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ marginTop: '0.25rem', fontSize: '0.65rem', color: '#666', fontStyle: 'italic' }}>
+                          (Skipped word details not available)
                         </div>
                       )}
                     </div>
