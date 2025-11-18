@@ -588,6 +588,8 @@ async function generateSourceInfo(originalSourceName, sourceType, contentPreview
   let sourceCategory = 'Content';
   if (sourceType === 'srt') {
     sourceCategory = 'TvSeries';
+  } else if (sourceType === 'youtube') {
+    sourceCategory = 'YouTube';
   } else if (sourceType === 'pdf' || sourceType === 'other') {
     // Try to extract domain from URL first (most reliable)
     let domain = '';
@@ -762,6 +764,44 @@ Return ONLY a JSON object with this exact structure:
 
 No explanations, no markdown, just the JSON object.`;
     }
+  } else if (sourceType === 'youtube') {
+    // For YouTube videos: Use video title and content
+    prompt = `Generate a meaningful title and description for this YouTube video.
+
+Video Title: "${pageTitle || originalSourceName}"
+Original source name: "${originalSourceName}"
+Source type: ${sourceType}
+
+Content (first 1000 characters):
+${contentPreview.substring(0, 1000)}
+
+Your task:
+1. Use the video title provided above as the main title
+2. Extract a specific 4-5 word headline from the video title if it's long
+3. Examples:
+   - Video Title: "How to Learn English Fast - 10 Tips for Beginners"
+     Headline: "Learn English Fast Tips"
+   - Video Title: "BBC News - Breaking: Major Event Happens"
+     Headline: "BBC News Major Event"
+   - Video Title: "English Conversation Practice - Daily Dialogues"
+     Headline: "English Conversation Practice"
+   
+4. DO NOT use generic descriptions like:
+   - "YouTube Video Content"
+   - "Video Transcript"
+   - "Online Video"
+
+Generate:
+1. Title: Format as "${sourceCategory} | [4-5 word specific headline]" (e.g., "YouTube | Learn English Fast Tips")
+2. Description: A short, specific description (1-2 sentences) about what this video is about
+
+Return ONLY a JSON object with this exact structure:
+{
+  "title": "Generated title here",
+  "description": "Generated description here"
+}
+
+No explanations, no markdown, just the JSON object.`;
   } else if (sourceType === 'srt') {
     // For TV series: Use filename pattern
     prompt = `Generate a meaningful title and description for this TV series subtitle file.

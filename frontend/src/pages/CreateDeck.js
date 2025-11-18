@@ -551,7 +551,16 @@ const CreateDeck = () => {
     }
 
     setConvertingWebpage(true);
-    addDebugLog(`🌐 Converting webpage to Markdown: ${webpageUrl}`);
+    
+    // Check if it's a YouTube URL
+    const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+/;
+    const isYouTube = youtubeRegex.test(webpageUrl.trim());
+    
+    if (isYouTube) {
+      addDebugLog(`📹 Converting YouTube video to Markdown: ${webpageUrl}`);
+    } else {
+      addDebugLog(`🌐 Converting webpage to Markdown: ${webpageUrl}`);
+    }
     
     // Clear previous content
     setDebugFile(null);
@@ -570,7 +579,7 @@ const CreateDeck = () => {
     try {
       const response = await flashcardAPI.convertWebpageToMD(webpageUrl.trim());
       const mdContent = response.data.markdownContent;
-      const fileName = response.data.fileName || 'webpage.md';
+      const fileName = response.data.fileName || (isYouTube ? 'youtube.md' : 'webpage.md');
       const pageTitle = response.data.pageTitle || ''; // Store extracted page title
       
       setDebugConvertedContent(mdContent);
@@ -586,15 +595,26 @@ const CreateDeck = () => {
       };
       setDebugFile(virtualFile);
       
-      addDebugLog(`Conversion completed: ${mdContent.length} characters`, true);
-      addDebugLog(`Webpage converted successfully: ${fileName}`, true);
-      if (pageTitle) {
-        addDebugLog(`Page title extracted: ${pageTitle}`, true);
+      if (isYouTube) {
+        addDebugLog(`Conversion completed: ${mdContent.length} characters`, true);
+        addDebugLog(`YouTube video converted successfully: ${fileName}`, true);
+        if (pageTitle) {
+          addDebugLog(`Video title: ${pageTitle}`, true);
+        }
+        if (response.data.stats?.transcriptLength) {
+          addDebugLog(`Transcript length: ${response.data.stats.transcriptLength} characters`, true);
+        }
+      } else {
+        addDebugLog(`Conversion completed: ${mdContent.length} characters`, true);
+        addDebugLog(`Webpage converted successfully: ${fileName}`, true);
+        if (pageTitle) {
+          addDebugLog(`Page title extracted: ${pageTitle}`, true);
+        }
       }
     } catch (error) {
-      console.error('Error converting webpage:', error);
-      const errorMessage = error.response?.data?.error || error.response?.data?.message || error.message || 'Failed to convert webpage';
-      addDebugLog(`❌ Error converting webpage: ${errorMessage}`);
+      console.error('Error converting webpage/YouTube:', error);
+      const errorMessage = error.response?.data?.error || error.response?.data?.message || error.message || (isYouTube ? 'Failed to convert YouTube video' : 'Failed to convert webpage');
+      addDebugLog(`❌ Error: ${errorMessage}`);
       alert('Error: ' + errorMessage);
     } finally {
       setConvertingWebpage(false);
@@ -769,7 +789,17 @@ const CreateDeck = () => {
       // Determine content to use
       if (isPDF || isWebpage) {
         contentToUse = debugConvertedContent || debugFileContent || '';
-        sourceType = isPDF ? 'pdf' : 'other';
+        // Check if it's a YouTube URL
+        if (isWebpage && webpageUrl) {
+          const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+/;
+          if (youtubeRegex.test(webpageUrl.trim())) {
+            sourceType = 'youtube';
+          } else {
+            sourceType = 'other';
+          }
+        } else {
+          sourceType = isPDF ? 'pdf' : 'other';
+        }
       } else {
         // For SRT/TXT, prefer cleaned content, but if not available, clean it now
         if ((isSRT || isTXT) && !debugCleanedContent && debugConvertedContent) {
@@ -880,10 +910,16 @@ const CreateDeck = () => {
 
       // Get source file information
       const sourceName = debugFile?.name || 'Unknown Source';
-      // Determine sourceType: check if it's a webpage first, then check file extension
+      // Determine sourceType: check if it's a YouTube URL first, then webpage, then file extension
       let sourceType = 'other';
       if (webpageUrl && webpageUrl.trim() !== '') {
-        sourceType = 'other'; // Webpages use 'other' type
+        // Check if it's a YouTube URL
+        const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+/;
+        if (youtubeRegex.test(webpageUrl.trim())) {
+          sourceType = 'youtube';
+        } else {
+          sourceType = 'other'; // Regular webpages use 'other' type
+        }
       } else if (debugFile?.name) {
         const ext = debugFile.name.toLowerCase().split('.').pop();
         // Only use extension if it's a valid enum value
@@ -1185,13 +1221,13 @@ const CreateDeck = () => {
 
           {/* Webpage URL Input */}
           <div>
-            <label className="form-label">Or Paste Webpage URL</label>
+            <label className="form-label">Or Paste Webpage/YouTube URL</label>
             <div style={{ display: 'flex', gap: '0.5rem' }}>
               <input
                 type="text"
                 value={webpageUrl}
                 onChange={(e) => setWebpageUrl(e.target.value)}
-                placeholder="https://example.com/article"
+                placeholder="https://example.com/article or https://youtube.com/watch?v=..."
                 style={{ flex: 1, padding: '0.5rem', borderRadius: '4px', border: '1px solid #ddd' }}
                 disabled={convertingWebpage || convertingPDF || !!debugFile}
                 onKeyPress={(e) => {

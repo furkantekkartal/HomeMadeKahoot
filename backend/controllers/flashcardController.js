@@ -833,7 +833,7 @@ exports.convertPDFToMD = async (req, res) => {
   }
 }
 
-// Convert Webpage to Markdown using Firecrawl
+// Convert Webpage to Markdown using Firecrawl, or YouTube transcript to Markdown
 exports.convertWebpageToMD = async (req, res) => {
   console.log('convertWebpageToMD called');
   try {
@@ -841,11 +841,20 @@ exports.convertWebpageToMD = async (req, res) => {
 
     if (!url || typeof url !== 'string' || url.trim() === '') {
       return res.status(400).json({ 
-        error: 'URL is required. Please provide a valid webpage URL.' 
+        error: 'URL is required. Please provide a valid webpage URL or YouTube URL.' 
       });
     }
 
-    // Validate URL format
+    // Check if it's a YouTube URL
+    const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+/;
+    const isYouTube = youtubeRegex.test(url.trim());
+    
+    if (isYouTube) {
+      // Handle YouTube URL - extract transcript and convert to markdown
+      return await handleYouTubeConversion(req, res, url.trim());
+    }
+
+    // Validate URL format for regular webpages
     let validUrl;
     try {
       validUrl = new URL(url);
@@ -1006,6 +1015,91 @@ exports.convertWebpageToMD = async (req, res) => {
     });
   }
 };
+
+// Handle YouTube URL conversion - extract transcript and convert to markdown
+async function handleYouTubeConversion(req, res, videoUrl) {
+  try {
+    const { extractYouTubeTranscriptWithPython } = require('../services/aiDeckWordExtractionService');
+    const axios = require('axios');
+    
+    // Extract video ID
+    let videoId = '';
+    const urlPatterns = [
+      /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
+      /youtube\.com\/watch\?.*v=([^&\n?#]+)/
+    ];
+    
+    for (const pattern of urlPatterns) {
+      const match = videoUrl.match(pattern);
+      if (match && match[1]) {
+        videoId = match[1];
+        break;
+      }
+    }
+    
+    if (!videoId) {
+      return res.status(400).json({ 
+        error: 'Invalid YouTube URL format. Please provide a valid YouTube URL.' 
+      });
+    }
+    
+    console.log(`📹 Processing YouTube video: ${videoId}`);
+    
+    // Get video title using oEmbed API
+    let videoTitle = '';
+    try {
+      const oEmbedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(videoUrl)}&format=json`;
+      const oEmbedResponse = await axios.get(oEmbedUrl);
+      videoTitle = oEmbedResponse.data.title || '';
+      console.log(`📊 Video title: ${videoTitle || 'N/A'}`);
+    } catch (oEmbedError) {
+      console.warn('Could not fetch video title from oEmbed:', oEmbedError.message);
+      videoTitle = `YouTube Video ${videoId}`;
+    }
+    
+    // Extract transcript using Python script (prefers English, falls back to original language)
+    const logs = [];
+    let videoData;
+    try {
+      videoData = await extractYouTubeTranscriptWithPython(videoUrl, logs);
+      console.log(`✅ YouTube transcript extracted: ${videoData.transcript.length} characters`);
+    } catch (error) {
+      console.error('Error extracting YouTube transcript:', error);
+      return res.status(500).json({ 
+        error: `Failed to extract YouTube transcript: ${error.message}`,
+        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      });
+    }
+    
+    // Convert transcript to markdown format (similar to SRT format but as markdown)
+    // The transcript is already plain text, so we'll format it nicely
+    let markdown = `# ${videoTitle}\n\n`;
+    markdown += `**Video URL:** ${videoUrl}\n\n`;
+    markdown += `**Transcript:**\n\n${videoData.transcript}`;
+    
+    // Extract domain name for filename
+    const fileName = `youtube_${videoId}.md`;
+    
+    res.json({
+      success: true,
+      markdownContent: markdown,
+      fileName: fileName,
+      url: videoUrl,
+      pageTitle: videoTitle, // Use video title as page title
+      stats: {
+        markdownLength: markdown.length,
+        transcriptLength: videoData.transcript.length
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error converting YouTube video:', error);
+    res.status(500).json({ 
+      error: error.message || 'Failed to convert YouTube video to Markdown',
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+}
 
 // Export multer upload middleware
 exports.uploadFile = upload.single('file');

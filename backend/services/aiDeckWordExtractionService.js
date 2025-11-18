@@ -1112,6 +1112,7 @@ async function processYouTubeAndExtractWords(videoUrl) {
 
 module.exports = {
   processFileAndExtractWords,
-  processYouTubeAndExtractWords
+  processYouTubeAndExtractWords,
+  extractYouTubeTranscriptWithPython
 };
 

@@ -23,15 +23,31 @@ try:
     transcript_obj = None
     transcript_language = None
     
-    # Strategy: Try to get the best available transcript in any language
-    # 1. First, try to get any manually created transcript (usually more accurate)
+    # Strategy: Prefer English, then fallback to original language
+    # 1. First, try to get English manually created transcript (most accurate)
     try:
-        transcript_obj = transcript_list.find_manually_created_transcript([])
+        transcript_obj = transcript_list.find_manually_created_transcript(['en'])
         transcript_language = transcript_obj.language_code
     except NoTranscriptFound:
         pass
     
-    # 2. If no manual transcript, try to get any generated transcript
+    # 2. If no English manual transcript, try English generated transcript
+    if transcript_obj is None:
+        try:
+            transcript_obj = transcript_list.find_generated_transcript(['en'])
+            transcript_language = transcript_obj.language_code
+        except NoTranscriptFound:
+            pass
+    
+    # 3. If no English transcript, try any manually created transcript (usually more accurate)
+    if transcript_obj is None:
+        try:
+            transcript_obj = transcript_list.find_manually_created_transcript([])
+            transcript_language = transcript_obj.language_code
+        except NoTranscriptFound:
+            pass
+    
+    # 4. If no manual transcript, try any generated transcript
     if transcript_obj is None:
         try:
             transcript_obj = transcript_list.find_generated_transcript([])
@@ -39,7 +55,7 @@ try:
         except NoTranscriptFound:
             pass
     
-    # 3. If still nothing, iterate through all available transcripts
+    # 5. If still nothing, iterate through all available transcripts (fallback to original language)
     if transcript_obj is None:
         try:
             # Iterate through all available transcripts
