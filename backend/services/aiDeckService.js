@@ -574,20 +574,60 @@ async function generateSourceInfo(originalSourceName, sourceType, contentPreview
     throw new Error('OPENROUTER_API_KEY is not set in environment variables');
   }
 
-  // Determine source category based on type and name
+  // Log inputs for debugging
+  console.log('generateSourceInfo called with:', {
+    originalSourceName,
+    sourceType,
+    contentPreviewLength: contentPreview.length,
+    url,
+    pageTitle,
+    hasPageTitle: !!pageTitle
+  });
+
+  // Determine source category based on type, name, and URL
   let sourceCategory = 'Content';
   if (sourceType === 'srt') {
     sourceCategory = 'TvSeries';
   } else if (sourceType === 'pdf' || sourceType === 'other') {
-    // Check if it's a news website
-    if (originalSourceName.includes('news') || originalSourceName.includes('.com.au') || originalSourceName.includes('.com')) {
-      sourceCategory = '7News'; // Or extract from domain
-      // Try to extract domain name
-      const domainMatch = originalSourceName.match(/([a-zA-Z0-9-]+\.(com|com\.au|org|net))/);
-      if (domainMatch) {
-        const domain = domainMatch[1].replace(/\.(com|com\.au|org|net)$/, '');
-        sourceCategory = domain.charAt(0).toUpperCase() + domain.slice(1) + 'News';
+    // Try to extract domain from URL first (most reliable)
+    let domain = '';
+    if (url) {
+      try {
+        const urlObj = new URL(url);
+        domain = urlObj.hostname.replace(/^www\./, '');
+      } catch (e) {
+        // URL parsing failed, try from source name
       }
+    }
+    
+    // If no URL, try to extract from source name
+    if (!domain && originalSourceName) {
+      const domainMatch = originalSourceName.match(/([a-zA-Z0-9-]+\.(com|com\.au|org|net|co\.uk))/);
+      if (domainMatch) {
+        domain = domainMatch[1];
+      }
+    }
+    
+    // Determine category based on domain
+    if (domain) {
+      // Extract base domain (e.g., "bbc" from "bbc.com")
+      const baseDomain = domain.split('.')[0].toLowerCase();
+      
+      // Map common news domains
+      if (baseDomain === 'bbc') {
+        sourceCategory = 'BBC News';
+      } else if (baseDomain === '7news' || baseDomain === '7') {
+        sourceCategory = '7News';
+      } else if (baseDomain.includes('news')) {
+        sourceCategory = baseDomain.charAt(0).toUpperCase() + baseDomain.slice(1);
+      } else if (domain.includes('news') || domain.includes('.com.au') || domain.includes('.com')) {
+        // Generic news site
+        sourceCategory = baseDomain.charAt(0).toUpperCase() + baseDomain.slice(1) + ' News';
+      } else {
+        sourceCategory = 'Document';
+      }
+    } else if (originalSourceName.includes('news') || originalSourceName.includes('.com.au') || originalSourceName.includes('.com')) {
+      sourceCategory = '7News'; // Default fallback
     } else {
       sourceCategory = 'Document';
     }

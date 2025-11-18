@@ -898,43 +898,69 @@ exports.convertWebpageToMD = async (req, res) => {
       }
 
       // Extract page title from Firecrawl response (from metadata or markdown)
+      // Firecrawl v0 API structure: response.data.data.metadata.title or response.data.data.title
       let pageTitle = firecrawlData?.metadata?.title || 
                      firecrawlData?.title || 
                      response.data?.metadata?.title ||
                      response.data?.title ||
                      '';
       
+      // Log for debugging
+      console.log('Firecrawl response structure:', {
+        hasData: !!response.data?.data,
+        hasMetadata: !!response.data?.data?.metadata,
+        metadataTitle: response.data?.data?.metadata?.title,
+        dataTitle: response.data?.data?.title,
+        rootTitle: response.data?.title,
+        extractedTitle: pageTitle
+      });
+      
       // If title not in metadata, try to extract from markdown (first H1 heading)
       if (!pageTitle && markdown) {
-        // Try to find H1 heading (most common format)
+        // Try to find H1 heading (most common format) - search from start of document
         const h1Match = markdown.match(/^#\s+(.+)$/m);
-        if (h1Match) {
+        if (h1Match && h1Match[1]) {
           pageTitle = h1Match[1].trim();
           // Remove any markdown formatting from title
-          pageTitle = pageTitle.replace(/\*\*|__|\*|_|`/g, '').trim();
+          pageTitle = pageTitle.replace(/\*\*|__|\*|_|`|\[|\]|\([^)]*\)/g, '').trim();
+          // Remove links but keep text
+          pageTitle = pageTitle.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
           // Limit title length
           if (pageTitle.length > 200) {
             pageTitle = pageTitle.substring(0, 200) + '...';
           }
+          console.log('Extracted page title from H1:', pageTitle);
         } else {
           // Try to find the first line that looks like a title (long line, not a list item)
           const lines = markdown.split('\n').filter(line => {
             const trimmed = line.trim();
             return trimmed.length > 20 && 
+                   trimmed.length < 300 && // Not too long
                    !trimmed.startsWith('-') && 
                    !trimmed.startsWith('*') && 
                    !trimmed.startsWith('1.') &&
-                   !trimmed.match(/^\d+\./);
+                   !trimmed.match(/^\d+\./) &&
+                   !trimmed.match(/^\[/) && // Not a link reference
+                   !trimmed.match(/^!\[/); // Not an image
           });
           if (lines.length > 0) {
             pageTitle = lines[0].trim();
             // Remove markdown formatting
-            pageTitle = pageTitle.replace(/\*\*|__|\*|_|`|#/g, '').trim();
+            pageTitle = pageTitle.replace(/\*\*|__|\*|_|`|#|\[|\]|\([^)]*\)/g, '').trim();
+            pageTitle = pageTitle.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
             if (pageTitle.length > 200) {
               pageTitle = pageTitle.substring(0, 200) + '...';
             }
+            console.log('Extracted page title from first line:', pageTitle);
           }
         }
+      }
+      
+      // Final log
+      if (pageTitle) {
+        console.log('Final extracted page title:', pageTitle);
+      } else {
+        console.log('WARNING: No page title extracted from Firecrawl response');
       }
 
       // Extract domain name for filename
