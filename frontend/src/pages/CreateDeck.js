@@ -566,7 +566,7 @@ const CreateDeck = () => {
         setOriginalFileContent(mdContent.substring(0, 200));
         setOriginalFileTimestamp(new Date());
         const wordCount = countWords(mdContent);
-        addDebugLog(`Conversion completed: ${mdContent.length} characters = ${wordCount} words`, true);
+        addDebugLog(`Completed: ${mdContent.length} characters = ${wordCount} words`, true);
       } catch (error) {
         console.error('Error converting PDF:', error);
         addDebugLog(`❌ Error converting PDF: ${error.response?.data?.error || error.message}`);
@@ -582,7 +582,7 @@ const CreateDeck = () => {
         setOriginalFileContent(content.substring(0, 200));
         setOriginalFileTimestamp(new Date());
         const wordCount = countWords(content);
-        addDebugLog(`File loaded: ${content.length} characters = ${wordCount} words`, true);
+        addDebugLog(`Loaded: ${content.length} characters = ${wordCount} words`, true);
       };
       reader.onerror = () => {
         addDebugLog('❌ Error reading file');
@@ -701,8 +701,6 @@ const CreateDeck = () => {
       return null;
     }
 
-    addDebugLog('🔄 Converting to Markdown format...');
-    
     // Convert raw file content to MD format
     const mdContent = `# ${debugFile?.name || 'Document'}\n\n${debugFileContent}`;
     
@@ -721,8 +719,6 @@ const CreateDeck = () => {
       return;
     }
 
-    addDebugLog('🧹 Cleaning Markdown file...');
-    
     // SRT format structure (that might be in the MD content):
     // 1. Sequence number (e.g., "1")
     // 2. Blank line
@@ -803,7 +799,7 @@ const CreateDeck = () => {
     setCleanedFileTimestamp(new Date());
     const originalWordCount = countWords(debugConvertedContent);
     const cleanedWordCount = countWords(cleaned);
-    addDebugLog(`Cleaning completed: Original: ${debugConvertedContent.length} chars (${originalWordCount} words) → Cleaned: ${cleaned.length} chars (${cleanedWordCount} words)`, true);
+    addDebugLog(`Completed: Original: ${debugConvertedContent.length} chars (${originalWordCount} words) → Cleaned: ${cleaned.length} chars (${cleanedWordCount} words)`, true);
   };
 
   const handleTestTitle = async () => {
@@ -967,7 +963,6 @@ const CreateDeck = () => {
     }
 
     setAddingWords(true);
-    addDebugLog('📊 Adding words to database in batches of 100...');
     
     try {
       // Parse AI response (plain text, one word per line)
@@ -1134,7 +1129,7 @@ const CreateDeck = () => {
         isProcessing: false
       });
 
-      addDebugLog(`✅ All batches completed! Total: ${totalAdded} added, ${totalDuplicates} duplicates, ${totalSkipped} skipped`, true);
+      addDebugLog(`✅ Completed! Total: ${totalAdded} added, ${totalDuplicates} duplicates, ${totalSkipped} skipped`, true);
       setAddingWords(false);
       return { success: true, results: results, sourceInfo: sourceInfoFromAPI };
     } catch (error) {
@@ -1158,7 +1153,6 @@ const CreateDeck = () => {
 
   const handleFillWordColumns = async () => {
     setFillingColumns(true);
-    addDebugLog('🤖 Filling word columns with AI in batches of 50...');
     
     try {
       // Query database for words without Turkish meaning
@@ -1253,7 +1247,7 @@ const CreateDeck = () => {
         isProcessing: false
       });
       
-      addDebugLog(`✅ All batches completed! Total: ${totalUpdated} words updated`, true);
+      addDebugLog(`✅ Completed! Total: ${totalUpdated} words updated`, true);
     } catch (error) {
       console.error('Error filling word columns:', error);
       const errorMessage = error.response?.data?.message || error.message || 'Failed to fill word columns';
@@ -1284,7 +1278,7 @@ const CreateDeck = () => {
     }
 
     try {
-      addDebugLog(`📊 Calculating assigned level for source: "${sourceName}"...`);
+      addDebugLog('📊 Calculating assigned level');
 
       // Filter database with source name
       // First, get all sources to find the one matching the source name
@@ -1306,9 +1300,7 @@ const CreateDeck = () => {
         });
         
         if (partialMatch) {
-          addDebugLog(`📊 Found source using partial match: "${partialMatch.name || partialMatch.title}"`);
           const sourceId = partialMatch._id;
-          addDebugLog(`📊 Using source ID: ${sourceId}`);
           
           // Get all words from this source
           const wordsResponse = await wordAPI.getWordsWithStatus({
@@ -1320,7 +1312,7 @@ const CreateDeck = () => {
           });
 
           const words = wordsResponse.data.words || [];
-          addDebugLog(`📊 Found ${words.length} words in source`);
+          addDebugLog(`Found ${words.length} words in source "${partialMatch.name || partialMatch.title}"`, true);
 
           if (words.length === 0) {
             addDebugLog('⚠️ No words found in source');
@@ -1343,7 +1335,7 @@ const CreateDeck = () => {
             }
           });
 
-          addDebugLog(`📊 Level counts: A1:${counts.A1}, A2:${counts.A2}, B1:${counts.B1}, B2:${counts.B2}, C1:${counts.C1}, C2:${counts.C2}`);
+          addDebugLog(`Level counts: A1:${counts.A1}, A2:${counts.A2}, B1:${counts.B1}, B2:${counts.B2}, C1:${counts.C1}, C2:${counts.C2}`, true);
 
           // Calculate weighted mean
           const values = {
@@ -1374,7 +1366,6 @@ const CreateDeck = () => {
           });
 
           const mean = weightedSum / N;
-          addDebugLog(`📊 Weighted mean: ${mean.toFixed(2)} (N=${N})`);
 
           // Map mean to CEFR level
           const mapCefr = (mean) => {
@@ -1387,7 +1378,7 @@ const CreateDeck = () => {
           };
 
           const assignedLevel = mapCefr(mean);
-          addDebugLog(`✅ Assigned level: ${assignedLevel} (mean: ${mean.toFixed(2)})`);
+          addDebugLog(`Assigned level: ${assignedLevel} (mean: ${mean.toFixed(2)})`, true);
 
           // Store calculation details for debug display
           setLevelCalculation({
@@ -1416,7 +1407,6 @@ const CreateDeck = () => {
       }
 
       const sourceId = matchingSource._id;
-      addDebugLog(`📊 Found source ID: ${sourceId} for "${sourceName}"`);
 
       // Get all words from this source
       const wordsResponse = await wordAPI.getWordsWithStatus({
@@ -1428,7 +1418,7 @@ const CreateDeck = () => {
       });
 
       const words = wordsResponse.data.words || [];
-      addDebugLog(`📊 Found ${words.length} words in source "${sourceName}"`);
+      addDebugLog(`    Found ${words.length} words in source "${sourceName}"`, true);
 
       if (words.length === 0) {
         addDebugLog('⚠️ No words found in source');
@@ -1451,7 +1441,7 @@ const CreateDeck = () => {
         }
       });
 
-      addDebugLog(`📊 Level counts: A1:${counts.A1}, A2:${counts.A2}, B1:${counts.B1}, B2:${counts.B2}, C1:${counts.C1}, C2:${counts.C2}`);
+      addDebugLog(`    Level counts: A1:${counts.A1}, A2:${counts.A2}, B1:${counts.B1}, B2:${counts.B2}, C1:${counts.C1}, C2:${counts.C2}`, true);
 
       // Calculate weighted mean
       const values = {
@@ -1482,7 +1472,6 @@ const CreateDeck = () => {
       });
 
       const mean = weightedSum / N;
-      addDebugLog(`📊 Weighted mean: ${mean.toFixed(2)} (N=${N})`);
 
       // Map mean to CEFR level
       const mapCefr = (mean) => {
@@ -1495,7 +1484,7 @@ const CreateDeck = () => {
       };
 
       const assignedLevel = mapCefr(mean);
-      addDebugLog(`✅ Assigned level: ${assignedLevel} (mean: ${mean.toFixed(2)})`);
+      addDebugLog(`    Assigned level: ${assignedLevel} (mean: ${mean.toFixed(2)})`, true);
 
       // Store calculation details for debug display
       setLevelCalculation({
@@ -1525,8 +1514,6 @@ const CreateDeck = () => {
 
   const analyzeAndFillDeckMetadata = async (wordsFromCurrentRun = null) => {
     try {
-      addDebugLog('🔍 Analyzing words to determine Level, Skill, Task...');
-      
       // Get the latest source ID from the words that were just added
       // First, try to get words from the most recent source by querying sources
       let latestSourceId = null;
@@ -1546,7 +1533,6 @@ const CreateDeck = () => {
             return (b._id || '').localeCompare(a._id || '');
           });
           latestSourceId = sortedSources[0]._id;
-          addDebugLog(`📊 Found source ID: ${latestSourceId}`);
         }
       } catch (error) {
         console.error('Error getting sources:', error);
@@ -1572,7 +1558,6 @@ const CreateDeck = () => {
           
           if (sourceIds.size > 0) {
             latestSourceId = Math.max(...Array.from(sourceIds));
-            addDebugLog(`📊 Found source ID from words: ${latestSourceId}`);
           }
         }
       }
@@ -1699,22 +1684,16 @@ const CreateDeck = () => {
           return currentRunWordsSet.has(normalizedDbWord);
         });
         
-        addDebugLog(`📊 Filtered to ${wordsToAnalyze.length} words from current run (out of ${sourceWords.length} total in source, ${wordsFromCurrentRun.length} words in current run)`);
-        
         // If no words matched, try without normalization (exact match)
         if (wordsToAnalyze.length === 0) {
           const exactMatchSet = new Set(wordsFromCurrentRun.map(w => w.toLowerCase().trim()));
           wordsToAnalyze = sourceWords.filter(word => 
             word.englishWord && exactMatchSet.has(word.englishWord.toLowerCase().trim())
           );
-          if (wordsToAnalyze.length > 0) {
-            addDebugLog(`📊 Found ${wordsToAnalyze.length} words using exact match`);
-          }
         }
         
         // If still no match, try querying words directly by their text
         if (wordsToAnalyze.length === 0 && wordsFromCurrentRun.length > 0) {
-          addDebugLog(`📊 Attempting to query words directly by text...`);
           try {
             // Query words by searching for each word
             const wordQueries = wordsFromCurrentRun.slice(0, 20); // Limit to avoid too many queries
@@ -1746,7 +1725,6 @@ const CreateDeck = () => {
             
             if (foundWords.length > 0) {
               wordsToAnalyze = foundWords;
-              addDebugLog(`📊 Found ${foundWords.length} words by direct query`);
             }
           } catch (error) {
             console.error('Error querying words directly:', error);
@@ -1771,11 +1749,9 @@ const CreateDeck = () => {
       
       // If we have words from current run but couldn't find them in source, show breakdown with zeros
       if (wordsToAnalyze.length === 0 && wordsFromCurrentRun && wordsFromCurrentRun.length > 0) {
-        addDebugLog(`⚠️ No words matched between current run (${wordsFromCurrentRun.length} words) and source words (${sourceWords.length} words). Words may not have levels set yet.`);
         // Show breakdown with zeros but indicate it's for the current run words
         const levelBreakdownStr = DECK_LEVELS.map(lvl => `${lvl}: 0`).join(', ');
         setLevelBreakdown(levelBreakdownStr);
-        addDebugLog(`📊 Level breakdown: ${levelBreakdownStr} | ${wordsFromCurrentRun.length} words from current run (levels not available)`);
       } else {
         if (wordsWithoutLevel > 0) {
           addDebugLog(`⚠️ ${wordsWithoutLevel} words don't have englishLevel set yet (out of ${wordsToAnalyze.length} analyzed)`);
@@ -1805,17 +1781,14 @@ const CreateDeck = () => {
           // Count A1, A2, B1, B2, C1, C2 and use the most common one
           if (DECK_LEVELS.includes(mostCommonLevel)) {
             setLevel(mostCommonLevel);
-            addDebugLog(`📊 Level set to: ${mostCommonLevel} (most common: ${levelCounts[mostCommonLevel]} words)`);
           } else if (DECK_LEVELS.length > 0) {
             // Fallback to first available level
             setLevel(DECK_LEVELS[0]);
-            addDebugLog(`📊 Level set to: ${DECK_LEVELS[0]} (default, no matching level found)`);
           }
         } else {
           // No englishLevel found in words, use default
           if (DECK_LEVELS.length > 0) {
             setLevel(DECK_LEVELS[0]);
-            addDebugLog(`📊 Level set to: ${DECK_LEVELS[0]} (default, no level data in words)`);
           }
         }
       }
@@ -1847,13 +1820,10 @@ const CreateDeck = () => {
         
         if (suggestedSkill && DECK_SKILLS.includes(suggestedSkill)) {
           setSkill(suggestedSkill);
-          addDebugLog(`📊 Skill set to: ${suggestedSkill} (based on source type)`);
         } else if (DECK_SKILLS.includes('Reading')) {
           setSkill('Reading');
-          addDebugLog(`📊 Skill set to: Reading (default)`);
         } else if (DECK_SKILLS.length > 0) {
           setSkill(DECK_SKILLS[0]);
-          addDebugLog(`📊 Skill set to: ${DECK_SKILLS[0]} (default)`);
         }
       }
       
@@ -1862,14 +1832,10 @@ const CreateDeck = () => {
       if (!task || task === '') {
         if (DECK_TASKS.includes('Vocabulary')) {
           setTask('Vocabulary');
-          addDebugLog(`📊 Task set to: Vocabulary (always for this feature)`);
         } else if (DECK_TASKS.length > 0) {
           setTask(DECK_TASKS[0]);
-          addDebugLog(`📊 Task set to: ${DECK_TASKS[0]} (default)`);
         }
       }
-      
-      addDebugLog('✅ Deck metadata analysis completed');
     } catch (error) {
       console.error('Error analyzing deck metadata:', error);
       addDebugLog('⚠️ Could not analyze deck metadata');
@@ -1978,7 +1944,6 @@ const CreateDeck = () => {
             addDebugLog(`📝 Title set from source: ${webpagePageTitle}`);
           } else if (aiGeneratedTitle) {
             setDeckName(aiGeneratedTitle);
-            addDebugLog(`📝 Title set from AI: ${aiGeneratedTitle}`);
           } else if (debugFile?.name) {
             // Use file name without extension as title
             const fileName = debugFile.name.replace(/\.[^/.]+$/, '');
@@ -1991,7 +1956,6 @@ const CreateDeck = () => {
         if (!deckDescription) {
           if (aiGeneratedDescription) {
             setDeckDescription(aiGeneratedDescription);
-            addDebugLog(`📝 Description set from AI`);
           } else {
             // Fallback description
             let description = '';
@@ -2016,9 +1980,6 @@ const CreateDeck = () => {
         const totalWords = storedDbResults.added + storedDbResults.duplicates;
         const newQty = totalWords > 0 ? Math.min(totalWords, 100) : 0;
         setQuestionNumber(newQty);
-        addDebugLog(`📝 Card (qty) set to: ${newQty} (from ${storedDbResults.added} added + ${storedDbResults.duplicates} duplicates = ${totalWords} total words)`);
-        
-        addDebugLog('📝 Deck information filled: Title, Description, Word Quantity');
       } catch (error) {
         console.error('Error filling deck information:', error);
         addDebugLog('⚠️ Could not auto-fill deck information');
@@ -2030,7 +1991,6 @@ const CreateDeck = () => {
         if (!level || level === '') {
           if (DECK_LEVELS.length > 0) {
             setLevel(DECK_LEVELS[0]);
-            addDebugLog(`📊 Level set to: ${DECK_LEVELS[0]} (default, will be updated after Step 9 if words found)`);
           }
         }
         
@@ -2056,7 +2016,6 @@ const CreateDeck = () => {
           
           if (suggestedSkill && DECK_SKILLS.includes(suggestedSkill)) {
             setSkill(suggestedSkill);
-            addDebugLog(`📊 Skill set to: ${suggestedSkill} (based on source type)`);
           }
         }
         
@@ -2064,7 +2023,6 @@ const CreateDeck = () => {
         if (!task || task === '') {
           if (DECK_TASKS.includes('Vocabulary')) {
             setTask('Vocabulary');
-            addDebugLog(`📊 Task set to: Vocabulary (always for this feature)`);
           }
         }
       } catch (error) {
@@ -2104,7 +2062,6 @@ const CreateDeck = () => {
               const assignedLevel = await calculateAssignedLevel(sourceInfo.title);
               if (assignedLevel && DECK_LEVELS.includes(assignedLevel)) {
                 setLevel(assignedLevel);
-                addDebugLog(`📊 Level updated to: ${assignedLevel} (calculated from source)`);
               }
             }
             
@@ -2133,7 +2090,6 @@ const CreateDeck = () => {
               const assignedLevel = await calculateAssignedLevel(sourceInfo.title);
               if (assignedLevel && DECK_LEVELS.includes(assignedLevel)) {
                 setLevel(assignedLevel);
-                addDebugLog(`📊 Level updated to: ${assignedLevel} (calculated from source)`);
               }
             }
           } else {
@@ -2159,13 +2115,11 @@ const CreateDeck = () => {
               
               if (suggestedSkill && DECK_SKILLS.includes(suggestedSkill)) {
                 setSkill(suggestedSkill);
-                addDebugLog(`📊 Skill set to: ${suggestedSkill} (based on source type)`);
               }
             }
             if (!task || task === '') {
               if (DECK_TASKS.includes('Vocabulary')) {
                 setTask('Vocabulary');
-                addDebugLog(`📊 Task set to: Vocabulary (always for this feature)`);
               }
             }
           }
@@ -2176,7 +2130,6 @@ const CreateDeck = () => {
             const assignedLevel = await calculateAssignedLevel(sourceInfo.title);
             if (assignedLevel && DECK_LEVELS.includes(assignedLevel)) {
               setLevel(assignedLevel);
-              addDebugLog(`📊 Level updated to: ${assignedLevel} (calculated from source)`);
             }
           }
           
@@ -2219,7 +2172,6 @@ const CreateDeck = () => {
     const fileType = isWebpage ? 'pdf' : ext; // Treat webpage like PDF for AI processing
 
     setSendingToAI(true);
-    addDebugLog('🤖 Sending content to AI...');
     if (isPDF) {
       addDebugLog('📄 PDF file detected - AI is cleaning and extracting vocabulary', true);
     } else if (isWebpage) {
@@ -3022,52 +2974,57 @@ const CreateDeck = () => {
           Deck Informations
         </h2>
         
-        {/* Debug Label - Show current values */}
-        <div style={{
-          background: '#fff3cd',
-          border: '2px solid #ffc107',
-          borderRadius: '8px',
-          padding: '1rem',
-          marginBottom: '1.5rem',
-          fontSize: '0.9rem',
-          color: '#856404'
-        }}>
-          <strong>🔍 Debug Info:</strong>
-          <div style={{ marginTop: '0.5rem', display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
-            <span><strong>Card (qty):</strong> {questionNumber}</span>
-            <span><strong>Level:</strong> {level || '(not set)'}</span>
-            <span><strong>Skill:</strong> {skill || '(not set)'}</span>
-            <span><strong>Task:</strong> {task || '(not set)'}</span>
-          </div>
-          {levelBreakdown && (
-            <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid #ffc107', fontSize: '0.85rem' }}>
-              <strong>Level breakdown:</strong> {levelBreakdown}
+        {/* ============================================================================
+            DEBUG: Debug Info Display - Hidden but kept for future use
+            Uncomment to show debug information about deck metadata
+            ============================================================================ */}
+        {false && (
+          <div style={{
+            background: '#fff3cd',
+            border: '2px solid #ffc107',
+            borderRadius: '8px',
+            padding: '1rem',
+            marginBottom: '1.5rem',
+            fontSize: '0.9rem',
+            color: '#856404'
+          }}>
+            <strong>🔍 Debug Info:</strong>
+            <div style={{ marginTop: '0.5rem', display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
+              <span><strong>Card (qty):</strong> {questionNumber}</span>
+              <span><strong>Level:</strong> {level || '(not set)'}</span>
+              <span><strong>Skill:</strong> {skill || '(not set)'}</span>
+              <span><strong>Task:</strong> {task || '(not set)'}</span>
             </div>
-          )}
-          {levelCalculation && (
-            <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid #ffc107', fontSize: '0.85rem' }}>
-              <strong>Level calculation:</strong>
-              <div style={{ marginTop: '0.25rem', fontFamily: 'monospace', fontSize: '0.8rem', lineHeight: '1.4' }}>
-                <div><strong>Counts:</strong> {DECK_LEVELS.map(lvl => `${lvl}: ${levelCalculation.counts[lvl] || 0}`).join(', ')}</div>
-                <div style={{ marginTop: '0.25rem' }}><strong>Values:</strong> {DECK_LEVELS.map(lvl => `${lvl}: ${levelCalculation.values[lvl]}`).join(', ')}</div>
-                {levelCalculation.calculationDetails.length > 0 && (
+            {levelBreakdown && (
+              <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid #ffc107', fontSize: '0.85rem' }}>
+                <strong>Level breakdown:</strong> {levelBreakdown}
+              </div>
+            )}
+            {levelCalculation && (
+              <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid #ffc107', fontSize: '0.85rem' }}>
+                <strong>Level calculation:</strong>
+                <div style={{ marginTop: '0.25rem', fontFamily: 'monospace', fontSize: '0.8rem', lineHeight: '1.4' }}>
+                  <div><strong>Counts:</strong> {DECK_LEVELS.map(lvl => `${lvl}: ${levelCalculation.counts[lvl] || 0}`).join(', ')}</div>
+                  <div style={{ marginTop: '0.25rem' }}><strong>Values:</strong> {DECK_LEVELS.map(lvl => `${lvl}: ${levelCalculation.values[lvl]}`).join(', ')}</div>
+                  {levelCalculation.calculationDetails.length > 0 && (
+                    <div style={{ marginTop: '0.25rem' }}>
+                      <strong>Calculation:</strong>
+                      {levelCalculation.calculationDetails.map((detail, idx) => (
+                        <div key={idx} style={{ marginLeft: '1rem' }}>{detail}</div>
+                      ))}
+                    </div>
+                  )}
                   <div style={{ marginTop: '0.25rem' }}>
-                    <strong>Calculation:</strong>
-                    {levelCalculation.calculationDetails.map((detail, idx) => (
-                      <div key={idx} style={{ marginLeft: '1rem' }}>{detail}</div>
-                    ))}
+                    <strong>Sum:</strong> {levelCalculation.weightedSum} / <strong>N:</strong> {levelCalculation.N} = <strong>Mean:</strong> {levelCalculation.mean.toFixed(2)}
                   </div>
-                )}
-                <div style={{ marginTop: '0.25rem' }}>
-                  <strong>Sum:</strong> {levelCalculation.weightedSum} / <strong>N:</strong> {levelCalculation.N} = <strong>Mean:</strong> {levelCalculation.mean.toFixed(2)}
-                </div>
-                <div style={{ marginTop: '0.25rem', fontWeight: 'bold', color: '#1565c0' }}>
-                  → Assigned Level: {levelCalculation.assignedLevel}
+                  <div style={{ marginTop: '0.25rem', fontWeight: 'bold', color: '#1565c0' }}>
+                    → Assigned Level: {levelCalculation.assignedLevel}
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
         
         <div>
             <div className="form-group">
