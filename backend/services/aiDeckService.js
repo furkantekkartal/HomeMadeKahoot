@@ -232,9 +232,11 @@ Extract ONLY:
 1. Individual words (nouns, verbs, adjectives, adverbs) - extract each unique word
 2. Common/important idioms (e.g., "break the ice", "hit the nail on the head") - NOT regular phrases
 3. Phrasal verbs (e.g., "give up", "look after", "turn down") - verbs with prepositions that have special meaning
-4. Always basic form of a verb. For example; "swimming", "swim," "swam," and "swum" " should be swim in your output. Similarly looked, waiting, liked, etc should be lean like look, wait, like etc.
-5. Don't return persons names like "John", "Donna", "Smith", etc. Also don't return to city or state name like "Sydney", "NSW", "New York"
-6. Don't return the example in this prompt like "break the ice", "idiom example", etc. You should check the text given after "Text to extract from: " part.
+4. Always basic form of a verb. For example; "swimming", "swim," "swam," and "swum" " should be swim in your output. Similarly looked, waiting, liked, etc should be in basic form like look, wait, like etc.
+5. Don't return;
+5.1 Persons names like "John", "Donna", "Smith", etc. 
+5.2 City or state names like "Sydney", "NSW", "New York", etc. 
+5.3 Company names like "Samsung", "Costco", "Toyota", etc.
 
 DO NOT extract:
 * Regular phrases that are not idioms or phrasal verbs
@@ -267,6 +269,11 @@ ${markdownContent}`;
 1. Individual words (nouns, verbs, adjectives, adverbs) - extract each unique word
 2. Common/important idioms (e.g., "break the ice", "hit the nail on the head") - NOT regular phrases
 3. Phrasal verbs (e.g., "give up", "look after", "turn down") - verbs with prepositions that have special meaning
+4. Always basic form of a verb. For example; "swimming", "swim," "swam," and "swum" " should be swim in your output. Similarly looked, waiting, liked, etc should be in basic form like look, wait, like etc.
+5. Don't return;
+5.1 Persons names like "John", "Donna", "Smith", etc. 
+5.2 City or state names like "Sydney", "NSW", "New York", etc. 
+5.3 Company names like "Samsung", "Costco", "Toyota", etc.
 
 DO NOT extract:
 - Regular phrases that are not idioms or phrasal verbs
@@ -384,8 +391,7 @@ Example database records (10 records):
     "sampleSentenceEn": "This stain remover really works - it's amazing!",
     "sampleSentenceTr": "Bu leke çıkarıcı gerçekten işe yarıyor - harika!",
     "isKnown": true
-  },
- 
+  }, 
   {
     "wordId": 3,
     "englishWord": "locate",
@@ -501,7 +507,7 @@ For each word, return a JSON array of objects with these fields:
 - turkishMeaning (string) - Turkish translation
 - category1 (null) - MUST ALWAYS be null, never fill this field
 - category2 (null) - MUST ALWAYS be null, never fill this field
-- category3 (string or null) - optional subcategory, you may fill this if relevant, otherwise null
+- category3 (string) - you should fill this with a relevant subcategory
 - englishLevel (string) - one of: "A1", "A2", "B1", "B2", "C1", "C2"
 - sampleSentenceEn (string) - example sentence in English using this word
 - sampleSentenceTr (string) - example sentence in Turkish translation
@@ -512,7 +518,7 @@ IMPORTANT:
 - No markdown formatting, no code blocks, no backticks
 - Match the format and style of the example records
 - category1 and category2 MUST ALWAYS be null (never fill these fields)
-- category3 can be filled with a relevant subcategory or left as null
+- category3 should be filled with a relevant subcategory
 - Ensure all other fields are filled (no null values except for category1, category2, and optionally category3)
 - Start with [ and end with ]`;
 
