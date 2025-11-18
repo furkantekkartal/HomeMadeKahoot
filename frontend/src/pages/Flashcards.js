@@ -666,7 +666,6 @@ const Flashcards = () => {
         setShowKnownText(true);
         playSuccessSound();
         setTimeout(() => setShowKnownText(false), 300);
-        goToNextCard();
         // Manually trigger speaker button to pronounce the NEW card's word after navigation
         // Wait 400ms to ensure the card has changed (goToNextCard updates index after 300ms)
         setTimeout(() => {
@@ -687,7 +686,6 @@ const Flashcards = () => {
         setShowUnknownText(true);
         playUnknownSound();
         setTimeout(() => setShowUnknownText(false), 300);
-        goToNextCard();
         // Manually trigger speaker button to pronounce the NEW card's word after navigation
         // Wait 400ms to ensure the card has changed (goToNextCard updates index after 300ms)
         setTimeout(() => {

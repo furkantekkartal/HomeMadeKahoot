@@ -367,14 +367,17 @@ Return ONLY a JSON array of objects with these fields:
 - englishWord (string)
 - wordType (string, e.g., "Noun", "Verb", "Adjective", "Phrase", "Idiom", "Phrasal Verb")
 - turkishMeaning (string)
-- category1 (string, e.g., "verb", "noun", "adjective", "phrase", "idiom", "phrasal verb")
-- category2 (string, optional)
-- category3 (string, set to: "${categoryTag}")
+- category1 (null) - MUST ALWAYS be null, never fill this field
+- category2 (null) - MUST ALWAYS be null, never fill this field
+- category3 (string, set to: "${categoryTag}") - fill with the category tag provided
 - englishLevel (string, one of: "A1", "A2", "B1", "B2", "C1", "C2")
 - sampleSentenceEn (string, example sentence in English)
 - sampleSentenceTr (string, example sentence in Turkish)
 
-Return only the JSON array, no explanations.`;
+IMPORTANT:
+- category1 and category2 MUST ALWAYS be null (never fill these fields)
+- category3 should be set to "${categoryTag}"
+- Return only the JSON array, no explanations.`;
 
   const promptNum = batchIndex + 1;
   const stepStartTime = Date.now();
@@ -393,7 +396,7 @@ Return only the JSON array, no explanations.`;
         messages: [
           {
             role: 'system',
-            content: 'You are a database filling tool. Return only JSON arrays, no explanations.'
+            content: 'You are a database filling tool. IMPORTANT: category1 and category2 must ALWAYS be null - never fill these fields. category3 should be set to the provided category tag. Return only JSON arrays, no explanations.'
           },
           {
             role: 'user',
@@ -647,8 +650,8 @@ async function processFileAndExtractWords(filePath, fileName, logs = []) {
             englishWord: wordData.englishWord,
             wordType: wordData.wordType || null,
             turkishMeaning: wordData.turkishMeaning || null,
-            category1: wordData.category1 || null,
-            category2: wordData.category2 || null,
+            category1: null, // Always null, never fill this field
+            category2: null, // Always null, never fill this field
             category3: wordData.category3 || null,
             englishLevel: wordData.englishLevel || null,
             sampleSentenceEn: wordData.sampleSentenceEn || null,
@@ -998,8 +1001,8 @@ async function processYouTubeAndExtractWords(videoUrl) {
             englishWord: wordData.englishWord,
             wordType: wordData.wordType || null,
             turkishMeaning: wordData.turkishMeaning || null,
-            category1: wordData.category1 || null,
-            category2: wordData.category2 || null,
+            category1: null, // Always null, never fill this field
+            category2: null, // Always null, never fill this field
             category3: wordData.category3 || null,
             englishLevel: wordData.englishLevel || null,
             sampleSentenceEn: wordData.sampleSentenceEn || null,

@@ -197,7 +197,7 @@ Current description: "${text}"`;
  * @param {string} fileType - Type of file: 'pdf', 'srt', 'txt', or null
  * @returns {Promise<{response: string, prompt: string}>} - AI response and prompt used
  */
-async function processMarkdownWithAI(markdownContent, fileType = null) {
+async function processMarkdownWithAI(markdownContent, fileType = null, customPrompt = null) {
   if (!OPENROUTER_API_KEY) {
     throw new Error('OPENROUTER_API_KEY is not set in environment variables');
   }
@@ -205,39 +205,50 @@ async function processMarkdownWithAI(markdownContent, fileType = null) {
   let prompt;
   let systemMessage;
 
-  if (fileType === 'pdf') {
-    // PDF-specific prompt: Clean and extract vocabulary
-    prompt = `This content was converted from a PDF file. Your task has two steps:
+  // Use custom prompt if provided, otherwise build it
+  if (customPrompt && customPrompt.trim()) {
+    prompt = customPrompt;
+    // Determine system message based on file type
+    if (fileType === 'pdf') {
+      systemMessage = 'You are a content cleaning and vocabulary extraction tool for PDF files and webpages. First, clean the content by removing unnecessary parts (index, ISBN, buttons, links, headers, footers). Then extract vocabulary: 1) Individual words (nouns, verbs, adjectives, adverbs), 2) Common/important idioms (only real idioms with special meaning), 3) Phrasal verbs (verbs with prepositions that have special meaning). DO NOT extract regular phrases that are not idioms or phrasal verbs. Return ONLY plain text. No explanations, no conversational messages, no markdown formatting. Plain text, each word, idiom, or phrasal verb on a new line. One item per line. Just the extracted items, nothing more.';
+    } else {
+      systemMessage = 'You are a vocabulary extraction tool. Extract: 1) Individual words (nouns, verbs, adjectives, adverbs), 2) Common/important idioms (only real idioms with special meaning), 3) Phrasal verbs (verbs with prepositions that have special meaning). DO NOT extract regular phrases that are not idioms or phrasal verbs. Return ONLY plain text. No explanations, no conversational messages, no markdown formatting. Plain text, each word, idiom, or phrasal verb on a new line. One item per line. Just the extracted items, nothing more.';
+    }
+  } else if (fileType === 'pdf') {
+    // PDF-specific prompt: Clean and extract vocabulary (also used for webpages)
+    prompt = `This content was converted from a PDF file or webpage. Your task has two steps:
 
 STEP 1: Clean the content
-- Remove unnecessary parts: table of contents, index, ISBN numbers, page numbers, headers, footers
-- Remove navigation elements: "click here" buttons, links to other pages, advertisement text
-- Remove metadata: publication info, copyright notices (unless relevant to content)
-- Keep only the main readable content about the primary topic
-- If it's a story book, keep only the story text (no index, ISBN, etc.)
-- If it's a newspaper webpage, keep only the news article (no buttons, links, other news)
-- If it's a document, keep only the main content (no headers, footers, page numbers)
+* Remove unnecessary parts: table of contents, index, ISBN numbers, page numbers, headers, footers
+* Remove navigation elements: "click here" buttons, links to other pages, advertisement text
+* Remove metadata: publication info, copyright notices (unless relevant to content)
+* Keep only the main readable content about the primary topic
+** If it's a story book, keep only the story text (no index, ISBN, etc.)
+** If it's a newspaper webpage, keep only the news article (no buttons, links, other news)
+** If it's a document, keep only the main content (no headers, footers, page numbers)
 
 STEP 2: Extract vocabulary from the cleaned content
 Extract ONLY:
 1. Individual words (nouns, verbs, adjectives, adverbs) - extract each unique word
 2. Common/important idioms (e.g., "break the ice", "hit the nail on the head") - NOT regular phrases
 3. Phrasal verbs (e.g., "give up", "look after", "turn down") - verbs with prepositions that have special meaning
-4. V1 of a verb. For example; "swimming", "swim," "swam," and "swum" " should be swim in your output. 
+4. Always basic form of a verb. For example; "swimming", "swim," "swam," and "swum" " should be swim in your output. Similarly looked, waiting, liked, etc should be lean like look, wait, like etc.
+5. Don't return persons names like "John", "Donna", "Smith", etc. Also don't return to city or state name like "Sydney", "NSW", "New York"
+6. Don't return the example in this prompt like "break the ice", "idiom example", etc. You should check the text given after "Text to extract from: " part.
 
 DO NOT extract:
-- Regular phrases that are not idioms or phrasal verbs
-- Common everyday phrases like "going into", "gets three", "snap is good"
-- Simple word combinations that don't have special meaning
-- Only extract idioms/phrasal verbs that are actually idioms/phrasal verbs with special meanings
+* Regular phrases that are not idioms or phrasal verbs
+* Common everyday phrases like "going into", "gets three", "snap is good"
+* Simple word combinations that don't have special meaning
+* Only extract idioms/phrasal verbs that are actually idioms/phrasal verbs with special meanings
 
 IMPORTANT:
-- Return ONLY plain text, nothing else
-- No explanations, no conversational messages
-- No markdown formatting, no code blocks, no backticks
-- Each word, idiom, or phrasal verb should be on a new line
-- One item per line
-- Just the extracted items, nothing more
+* Return ONLY plain text, nothing else
+* No explanations, no conversational messages
+* No markdown formatting, no code blocks, no backticks
+* Each word, idiom, or phrasal verb should be on a new line
+* One item per line
+* Just the extracted items, nothing more
 
 Example format:
 word1
@@ -245,10 +256,10 @@ word2
 idiom example
 phrasal verb
 
-Content converted from PDF:
+Content converted from PDF or webpage:
 ${markdownContent}`;
 
-    systemMessage = 'You are a content cleaning and vocabulary extraction tool for PDF files. First, clean the PDF content by removing unnecessary parts (index, ISBN, buttons, links, headers, footers). Then extract vocabulary: 1) Individual words (nouns, verbs, adjectives, adverbs), 2) Common/important idioms (only real idioms with special meaning), 3) Phrasal verbs (verbs with prepositions that have special meaning). DO NOT extract regular phrases that are not idioms or phrasal verbs. Return ONLY plain text. No explanations, no conversational messages, no markdown formatting. Plain text, each word, idiom, or phrasal verb on a new line. One item per line. Just the extracted items, nothing more.';
+    systemMessage = 'You are a content cleaning and vocabulary extraction tool for PDF files and webpages. First, clean the content by removing unnecessary parts (index, ISBN, buttons, links, headers, footers). Then extract vocabulary: 1) Individual words (nouns, verbs, adjectives, adverbs), 2) Common/important idioms (only real idioms with special meaning), 3) Phrasal verbs (verbs with prepositions that have special meaning). DO NOT extract regular phrases that are not idioms or phrasal verbs. Return ONLY plain text. No explanations, no conversational messages, no markdown formatting. Plain text, each word, idiom, or phrasal verb on a new line. One item per line. Just the extracted items, nothing more.';
   } else {
     // SRT/TXT prompt (original)
     prompt = `Extract vocabulary from the following text. Extract ONLY:
@@ -350,132 +361,133 @@ Example database records (10 records):
 [
   {
     "wordId": 1,
-    "englishWord": "aback",
-    "wordType": "adverb",
-    "turkishMeaning": "şaşkın",
-    "category1": null,
+    "englishWord": "afraid",
+    "wordType": "adjective",
+    "turkishMeaning": "korkmuş",
+    "category1": "Oxford-3000",
     "category2": null,
     "category3": null,
-    "englishLevel": "C1",
-    "sampleSentenceEn": "I was somewhat taken aback by her honesty.",
-    "sampleSentenceTr": "Dürüstlüğü beni biraz şaşırttı.",
-    "isKnown": null
+    "englishLevel": "A1",
+    "sampleSentenceEn": "She was afraid for her children (= feared that they might be hurt).",
+    "sampleSentenceTr": "Çocukları için korkuyordu (= onlara zarar gelmesinden korkuyordu).",
+    "isKnown": true
   },
   {
     "wordId": 2,
-    "englishWord": "abandon",
-    "wordType": "verb",
-    "turkishMeaning": "terk etmek",
-    "category1": null,
+    "englishWord": "amazing",
+    "wordType": "adjective",
+    "turkishMeaning": "inanılmaz",
+    "category1": "Oxford-3000",
     "category2": null,
     "category3": null,
-    "englishLevel": "B2",
-    "sampleSentenceEn": "We had to abandon the car.",
-    "sampleSentenceTr": "Arabayı terk etmek zorunda kaldık.",
-    "isKnown": null
+    "englishLevel": "A1",
+    "sampleSentenceEn": "This stain remover really works - it's amazing!",
+    "sampleSentenceTr": "Bu leke çıkarıcı gerçekten işe yarıyor - harika!",
+    "isKnown": true
   },
+ 
   {
     "wordId": 3,
-    "englishWord": "abash",
+    "englishWord": "locate",
     "wordType": "verb",
-    "turkishMeaning": "utangaç",
-    "category1": null,
+    "turkishMeaning": "yerini tespit etmek",
+    "category1": "Oxford-3000",
     "category2": null,
     "category3": null,
-    "englishLevel": "C2",
-    "sampleSentenceEn": "Her elder cousins abashed her by commenting on her shyness.",
-    "sampleSentenceTr": "Büyük kuzenleri onun utangaçlığına dair yorumlarda bulunarak onu utandırıyorlardı.",
+    "englishLevel": "B1",
+    "sampleSentenceEn": "Our office is located in midtown Manhattan.",
+    "sampleSentenceTr": "Ofisimiz Manhattan'ın merkezinde bulunmaktadır.",
     "isKnown": null
   },
   {
     "wordId": 4,
-    "englishWord": "abate",
+    "englishWord": "located",
     "wordType": "verb",
-    "turkishMeaning": "azaltmak",
-    "category1": null,
+    "turkishMeaning": "bulunan",
+    "category1": "Oxford-3000",
     "category2": null,
     "category3": null,
     "englishLevel": "B1",
-    "sampleSentenceEn": "Our desire for consumer goods has not abated.",
-    "sampleSentenceTr": "Tüketim mallarına olan arzumuz azalmadı.",
+    "sampleSentenceEn": "Our office is located in midtown Manhattan.",
+    "sampleSentenceTr": "Ofisimiz Manhattan'ın merkezinde bulunmaktadır.",
     "isKnown": null
   },
   {
     "wordId": 5,
-    "englishWord": "abattoir",
+    "englishWord": "grocery",
     "wordType": "noun",
-    "turkishMeaning": "mezbaha",
-    "category1": null,
+    "turkishMeaning": "bakkal",
+    "category1": "Oxford-5000",
     "category2": null,
     "category3": null,
-    "englishLevel": "A1",
-    "sampleSentenceEn": "He was out at the abattoirs; where after a three-mile drive we obtained him.",
-    "sampleSentenceTr": "Mezbahalardaydı; üç mil yol gittikten sonra onu bulduk.",
+    "englishLevel": "B2",
+    "sampleSentenceEn": "America's largest grocery store chain will be bringing two new stores to Oakland.",
+    "sampleSentenceTr": "Amerika'nın en büyük market zinciri Oakland'a iki yeni mağaza açıyor.",
     "isKnown": null
   },
   {
     "wordId": 6,
-    "englishWord": "abberance",
+    "englishWord": "guideline",
     "wordType": "noun",
-    "turkishMeaning": "sapma",
-    "category1": null,
+    "turkishMeaning": "kılavuz",
+    "category1": "Oxford-5000",
     "category2": null,
     "category3": null,
-    "englishLevel": "A1",
-    "sampleSentenceEn": "This is an aberrance from the normal.",
-    "sampleSentenceTr": "Bu normalden bir sapmadır.",
+    "englishLevel": "B2",
+    "sampleSentenceEn": "Please follow the guidelines",
+    "sampleSentenceTr": "Lütfen yönergeleri izleyin",
     "isKnown": null
   },
   {
     "wordId": 7,
-    "englishWord": "abberant",
+    "englishWord": "loop",
     "wordType": "noun",
-    "turkishMeaning": "sapkın",
-    "category1": null,
+    "turkishMeaning": "döngü",
+    "category1": "Oxford-5000",
     "category2": null,
     "category3": null,
-    "englishLevel": "A1",
-    "sampleSentenceEn": "The aberrant behavior was unusual.",
-    "sampleSentenceTr": "Sapkın davranış alışılmadıktı.",
+    "englishLevel": "C1",
+    "sampleSentenceEn": "Tie the ends of the rope together in a loop.",
+    "sampleSentenceTr": "İpin uçlarını bir ilmek oluşturacak şekilde birbirine bağlayın.",
     "isKnown": null
   },
   {
     "wordId": 8,
-    "englishWord": "abbey",
+    "englishWord": "loyalty",
     "wordType": "noun",
-    "turkishMeaning": "manastır",
-    "category1": null,
+    "turkishMeaning": "bağlılık",
+    "category1": "Oxford-5000",
     "category2": null,
     "category3": null,
-    "englishLevel": "A1",
-    "sampleSentenceEn": "We glimpsed the ruined abbey from the windows of the train.",
-    "sampleSentenceTr": "Trenin penceresinden harap olmuş manastırı gördük.",
+    "englishLevel": "C1",
+    "sampleSentenceEn": "His loyalty was never in question.",
+    "sampleSentenceTr": "Sadakati hiçbir zaman sorgulanmadı.",
     "isKnown": null
   },
   {
     "wordId": 9,
-    "englishWord": "abbot",
-    "wordType": "noun",
-    "turkishMeaning": "başrahip",
-    "category1": null,
+    "englishWord": "godless",
+    "wordType": "adjective",
+    "turkishMeaning": "tanrısız",
+    "category1": "Gemini-15000",
     "category2": null,
     "category3": null,
-    "englishLevel": "A2",
-    "sampleSentenceEn": "The abbot leads the monks.",
-    "sampleSentenceTr": "Başrahip rahiplere önderlik eder.",
+    "englishLevel": "C2",
+    "sampleSentenceEn": "The villagers believed he was a godless man.",
+    "sampleSentenceTr": "Köylüler onun tanrısız bir adam olduğuna inanıyorlardı.",
     "isKnown": null
   },
   {
     "wordId": 10,
-    "englishWord": "abbreviate",
+    "englishWord": "wrecking",
     "wordType": "verb",
-    "turkishMeaning": "kısaltmak",
-    "category1": null,
+    "turkishMeaning": "yıkım",
+    "category1": "Gemini-15000",
     "category2": null,
     "category3": null,
-    "englishLevel": "C1",
-    "sampleSentenceEn": "We had to abbreviate the names of the states.",
-    "sampleSentenceTr": "Eyaletlerin isimlerini kısaltmak zorunda kaldık.",
+    "englishLevel": "C2",
+    "sampleSentenceEn": "The wrecking ball demolished the old building.",
+    "sampleSentenceTr": "Yıkım topu eski binayı yıktı.",
     "isKnown": null
   }
 ]
@@ -487,9 +499,9 @@ For each word, return a JSON array of objects with these fields:
 - englishWord (string) - the word itself
 - wordType (string) - e.g., "Noun", "Verb", "Adjective", "Adverb", "Phrase", "Idiom", "Phrasal Verb"
 - turkishMeaning (string) - Turkish translation
-- category1 (string) - optional subcategory
-- category2 (string) - optional subcategory
-- category3 (string) - optional subcategory
+- category1 (null) - MUST ALWAYS be null, never fill this field
+- category2 (null) - MUST ALWAYS be null, never fill this field
+- category3 (string or null) - optional subcategory, you may fill this if relevant, otherwise null
 - englishLevel (string) - one of: "A1", "A2", "B1", "B2", "C1", "C2"
 - sampleSentenceEn (string) - example sentence in English using this word
 - sampleSentenceTr (string) - example sentence in Turkish translation
@@ -499,7 +511,9 @@ IMPORTANT:
 - No explanations, no conversational messages
 - No markdown formatting, no code blocks, no backticks
 - Match the format and style of the example records
-- Ensure all fields are filled (no null values)
+- category1 and category2 MUST ALWAYS be null (never fill these fields)
+- category3 can be filled with a relevant subcategory or left as null
+- Ensure all other fields are filled (no null values except for category1, category2, and optionally category3)
 - Start with [ and end with ]`;
 
   try {
@@ -510,7 +524,7 @@ IMPORTANT:
         messages: [
           {
             role: 'system',
-            content: 'You are a database column filler. Fill empty columns for English words based on example database records. Return ONLY a valid JSON array of objects. No explanations, no conversational messages, no markdown formatting. Just the JSON array starting with [ and ending with ].'
+            content: 'You are a database column filler. Fill empty columns for English words based on example database records. IMPORTANT: category1 and category2 must ALWAYS be null - never fill these fields. category3 can be filled optionally. Return ONLY a valid JSON array of objects. No explanations, no conversational messages, no markdown formatting. Just the JSON array starting with [ and ending with ].'
           },
           {
             role: 'user',
@@ -546,11 +560,282 @@ IMPORTANT:
   }
 }
 
+/**
+ * Generate meaningful source title and description using AI
+ * @param {string} originalSourceName - Original source name (e.g., "7news.com.au.md", "9-1-1.Lone.Star.S01e01-en.srt")
+ * @param {string} sourceType - Type of source ('pdf', 'srt', 'txt', 'youtube', 'other')
+ * @param {string} contentPreview - First 500 characters of the content for context
+ * @param {string} url - URL of the webpage (for news articles)
+ * @param {string} pageTitle - Page title extracted from the webpage (from Firecrawl)
+ * @returns {Promise<{title: string, description: string}>} - Generated title and description
+ */
+async function generateSourceInfo(originalSourceName, sourceType, contentPreview = '', url = '', pageTitle = '') {
+  if (!OPENROUTER_API_KEY) {
+    throw new Error('OPENROUTER_API_KEY is not set in environment variables');
+  }
+
+  // Determine source category based on type and name
+  let sourceCategory = 'Content';
+  if (sourceType === 'srt') {
+    sourceCategory = 'TvSeries';
+  } else if (sourceType === 'pdf' || sourceType === 'other') {
+    // Check if it's a news website
+    if (originalSourceName.includes('news') || originalSourceName.includes('.com.au') || originalSourceName.includes('.com')) {
+      sourceCategory = '7News'; // Or extract from domain
+      // Try to extract domain name
+      const domainMatch = originalSourceName.match(/([a-zA-Z0-9-]+\.(com|com\.au|org|net))/);
+      if (domainMatch) {
+        const domain = domainMatch[1].replace(/\.(com|com\.au|org|net)$/, '');
+        sourceCategory = domain.charAt(0).toUpperCase() + domain.slice(1) + 'News';
+      }
+    } else {
+      sourceCategory = 'Document';
+    }
+  }
+
+  // For news/webpages, we need to extract the actual headline from URL
+  // For TV series, we can use the filename pattern
+  const isNewsOrWebpage = (sourceType === 'pdf' || sourceType === 'other') && 
+                          (originalSourceName.includes('news') || originalSourceName.includes('.com') || originalSourceName.includes('.com.au') || url);
+  
+  let prompt;
+  if (isNewsOrWebpage && url) {
+    // Check if URL has meaningful slug or if we have page title
+    const urlPath = new URL(url).pathname;
+    const urlSlug = urlPath.split('/').pop() || '';
+    const hasMeaningfulSlug = urlSlug && urlSlug.length > 10 && !/^[a-z0-9]+$/i.test(urlSlug); // Not just random ID
+    
+    if (pageTitle && pageTitle.trim()) {
+      // Use page title extracted from Firecrawl
+      prompt = `You are analyzing a news article. Use the page title provided below to generate a meaningful source title.
+
+URL: "${url}"
+Page Title: "${pageTitle}"
+Original source name: "${originalSourceName}"
+Source type: ${sourceType}
+
+Your task:
+1. Use the page title provided above - it's the actual headline from the webpage
+2. Extract a specific 4-5 word headline from the page title
+3. Examples:
+   - Page Title: "A Chinese firm bought an insurer for CIA agents - part of Beijing's trillion dollar spending spree"
+     Headline: "Chinese Firm Bought CIA Insurer"
+   - Page Title: "TPG Confirms Fatal 000 Failure in Emergency Services"
+     Headline: "TPG Confirms Fatal 000 Failure"
+   - Page Title: "Lachlan Young Sentenced to 28 Years for Murder"
+     Headline: "Lachlan Young Sentenced to 28 Years"
+   
+4. DO NOT use generic descriptions like:
+   - "Comprehensive Coverage of News"
+   - "Latest News Updates"
+   - "News and Lifestyle"
+   - "Breaking News Stories"
+
+5. Extract the core 4-5 word headline from the page title, removing any extra context or subtitles.
+
+Generate:
+1. Title: Format as "${sourceCategory} | [4-5 word specific headline]" (e.g., "BBC News | Chinese Firm Bought CIA Insurer")
+2. Description: A short, specific description (1-2 sentences) about what this article is actually about
+
+Return ONLY a JSON object with this exact structure:
+{
+  "title": "Generated title here",
+  "description": "Generated description here"
+}
+
+No explanations, no markdown, just the JSON object.`;
+    } else if (hasMeaningfulSlug) {
+      // URL has meaningful slug - extract from URL
+      prompt = `You are analyzing a news article URL. Extract the actual news headline or main topic from the URL.
+
+URL: "${url}"
+Original source name: "${originalSourceName}"
+Source type: ${sourceType}
+
+Your task:
+1. Analyze the URL and extract the main news headline or topic
+2. News URLs often contain the headline in the path or slug (the part after the domain)
+3. Extract a specific 4-5 word headline that describes what the article is actually about
+4. Examples of good headlines from URLs:
+   - URL: "https://7news.com.au/news/lachlan-young-sentenced-to-28-years-for-the-murder-of-hannah-mcguire"
+     Headline: "Lachlan Young Sentenced to 28 Years"
+   - URL: "https://7news.com.au/news/tpg-confirms-fatal-000-failure"
+     Headline: "TPG Confirms Fatal 000 Failure"
+   - URL: "https://news.com.au/article/new-covid-restrictions-announced"
+     Headline: "New COVID Restrictions Announced"
+   
+5. DO NOT use generic descriptions like:
+   - "Comprehensive Coverage of News"
+   - "Latest News Updates"
+   - "News and Lifestyle"
+   - "Breaking News Stories"
+   - Just the domain name or website name
+
+6. Extract the actual article topic from the URL path/slug. Convert URL slugs (with hyphens) to readable headlines.
+
+Generate:
+1. Title: Format as "${sourceCategory} | [4-5 word specific headline]" (e.g., "7News | TPG Confirms Fatal 000 Failure")
+2. Description: A short, specific description (1-2 sentences) about what this article is actually about
+
+Return ONLY a JSON object with this exact structure:
+{
+  "title": "Generated title here",
+  "description": "Generated description here"
+}
+
+No explanations, no markdown, just the JSON object.`;
+    } else {
+      // URL doesn't have meaningful slug - use content preview
+      prompt = `You are analyzing a news article. The URL doesn't contain a meaningful headline, so read the content below to extract the actual news headline.
+
+URL: "${url}"
+Original source name: "${originalSourceName}"
+Source type: ${sourceType}
+
+Content (first 1000 characters):
+${contentPreview.substring(0, 1000)}
+
+Your task:
+1. Read the content carefully and identify the main news headline or topic
+2. Extract a specific 4-5 word headline that describes what the article is actually about
+3. Look for the main headline in the content (usually at the beginning)
+4. Examples of good headlines:
+   - "Chinese Firm Bought CIA Insurer"
+   - "TPG Confirms Fatal 000 Failure"
+   - "Lachlan Young Sentenced to 28 Years"
+   
+5. DO NOT use generic descriptions like:
+   - "Comprehensive Coverage of News"
+   - "Latest News Updates"
+   - "News and Lifestyle"
+   - "Breaking News Stories"
+
+Generate:
+1. Title: Format as "${sourceCategory} | [4-5 word specific headline]" (e.g., "BBC News | Chinese Firm Bought CIA Insurer")
+2. Description: A short, specific description (1-2 sentences) about what this article is actually about
+
+Return ONLY a JSON object with this exact structure:
+{
+  "title": "Generated title here",
+  "description": "Generated description here"
+}
+
+No explanations, no markdown, just the JSON object.`;
+    }
+  } else if (sourceType === 'srt') {
+    // For TV series: Use filename pattern
+    prompt = `Generate a meaningful title and description for this TV series subtitle file.
+
+Original source name: "${originalSourceName}"
+Source type: ${sourceType}
+
+Generate:
+1. Title: Format as "TvSeries or Movie | [Series or Movie Name] [Season Episode]" (e.g., "TvSeries | 9-1-1 Lone Star S01E01")
+   - Extract series or movie name and episode info from the filename
+   - Format season/episode as S##E## (e.g., S01E01, S02E05)
+   - If it's a movie, format as "Movie | [Movie Name]" (e.g., "Movie | The Dark Knight")
+
+2. Description: A short description (1-2 sentences) about this TV series episode.
+
+Return ONLY a JSON object with this exact structure:
+{
+  "title": "Generated title here",
+  "description": "Generated description here"
+}
+
+No explanations, no markdown, just the JSON object.`;
+  } else {
+    // For other content types
+    prompt = `Generate a meaningful title and description for this English learning source.
+
+Original source name: "${originalSourceName}"
+Source type: ${sourceType}
+Source category: ${sourceCategory}
+
+${contentPreview ? `Content preview (first 500 chars):\n${contentPreview.substring(0, 500)}` : ''}
+
+Generate:
+1. Title: A meaningful, concise title in the format "[Category] | [Brief Description]"
+2. Description: A short, appropriate description (1-2 sentences) explaining what this source is about.
+
+Return ONLY a JSON object with this exact structure:
+{
+  "title": "Generated title here",
+  "description": "Generated description here"
+}
+
+No explanations, no markdown, just the JSON object.`;
+  }
+
+  try {
+    const response = await axios.post(
+      'https://openrouter.ai/api/v1/chat/completions',
+      {
+        model: 'openai/gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a helpful assistant that generates meaningful titles and descriptions for English learning sources. Return ONLY valid JSON, no explanations, no markdown formatting.'
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 300
+      },
+      {
+        headers: {
+          'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': process.env.APP_URL || 'http://localhost:3000',
+          'X-Title': 'HomeMadeKahoot'
+        }
+      }
+    );
+
+    const responseText = response.data.choices[0]?.message?.content?.trim();
+    
+    if (!responseText) {
+      throw new Error('Failed to generate source info');
+    }
+
+    // Extract JSON from response (might be wrapped in markdown code blocks)
+    let jsonText = responseText;
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      jsonText = jsonMatch[0];
+    }
+
+    const result = JSON.parse(jsonText);
+    
+    return {
+      title: result.title || `${sourceCategory} | ${originalSourceName}`,
+      description: result.description || `English learning content from ${originalSourceName}`
+    };
+  } catch (error) {
+    console.error('Error generating source info:', error.response?.data || error.message);
+    // Fallback
+    const fallbackTitle = sourceType === 'srt' 
+      ? `TvSeries | ${originalSourceName.replace(/\.srt$/i, '')}`
+      : sourceType === 'other' && originalSourceName.includes('news')
+      ? `7News | ${originalSourceName.replace(/\.md$/i, '')}`
+      : `${sourceCategory} | ${originalSourceName}`;
+    
+    return {
+      title: fallbackTitle,
+      description: `English learning content from ${originalSourceName}`
+    };
+  }
+}
+
 module.exports = {
   generateDeckTitle,
   generateDeckDescription,
   enhanceDeckText,
   processMarkdownWithAI,
-  fillWordColumnsWithAI
+  fillWordColumnsWithAI,
+  generateSourceInfo
 };
 

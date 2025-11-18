@@ -666,6 +666,52 @@ exports.importWords = async (req, res) => {
 };
 
 // Helper function to validate if a word is valid
+// Helper function to recalculate source level based on word distribution
+async function recalculateSourceLevel(sourceId) {
+  try {
+    const source = await Source.findById(sourceId);
+    if (!source) return;
+
+    // Get all words linked to this source
+    const sourceWords = await SourceWord.find({ sourceId }).select('wordId').lean();
+    const wordIds = sourceWords.map(sw => sw.wordId);
+
+    if (wordIds.length === 0) return;
+
+    // Get words with levels
+    const wordsWithLevels = await Word.find({
+      _id: { $in: wordIds },
+      englishLevel: { $exists: true, $ne: null, $ne: '' }
+    }).select('englishLevel').lean();
+
+    // Count words by level
+    const levelCounts = { A1: 0, A2: 0, B1: 0, B2: 0, C1: 0, C2: 0 };
+    wordsWithLevels.forEach(word => {
+      if (word.englishLevel && levelCounts.hasOwnProperty(word.englishLevel)) {
+        levelCounts[word.englishLevel]++;
+      }
+    });
+
+    // Find the level with the most words
+    let maxCount = 0;
+    let majorityLevel = null;
+    for (const [level, count] of Object.entries(levelCounts)) {
+      if (count > maxCount) {
+        maxCount = count;
+        majorityLevel = level;
+      }
+    }
+
+    // Update source level if we found a majority
+    if (majorityLevel && maxCount > 0) {
+      source.level = majorityLevel;
+      await source.save();
+    }
+  } catch (error) {
+    console.error('Error recalculating source level:', error);
+  }
+}
+
 function isValidWord(word) {
   if (!word || typeof word !== 'string') return false;
   const trimmed = word.trim();
@@ -688,7 +734,7 @@ function isValidWord(word) {
 exports.addWordsFromAI = async (req, res) => {
   console.log('addWordsFromAI called');
   try {
-    const { words, sourceName, sourceType, fileSize } = req.body; // Array of word strings, source file name, type, and size
+    const { words, sourceName, sourceType, fileSize, contentPreview, url, pageTitle } = req.body; // Array of word strings, source file name, type, size, content preview, URL, and page title
     const userId = req.user.userId;
 
     if (!words || !Array.isArray(words) || words.length === 0) {
@@ -703,23 +749,76 @@ exports.addWordsFromAI = async (req, res) => {
     let detectedSourceType = sourceType || 'other';
     if (!sourceType && sourceName) {
       const ext = sourceName.toLowerCase().split('.').pop();
+      // Only use extension if it's a valid enum value
       if (ext === 'pdf') detectedSourceType = 'pdf';
       else if (ext === 'srt') detectedSourceType = 'srt';
       else if (ext === 'txt') detectedSourceType = 'txt';
+      else if (ext === 'youtube') detectedSourceType = 'youtube';
+      // For .md files (from webpages) or any other extension, use 'other'
+      else detectedSourceType = 'other';
     }
 
-    // Create or find source
-    let source = await Source.findOne({ userId, sourceName });
+    // Generate meaningful title and description FIRST using AI
+    let generatedTitle = sourceName; // Fallback to original name
+    let generatedDescription = `English learning content from ${sourceName}`;
+    
+    try {
+      const { generateSourceInfo } = require('../services/aiDeckService');
+      const sourceInfo = await generateSourceInfo(sourceName, detectedSourceType, contentPreview || '', url || '', pageTitle || '');
+      generatedTitle = sourceInfo.title;
+      generatedDescription = sourceInfo.description;
+    } catch (error) {
+      console.error('Error generating source info:', error);
+      // Use fallback title based on type
+      if (detectedSourceType === 'srt') {
+        generatedTitle = `TvSeries | ${sourceName.replace(/\.srt$/i, '')}`;
+      } else if (detectedSourceType === 'other' && sourceName.includes('news')) {
+        generatedTitle = `7News | ${sourceName.replace(/\.md$/i, '')}`;
+      } else {
+        generatedTitle = sourceName;
+      }
+    }
+
+    // Use generated title as sourceName (meaningful name instead of filename)
+    const meaningfulSourceName = generatedTitle;
+
+    // Determine skill based on source type
+    let detectedSkill = null;
+    if (detectedSourceType === 'srt') {
+      detectedSkill = 'Listening';
+    } else if (['pdf', 'txt', 'other'].includes(detectedSourceType)) {
+      detectedSkill = 'Reading';
+    } else {
+      detectedSkill = 'Reading'; // Default
+    }
+
+    // Create or find source using the meaningful name
+    let source = await Source.findOne({ userId, sourceName: meaningfulSourceName });
     if (!source) {
       source = await Source.create({
         userId,
-        sourceName,
+        sourceName: meaningfulSourceName, // Use generated title as sourceName
         sourceType: detectedSourceType,
         fileSize: fileSize || 0,
         totalWords: 0,
         newWords: 0,
-        duplicateWords: 0
+        duplicateWords: 0,
+        title: generatedTitle,
+        description: generatedDescription,
+        skill: detectedSkill, // Set skill immediately
+        task: 'Vocabulary',
+        cardQty: 0
+        // level will be calculated later and set when available
       });
+    } else {
+      // Update existing source with new info if needed
+      if (!source.title) {
+        source.title = generatedTitle;
+        source.description = generatedDescription;
+      }
+      if (!source.skill) {
+        source.skill = detectedSkill;
+      }
     }
 
     // Get the highest wordId to start from
@@ -815,11 +914,74 @@ exports.addWordsFromAI = async (req, res) => {
     source.totalWords = wordIdsToLink.length;
     source.newWords = results.added;
     source.duplicateWords = results.duplicates;
+    source.cardQty = wordIdsToLink.length; // Set card quantity to total words
+    
+    // Set skill based on source type
+    if (detectedSourceType === 'srt') {
+      source.skill = 'Listening';
+    } else if (['pdf', 'txt', 'other'].includes(detectedSourceType)) {
+      source.skill = 'Reading';
+    } else {
+      source.skill = 'Reading'; // Default
+    }
+    
+    // Set task to Vocabulary (already set during creation, but ensure it's set)
+    source.task = 'Vocabulary';
+    
+    // Ensure title and description are set (they should be set during creation, but update if missing)
+    if (!source.title) {
+      source.title = generatedTitle;
+    }
+    if (!source.description) {
+      source.description = generatedDescription;
+    }
+    
+    // Calculate level based on word distribution
+    // Get all words linked to this source to check their levels
+    const sourceWordIds = wordIdsToLink.map(item => item.wordId);
+    const wordsWithLevels = await Word.find({
+      _id: { $in: sourceWordIds },
+      englishLevel: { $exists: true, $ne: null, $ne: '' }
+    }).select('englishLevel').lean();
+    
+    // Count words by level
+    const levelCounts = { A1: 0, A2: 0, B1: 0, B2: 0, C1: 0, C2: 0 };
+    wordsWithLevels.forEach(word => {
+      if (word.englishLevel && levelCounts.hasOwnProperty(word.englishLevel)) {
+        levelCounts[word.englishLevel]++;
+      }
+    });
+    
+    // Find the level with the most words
+    let maxCount = 0;
+    let majorityLevel = null;
+    for (const [level, count] of Object.entries(levelCounts)) {
+      if (count > maxCount) {
+        maxCount = count;
+        majorityLevel = level;
+      }
+    }
+    
+    // If we have words with levels, set the majority level
+    if (majorityLevel && maxCount > 0) {
+      source.level = majorityLevel;
+    }
+    
     await source.save();
 
     res.json({
       message: `Processed ${results.total} words: ${results.added} added, ${results.duplicates} duplicates skipped, ${results.skipped} invalid words skipped`,
-      results
+      results,
+      sourceInfo: {
+        sourceId: source._id,
+        sourceName: source.sourceName, // This is now the meaningful title
+        title: source.title,
+        description: source.description,
+        level: source.level,
+        skill: source.skill,
+        task: source.task,
+        cardQty: source.cardQty
+      }
     });
   } catch (error) {
     console.error('Error adding words from AI:', error);
@@ -899,6 +1061,49 @@ exports.getSourceWords = async (req, res) => {
   }
 };
 
+// Test source title and description generation
+exports.testSourceTitle = async (req, res) => {
+  console.log('testSourceTitle called');
+  try {
+    const { sourceName, sourceType, contentPreview, url, pageTitle } = req.body;
+    const userId = req.user.userId;
+
+    if (!sourceName) {
+      return res.status(400).json({ message: 'Source name is required' });
+    }
+
+    // Determine source type from file extension if not provided
+    let detectedSourceType = sourceType || 'other';
+    if (!sourceType && sourceName) {
+      const ext = sourceName.toLowerCase().split('.').pop();
+      if (ext === 'pdf') detectedSourceType = 'pdf';
+      else if (ext === 'srt') detectedSourceType = 'srt';
+      else if (ext === 'txt') detectedSourceType = 'txt';
+      else if (ext === 'youtube') detectedSourceType = 'youtube';
+      else detectedSourceType = 'other';
+    }
+
+    // Generate title and description using AI
+    const { generateSourceInfo } = require('../services/aiDeckService');
+    const sourceInfo = await generateSourceInfo(sourceName, detectedSourceType, contentPreview || '', url || '', pageTitle || '');
+
+    res.json({
+      success: true,
+      sourceInfo: {
+        title: sourceInfo.title,
+        description: sourceInfo.description,
+        sourceType: detectedSourceType
+      }
+    });
+  } catch (error) {
+    console.error('Error testing source title:', error);
+    res.status(500).json({ 
+      message: error.message || 'Failed to generate source title',
+      error: error.message
+    });
+  }
+};
+
 // Get unique filter values
 exports.getFilterValues = async (req, res) => {
   try {
@@ -932,6 +1137,7 @@ exports.getFilterValues = async (req, res) => {
 exports.getWordsWithoutTurkish = async (req, res) => {
   try {
     // Find words that don't have Turkish meaning (null or empty)
+    // Remove limit to get all words - frontend will handle batching
     const words = await Word.find({
       $or: [
         { turkishMeaning: { $exists: false } },
@@ -940,7 +1146,6 @@ exports.getWordsWithoutTurkish = async (req, res) => {
       ]
     })
     .select('englishWord wordType turkishMeaning category1 category2 category3 englishLevel sampleSentenceEn sampleSentenceTr')
-    .limit(100) // Limit to prevent too many words at once
     .lean();
 
     res.json({
@@ -959,24 +1164,31 @@ exports.getWordsWithoutTurkish = async (req, res) => {
 exports.fillWordColumns = async (req, res) => {
   console.log('fillWordColumns called');
   try {
-    // Get words without Turkish meaning from database
-    const wordsWithoutTurkish = await Word.find({
-      $or: [
-        { turkishMeaning: { $exists: false } },
-        { turkishMeaning: null },
-        { turkishMeaning: '' }
-      ]
-    })
-    .select('englishWord')
-    .limit(100) // Limit to prevent too many words at once
-    .lean();
+    let words;
+    
+    // If words are provided in request, use them; otherwise get from database
+    if (req.body.words && Array.isArray(req.body.words) && req.body.words.length > 0) {
+      words = req.body.words;
+    } else {
+      // Get words without Turkish meaning from database
+      const wordsWithoutTurkish = await Word.find({
+        $or: [
+          { turkishMeaning: { $exists: false } },
+          { turkishMeaning: null },
+          { turkishMeaning: '' }
+        ]
+      })
+      .select('englishWord')
+      .limit(100) // Limit to prevent too many words at once
+      .lean();
 
-    if (wordsWithoutTurkish.length === 0) {
-      return res.status(400).json({ message: 'No words found without Turkish meaning. All words are already filled.' });
+      if (wordsWithoutTurkish.length === 0) {
+        return res.status(400).json({ message: 'No words found without Turkish meaning. All words are already filled.' });
+      }
+
+      // Extract word strings
+      words = wordsWithoutTurkish.map(w => w.englishWord);
     }
-
-    // Extract word strings
-    const words = wordsWithoutTurkish.map(w => w.englishWord);
 
     // Filter out invalid words before processing
     const validWords = words.filter(word => {
@@ -1228,8 +1440,10 @@ exports.fillWordColumns = async (req, res) => {
         // Update word with AI-filled data
         if (wordData.wordType) word.wordType = wordData.wordType;
         if (wordData.turkishMeaning) word.turkishMeaning = wordData.turkishMeaning;
-        if (wordData.category1) word.category1 = wordData.category1;
-        if (wordData.category2) word.category2 = wordData.category2;
+        // Always set category1 and category2 to null (never fill these fields)
+        word.category1 = null;
+        word.category2 = null;
+        // category3 can be filled optionally
         if (wordData.category3) word.category3 = wordData.category3;
         if (wordData.englishLevel) word.englishLevel = wordData.englishLevel;
         if (wordData.sampleSentenceEn) word.sampleSentenceEn = wordData.sampleSentenceEn;
@@ -1238,11 +1452,33 @@ exports.fillWordColumns = async (req, res) => {
         await word.save();
         results.processed++;
         results.updated++;
+        
+        // Track which sources this word belongs to for level recalculation
+        if (!results.updatedSourceIds) {
+          results.updatedSourceIds = new Set();
+        }
+        // Find all sources this word belongs to
+        const wordSources = await SourceWord.find({ wordId: word._id }).select('sourceId').lean();
+        wordSources.forEach(sw => {
+          results.updatedSourceIds.add(sw.sourceId.toString());
+        });
       } catch (error) {
         results.errors.push({
           word: wordData.englishWord,
           error: error.message
         });
+      }
+    }
+
+    // Recalculate source levels for all affected sources
+    if (results.updatedSourceIds && results.updatedSourceIds.size > 0) {
+      const sourceIds = Array.from(results.updatedSourceIds);
+      for (const sourceId of sourceIds) {
+        try {
+          await recalculateSourceLevel(sourceId);
+        } catch (error) {
+          console.error(`Error recalculating level for source ${sourceId}:`, error);
+        }
       }
     }
 

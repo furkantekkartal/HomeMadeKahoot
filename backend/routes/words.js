@@ -26,6 +26,8 @@ router.get('/without-turkish', auth, wordController.getWordsWithoutTurkish);
 console.log('✓ Route registered: GET /api/words/without-turkish');
 router.post('/fill-columns', auth, wordController.fillWordColumns);
 console.log('✓ Route registered: POST /api/words/fill-columns');
+router.post('/test-source-title', auth, wordController.testSourceTitle);
+console.log('✓ Route registered: POST /api/words/test-source-title');
 router.post('/:wordId/generate-image', auth, wordController.generateWordImage);
 router.put('/:id', auth, wordController.updateWord);
 router.delete('/:id', auth, wordController.deleteWord);

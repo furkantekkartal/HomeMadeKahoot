@@ -678,13 +678,13 @@ exports.toggleDeckVisibility = async (req, res) => {
 exports.processMarkdownWithAI = async (req, res) => {
   console.log('processMarkdownWithAI called');
   try {
-    const { markdownContent, fileType } = req.body;
+    const { markdownContent, fileType, customPrompt } = req.body;
 
     if (!markdownContent) {
       return res.status(400).json({ message: 'Markdown content is required' });
     }
 
-    const result = await processMarkdownWithAI(markdownContent, fileType);
+    const result = await processMarkdownWithAI(markdownContent, fileType, customPrompt);
     res.json({ 
       response: result.response,
       prompt: result.prompt
@@ -829,6 +829,154 @@ exports.convertPDFToMD = async (req, res) => {
     console.error('Error in convertPDFToMD:', error);
     res.status(500).json({ 
       message: error.message || 'Failed to convert PDF to Markdown' 
+    });
+  }
+}
+
+// Convert Webpage to Markdown using Firecrawl
+exports.convertWebpageToMD = async (req, res) => {
+  console.log('convertWebpageToMD called');
+  try {
+    const { url } = req.body;
+
+    if (!url || typeof url !== 'string' || url.trim() === '') {
+      return res.status(400).json({ 
+        error: 'URL is required. Please provide a valid webpage URL.' 
+      });
+    }
+
+    // Validate URL format
+    let validUrl;
+    try {
+      validUrl = new URL(url);
+      if (!['http:', 'https:'].includes(validUrl.protocol)) {
+        return res.status(400).json({ 
+          error: 'Invalid URL protocol. Only http:// and https:// URLs are supported.' 
+        });
+      }
+    } catch (urlError) {
+      return res.status(400).json({ 
+        error: 'Invalid URL format. Please provide a valid URL (e.g., https://example.com)' 
+      });
+    }
+
+    const FIRECRAWL_API_KEY = process.env.FIRECRAWL_API_KEY;
+    
+    if (!FIRECRAWL_API_KEY) {
+      return res.status(500).json({ 
+        error: 'Firecrawl API key is not configured. Please set FIRECRAWL_API_KEY in environment variables.' 
+      });
+    }
+
+    try {
+      const axios = require('axios');
+      
+      // Call Firecrawl API to scrape and convert webpage to markdown
+      const response = await axios.post(
+        'https://api.firecrawl.dev/v0/scrape',
+        {
+          url: url.trim(),
+          formats: ['markdown'],
+          onlyMainContent: true
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${FIRECRAWL_API_KEY}`
+          },
+          timeout: 60000 // 60 second timeout
+        }
+      );
+
+      const firecrawlData = response.data?.data || response.data;
+      const markdown = firecrawlData?.markdown || response.data?.markdown || '';
+      
+      if (!markdown || markdown.trim() === '') {
+        return res.status(500).json({ 
+          error: 'Failed to extract content from webpage. The page might be empty or inaccessible.' 
+        });
+      }
+
+      // Extract page title from Firecrawl response (from metadata or markdown)
+      let pageTitle = firecrawlData?.metadata?.title || 
+                     firecrawlData?.title || 
+                     response.data?.metadata?.title ||
+                     response.data?.title ||
+                     '';
+      
+      // If title not in metadata, try to extract from markdown (first H1 heading)
+      if (!pageTitle && markdown) {
+        // Try to find H1 heading (most common format)
+        const h1Match = markdown.match(/^#\s+(.+)$/m);
+        if (h1Match) {
+          pageTitle = h1Match[1].trim();
+          // Remove any markdown formatting from title
+          pageTitle = pageTitle.replace(/\*\*|__|\*|_|`/g, '').trim();
+          // Limit title length
+          if (pageTitle.length > 200) {
+            pageTitle = pageTitle.substring(0, 200) + '...';
+          }
+        } else {
+          // Try to find the first line that looks like a title (long line, not a list item)
+          const lines = markdown.split('\n').filter(line => {
+            const trimmed = line.trim();
+            return trimmed.length > 20 && 
+                   !trimmed.startsWith('-') && 
+                   !trimmed.startsWith('*') && 
+                   !trimmed.startsWith('1.') &&
+                   !trimmed.match(/^\d+\./);
+          });
+          if (lines.length > 0) {
+            pageTitle = lines[0].trim();
+            // Remove markdown formatting
+            pageTitle = pageTitle.replace(/\*\*|__|\*|_|`|#/g, '').trim();
+            if (pageTitle.length > 200) {
+              pageTitle = pageTitle.substring(0, 200) + '...';
+            }
+          }
+        }
+      }
+
+      // Extract domain name for filename
+      const domain = validUrl.hostname.replace(/^www\./, '');
+      const fileName = `${domain}.md`;
+
+      res.json({
+        success: true,
+        markdownContent: markdown,
+        fileName: fileName,
+        url: url,
+        pageTitle: pageTitle, // Include extracted page title
+        stats: {
+          markdownLength: markdown.length
+        }
+      });
+      
+    } catch (error) {
+      console.error('Error converting webpage with Firecrawl:', error);
+      
+      let errorMessage = 'Failed to convert webpage to Markdown';
+      
+      if (error.response) {
+        // Firecrawl API error
+        errorMessage = error.response.data?.error?.message || 
+                      error.response.data?.message || 
+                      `Firecrawl API error: ${error.response.status} ${error.response.statusText}`;
+      } else if (error.request) {
+        errorMessage = 'No response from Firecrawl API. Please check your internet connection and API key.';
+      } else {
+        errorMessage = error.message || 'Failed to convert webpage to Markdown';
+      }
+      
+      res.status(500).json({ 
+        error: errorMessage,
+        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      });
+    }
+  } catch (error) {
+    console.error('Error in convertWebpageToMD:', error);
+    res.status(500).json({ 
+      message: error.message || 'Failed to convert webpage to Markdown' 
     });
   }
 };

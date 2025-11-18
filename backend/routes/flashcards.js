@@ -19,6 +19,9 @@ console.log('✓ Route registered: POST /api/flashcards/process-markdown');
 // Convert PDF to Markdown route
 router.post('/convert-pdf-to-md', auth, flashcardController.uploadFile, flashcardController.convertPDFToMD);
 console.log('✓ Route registered: POST /api/flashcards/convert-pdf-to-md');
+// Convert Webpage to Markdown route
+router.post('/convert-webpage-to-md', auth, flashcardController.convertWebpageToMD);
+console.log('✓ Route registered: POST /api/flashcards/convert-webpage-to-md');
 router.post('/generate-from-file', auth, flashcardController.uploadFile, flashcardController.generateDeckFromFile);
 router.post('/generate-from-youtube', auth, flashcardController.generateDeckFromYouTube);
 router.patch('/decks/:id/visibility', auth, flashcardController.toggleDeckVisibility);

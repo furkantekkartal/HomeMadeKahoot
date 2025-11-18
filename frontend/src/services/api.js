@@ -94,8 +94,9 @@ export const wordAPI = {
     });
   },
   generateWordImage: (wordId, customKeywords, service = 'google') => api.post(`/words/${wordId}/generate-image`, { customKeywords, service }),
-  addWordsFromAI: (words, sourceName, sourceType, fileSize) => api.post('/words/add-from-ai', { words, sourceName, sourceType, fileSize }),
-  fillWordColumns: () => api.post('/words/fill-columns', {}),
+  addWordsFromAI: (words, sourceName, sourceType, fileSize, contentPreview, url, pageTitle) => api.post('/words/add-from-ai', { words, sourceName, sourceType, fileSize, contentPreview, url, pageTitle }),
+  testSourceTitle: (sourceName, sourceType, contentPreview, url, pageTitle) => api.post('/words/test-source-title', { sourceName, sourceType, contentPreview, url, pageTitle }),
+  fillWordColumns: (words = null) => api.post('/words/fill-columns', { words }),
   getWordsWithoutTurkish: () => api.get('/words/without-turkish'),
   getSources: () => api.get('/words/sources'),
   getSourceWords: (sourceId) => api.get(`/words/sources/${sourceId}/words`),
@@ -116,7 +117,7 @@ export const flashcardAPI = {
   generateDeckTitle: (level, skill, task) => api.post('/flashcards/generate-title', { level, skill, task }),
   generateDeckDescription: (title, level, skill, task) => api.post('/flashcards/generate-description', { title, level, skill, task }),
   enhanceDeckText: (text, type) => api.post('/flashcards/enhance-text', { text, type }),
-  processMarkdownWithAI: (markdownContent, fileType) => api.post('/flashcards/process-markdown', { markdownContent, fileType }),
+  processMarkdownWithAI: (markdownContent, fileType, customPrompt = null) => api.post('/flashcards/process-markdown', { markdownContent, fileType, customPrompt }),
   convertPDFToMD: (file) => {
     const formData = new FormData();
     formData.append('file', file);
@@ -126,6 +127,7 @@ export const flashcardAPI = {
       }
     });
   },
+  convertWebpageToMD: (url) => api.post('/flashcards/convert-webpage-to-md', { url }),
   generateDeckFromFile: (file) => {
     const formData = new FormData();
     formData.append('file', file);
