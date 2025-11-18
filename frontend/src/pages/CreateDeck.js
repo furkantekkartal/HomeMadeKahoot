@@ -2,17 +2,30 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { wordAPI, flashcardAPI } from '../services/api';
 import { DECK_LEVELS, DECK_SKILLS, DECK_TASKS } from '../constants/deckConstants';
+import { useWordList } from '../context/WordListContext';
+import WordList from '../components/WordList/WordList';
 import './CreateDeck.css';
 
 const CreateDeck = () => {
   const navigate = useNavigate();
-  const [words, setWords] = useState([]);
-  const [selectedWords, setSelectedWords] = useState(new Set());
-  const [loading, setLoading] = useState(true);
-  const [selectingAllFiltered, setSelectingAllFiltered] = useState(false);
-  const [allFilteredWordIds, setAllFilteredWordIds] = useState(new Set());
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+  const { 
+    selectedWords, 
+    words,
+    page,
+    setPage,
+    setSelectedWords,
+    handleSelectWord,
+    handleSelectAll,
+    handleSelectAllFiltered,
+    handleSelectActiveSource,
+    allFilteredWordIds,
+    selectingAllFiltered,
+    filters,
+    appliedFilters,
+    handleFilterChange,
+    handleApplyFilters,
+    refreshWords
+  } = useWordList();
   const [deckName, setDeckName] = useState('');
   const [deckDescription, setDeckDescription] = useState('');
   const [level, setLevel] = useState('');
@@ -23,27 +36,8 @@ const CreateDeck = () => {
   const [deckType, setDeckType] = useState('dynamic');
   const [questionNumber, setQuestionNumber] = useState(20);
   const [creating, setCreating] = useState(false);
-  const [filters, setFilters] = useState({
-    search: '',
-    englishLevel: '',
-    wordType: '',
-    category1: '',
-    category2: '',
-    sourceId: '',
-    showKnown: true,
-    showUnknown: true
-  });
-  const [appliedFilters, setAppliedFilters] = useState({
-    search: '',
-    englishLevel: '',
-    wordType: '',
-    category1: '',
-    category2: '',
-    sourceId: '',
-    showKnown: true,
-    showUnknown: true
-  });
   const [sources, setSources] = useState([]);
+  const [activeSourceId, setActiveSourceId] = useState(null);
   const [uploadedFile, setUploadedFile] = useState(null);
   const [generatingFromSource, setGeneratingFromSource] = useState(false);
   const [processingSummary, setProcessingSummary] = useState(null);
@@ -214,139 +208,26 @@ const CreateDeck = () => {
   const [skippedWords, setSkippedWords] = useState([]);
 
   useEffect(() => {
-    loadData();
     loadSources();
-  }, [page, appliedFilters]);
+  }, []);
 
   const loadSources = async () => {
     try {
       const response = await wordAPI.getSources();
-      setSources(response.data.sources || []);
+      const sourcesList = response.data.sources || [];
+      setSources(sourcesList);
+      
+      // Set the most recent source as active source
+      if (sourcesList.length > 0) {
+        const sortedSources = [...sourcesList].sort((a, b) => {
+          const dateA = new Date(a.createdAt || 0);
+          const dateB = new Date(b.createdAt || 0);
+          return dateB - dateA;
+        });
+        setActiveSourceId(sortedSources[0]._id);
+      }
     } catch (error) {
       console.error('Error loading sources:', error);
-    }
-  };
-
-  const loadData = async () => {
-    try {
-      setLoading(true);
-      const response = await wordAPI.getWordsWithStatus({
-        page,
-        limit: 50,
-        ...appliedFilters,
-        sourceId: appliedFilters.sourceId || undefined,
-        showKnown: appliedFilters.showKnown ? 'true' : 'false',
-        showUnknown: appliedFilters.showUnknown ? 'true' : 'false'
-      });
-      
-      setWords(response.data.words);
-      setTotalPages(response.data.pagination.pages);
-    } catch (error) {
-      console.error('Error loading data:', error);
-      alert('Failed to load words');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleFilterChange = (key, value) => {
-    setFilters(prev => ({ ...prev, [key]: value }));
-  };
-
-  const handleApplyFilters = () => {
-    setAppliedFilters({ ...filters });
-    setPage(1);
-    // Clear all filtered words selection when filters change
-    setAllFilteredWordIds(new Set());
-  };
-
-  const handleSelectWord = (wordId) => {
-    setSelectedWords(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(wordId)) {
-        newSet.delete(wordId);
-      } else {
-        newSet.add(wordId);
-      }
-      return newSet;
-    });
-  };
-
-  const handleSelectAll = () => {
-    if (selectedWords.size === words.length && words.length > 0) {
-      // Deselect all words on current page
-      words.forEach(word => {
-        setSelectedWords(prev => {
-          const newSet = new Set(prev);
-          newSet.delete(word._id);
-          return newSet;
-        });
-      });
-    } else {
-      // Select all words on current page
-      words.forEach(word => {
-        setSelectedWords(prev => new Set([...prev, word._id]));
-      });
-    }
-  };
-
-  const handleSelectAllFiltered = async () => {
-    // Check if all filtered words are already selected
-    const allFilteredSelected = allFilteredWordIds.size > 0 && 
-      Array.from(allFilteredWordIds).every(id => selectedWords.has(id));
-
-    if (allFilteredSelected) {
-      // Deselect all filtered words
-      setSelectedWords(prev => {
-        const newSet = new Set(prev);
-        allFilteredWordIds.forEach(id => newSet.delete(id));
-        return newSet;
-      });
-      setAllFilteredWordIds(new Set());
-      return;
-    }
-
-    try {
-      setSelectingAllFiltered(true);
-      
-      // Fetch all words matching the current filters (without pagination)
-      const allWords = [];
-      let currentPage = 1;
-      let hasMore = true;
-
-      while (hasMore) {
-        const response = await wordAPI.getWordsWithStatus({
-          page: currentPage,
-          limit: 1000, // Large limit to reduce API calls
-          ...appliedFilters,
-          sourceId: appliedFilters.sourceId || undefined,
-          showKnown: appliedFilters.showKnown ? 'true' : 'false',
-          showUnknown: appliedFilters.showUnknown ? 'true' : 'false'
-        });
-
-        const pageWords = response.data.words || [];
-        allWords.push(...pageWords);
-
-        const totalPages = response.data.pagination?.pages || 1;
-        if (currentPage >= totalPages || pageWords.length === 0) {
-          hasMore = false;
-        } else {
-          currentPage++;
-        }
-      }
-
-      // Extract all word IDs
-      const allWordIds = allWords.map(word => word._id);
-      const allWordIdsSet = new Set(allWordIds);
-      setAllFilteredWordIds(allWordIdsSet);
-
-      // Select all filtered words
-      setSelectedWords(prev => new Set([...prev, ...allWordIds]));
-    } catch (error) {
-      console.error('Error selecting all filtered words:', error);
-      alert('Failed to select all filtered words: ' + (error.response?.data?.message || error.message));
-    } finally {
-      setSelectingAllFiltered(false);
     }
   };
 
@@ -392,8 +273,8 @@ const CreateDeck = () => {
       // Reload sources to include the newly created source
       await loadSources();
       
-      // Refresh the page data
-      await loadData();
+      // Refresh the word list data
+      refreshWords();
       
       // Wait a bit for data to load, then select words
       setTimeout(async () => {
@@ -1049,6 +930,10 @@ const CreateDeck = () => {
           // Capture sourceInfo from first batch (contains AI-generated title and description)
           if (batchNumber === 1 && response.data.sourceInfo) {
             sourceInfoFromAPI = response.data.sourceInfo;
+            // Set active source ID when new source is created
+            if (response.data.sourceInfo.sourceId) {
+              setActiveSourceId(response.data.sourceInfo.sourceId);
+            }
           }
           
           totalAdded += results.added || 0;
@@ -1845,8 +1730,8 @@ const CreateDeck = () => {
   // Process All function - runs all steps automatically in sequence, always from Step 1
   const handleProcessAll = async () => {
     setProcessingAll(true);
-    // Show Details pane, Logs and Content Preview when Run is clicked
-    setDetailsExpanded(true);
+    // Keep Details pane hidden when Run is clicked - user can click Details button to see it
+    setDetailsExpanded(false);
     setLogsExpanded(true);
     setContentPreviewExpanded(true);
     
@@ -2067,6 +1952,27 @@ const CreateDeck = () => {
             
             // Use stored results directly (no need to wait, we have the correct values)
             addDebugLog(`✅ Completed! | Source: ${sourceWordCount} w | AI cleaned: ${aiCleanedWordCount} w | ${storedDbResults.added} add, ${storedDbResults.duplicates} dup, ${storedDbResults.skipped} skip`);
+            
+            // Automatically apply filter for the active source when process completes
+            const applySourceFilter = async () => {
+              // Use sourceId from sourceInfo if available, otherwise use activeSourceId
+              let sourceIdToUse = sourceInfo?.sourceId || activeSourceId;
+              
+              // If still not set, reload sources to get the latest one
+              if (!sourceIdToUse) {
+                await loadSources();
+                // Wait a bit for state to update
+                await new Promise(resolve => setTimeout(resolve, 300));
+                sourceIdToUse = activeSourceId;
+              }
+              
+              if (sourceIdToUse && handleSelectActiveSource) {
+                handleSelectActiveSource(sourceIdToUse);
+              }
+            };
+            
+            // Small delay to ensure source is fully created and database is updated
+            setTimeout(applySourceFilter, 500);
           } else {
             addDebugLog('⏸️ Step 5: Cancelled by user');
           }
@@ -2135,6 +2041,27 @@ const CreateDeck = () => {
           
           // Use stored results directly (no need to wait, we have the correct values)
           addDebugLog(`✅ Completed! | Source: ${sourceWordCount} w | AI cleaned: ${aiCleanedWordCount} w | ${storedDbResults.added} add, ${storedDbResults.duplicates} dup, ${storedDbResults.skipped} skip`);
+          
+          // Automatically apply filter for the active source when process completes
+          const applySourceFilter = async () => {
+            // Use sourceId from sourceInfo if available, otherwise use activeSourceId
+            let sourceIdToUse = sourceInfo?.sourceId || activeSourceId;
+            
+            // If still not set, reload sources to get the latest one
+            if (!sourceIdToUse) {
+              await loadSources();
+              // Wait a bit for state to update
+              await new Promise(resolve => setTimeout(resolve, 300));
+              sourceIdToUse = activeSourceId;
+            }
+            
+            if (sourceIdToUse && handleSelectActiveSource) {
+              handleSelectActiveSource(sourceIdToUse);
+            }
+          };
+          
+          // Small delay to ensure source is fully created and database is updated
+          setTimeout(applySourceFilter, 500);
         }
       } catch (error) {
         console.error('Error checking words without Turkish:', error);
@@ -3157,239 +3084,7 @@ const CreateDeck = () => {
       </div>
 
       {/* Word List Section */}
-      <div className="manual-creation-section">
-        <h2>Word List</h2>
-        
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
-        <div className="selected-count">
-          {selectedWords.size} word{selectedWords.size !== 1 ? 's' : ''} selected
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <input
-              type="checkbox"
-              id="select-all-filtered"
-              checked={allFilteredWordIds.size > 0 && Array.from(allFilteredWordIds).every(id => selectedWords.has(id))}
-              onChange={handleSelectAllFiltered}
-              disabled={selectingAllFiltered}
-              style={{ cursor: 'pointer' }}
-            />
-            <label 
-              htmlFor="select-all-filtered" 
-              style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-            >
-              <span>Select All Filtered Words</span>
-              {allFilteredWordIds.size > 0 && (
-                <span style={{ fontSize: '0.85rem', color: '#666', fontWeight: 'normal' }}>
-                  ({allFilteredWordIds.size} words)
-                </span>
-              )}
-              {selectingAllFiltered && (
-                <span style={{ fontSize: '0.85rem', color: '#667eea' }}>Loading...</span>
-              )}
-            </label>
-          </div>
-        </div>
-
-        {/* Filters */}
-        <div className="word-filters">
-          <input
-            type="text"
-            placeholder="Search words..."
-            value={filters.search}
-            onChange={(e) => handleFilterChange('search', e.target.value)}
-            className="filter-input"
-          />
-          <select
-            value={filters.englishLevel}
-            onChange={(e) => handleFilterChange('englishLevel', e.target.value)}
-            className="filter-select"
-          >
-            <option value="">All Levels</option>
-            {DECK_LEVELS.map(lvl => (
-              <option key={lvl} value={lvl}>{lvl}</option>
-            ))}
-          </select>
-          <select
-            value={filters.wordType}
-            onChange={(e) => handleFilterChange('wordType', e.target.value)}
-            className="filter-select"
-          >
-            <option value="">All Types</option>
-            {words
-              .map(w => w.wordType)
-              .filter((t, i, arr) => t && arr.indexOf(t) === i)
-              .sort()
-              .map(type => (
-                <option key={type} value={type}>{type}</option>
-              ))}
-          </select>
-          <select
-            value={filters.category1}
-            onChange={(e) => handleFilterChange('category1', e.target.value)}
-            className="filter-select"
-          >
-            <option value="">All Category 1</option>
-            {words
-              .map(w => w.category1)
-              .filter((c, i, arr) => c && arr.indexOf(c) === i)
-              .sort()
-              .map(cat => (
-                <option key={cat} value={cat}>{cat}</option>
-              ))}
-          </select>
-          <select
-            value={filters.category2}
-            onChange={(e) => handleFilterChange('category2', e.target.value)}
-            className="filter-select"
-          >
-            <option value="">All Category 2</option>
-            {words
-              .map(w => w.category2)
-              .filter((c, i, arr) => c && arr.indexOf(c) === i)
-              .sort()
-              .map(cat => (
-                <option key={cat} value={cat}>{cat}</option>
-              ))}
-          </select>
-          <select
-            value={filters.sourceId}
-            onChange={(e) => handleFilterChange('sourceId', e.target.value)}
-            className="filter-select"
-          >
-            <option value="">All Sources</option>
-            {sources.map(source => (
-              <option key={source._id} value={source._id}>
-                {source.sourceName} ({source.totalWords} words)
-              </option>
-            ))}
-          </select>
-          <div className="filter-checkbox">
-            <input
-              type="checkbox"
-              id="show-known"
-              checked={filters.showKnown}
-              onChange={(e) => handleFilterChange('showKnown', e.target.checked)}
-            />
-            <label htmlFor="show-known">Show Known</label>
-          </div>
-          <div className="filter-checkbox">
-            <input
-              type="checkbox"
-              id="show-unknown"
-              checked={filters.showUnknown}
-              onChange={(e) => handleFilterChange('showUnknown', e.target.checked)}
-            />
-            <label htmlFor="show-unknown">Show Unknown</label>
-          </div>
-          <button
-            onClick={handleApplyFilters}
-            className="btn btn-primary"
-          >
-            Apply Filters
-          </button>
-        </div>
-
-        {/* Words Table */}
-        <div className="words-table-container">
-          {loading ? (
-            <div className="loading">Loading words...</div>
-          ) : words.length === 0 ? (
-            <div className="empty-state">
-              <p>No words found matching your filters.</p>
-            </div>
-          ) : (
-            <table className="words-table">
-              <thead>
-                <tr>
-                  <th>
-                    <input
-                      type="checkbox"
-                      checked={allSelected}
-                      ref={(input) => {
-                        if (input) input.indeterminate = someSelected;
-                      }}
-                      onChange={handleSelectAll}
-                    />
-                  </th>
-                  <th>English Word</th>
-                  <th>Turkish Meaning</th>
-                  <th>Word Type</th>
-                  <th>English Level</th>
-                  <th>Category 1</th>
-                  <th>Category 2</th>
-                  <th>Source</th>
-                </tr>
-              </thead>
-              <tbody>
-                {words.map(word => (
-                  <tr 
-                    key={word._id} 
-                    className={`word-row ${selectedWords.has(word._id) ? 'selected' : ''} ${word.isKnown === true ? 'known' : word.isKnown === false ? 'unknown' : ''}`}
-                  >
-                    <td>
-                      <input
-                        type="checkbox"
-                        checked={selectedWords.has(word._id)}
-                        onChange={() => handleSelectWord(word._id)}
-                      />
-                    </td>
-                    <td className="word-english-cell">
-                      <strong>{word.englishWord}</strong>
-                    </td>
-                    <td className="word-meaning-cell">{word.turkishMeaning || '-'}</td>
-                    <td className="word-type-cell">
-                      {word.wordType || '-'}
-                    </td>
-                    <td className="word-level-cell">
-                      {word.englishLevel ? (
-                        <span className="word-level-badge">{word.englishLevel}</span>
-                      ) : '-'}
-                    </td>
-                    <td className="word-category-cell">
-                      {word.category1 || '-'}
-                    </td>
-                    <td className="word-category-cell">
-                      {word.category2 || '-'}
-                    </td>
-                    <td className="word-category-cell">
-                      {word.sources && word.sources.length > 0 ? (
-                        <span className="source-badge" title={word.sources.join(', ')}>
-                          {word.sources.length === 1 
-                            ? word.sources[0] 
-                            : `${word.sources[0]} (+${word.sources.length - 1})`}
-                        </span>
-                      ) : '-'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="pagination">
-            <button
-              onClick={() => setPage(p => Math.max(1, p - 1))}
-              disabled={page === 1}
-              className="btn btn-secondary"
-            >
-              Previous
-            </button>
-            <span className="page-info">
-              Page {page} of {totalPages}
-            </span>
-            <button
-              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-              disabled={page === totalPages}
-              className="btn btn-secondary"
-            >
-              Next
-            </button>
-          </div>
-        )}
-      </div>
+      <WordList showFilters={false} showDeleteButton={false} activeSourceId={activeSourceId} />
     </div>
   );
 };

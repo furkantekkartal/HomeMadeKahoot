@@ -1011,6 +1011,80 @@ exports.getSources = async (req, res) => {
   }
 };
 
+// Update a source
+exports.updateSource = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { sourceId } = req.params;
+    const { title, description, level, skill, task, cardQty } = req.body;
+
+    // Verify source belongs to user
+    const source = await Source.findOne({ _id: sourceId, userId });
+    if (!source) {
+      return res.status(404).json({ message: 'Source not found' });
+    }
+
+    // Update deck information fields
+    if (title !== undefined) source.title = title;
+    if (description !== undefined) source.description = description;
+    if (level !== undefined) source.level = level;
+    if (skill !== undefined) source.skill = skill;
+    if (task !== undefined) source.task = task;
+    if (cardQty !== undefined) source.cardQty = cardQty;
+
+    await source.save();
+
+    res.json({ 
+      message: 'Source updated successfully',
+      source: {
+        _id: source._id,
+        sourceName: source.sourceName,
+        title: source.title,
+        description: source.description,
+        level: source.level,
+        skill: source.skill,
+        task: source.task,
+        cardQty: source.cardQty
+      }
+    });
+  } catch (error) {
+    console.error('Error updating source:', error);
+    res.status(500).json({ 
+      message: error.message || 'Failed to update source' 
+    });
+  }
+};
+
+// Delete a source
+exports.deleteSource = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { sourceId } = req.params;
+
+    // Verify source belongs to user
+    const source = await Source.findOne({ _id: sourceId, userId });
+    if (!source) {
+      return res.status(404).json({ message: 'Source not found' });
+    }
+
+    // Delete all SourceWord entries for this source
+    await SourceWord.deleteMany({ sourceId });
+
+    // Delete the source
+    await Source.findByIdAndDelete(sourceId);
+
+    res.json({ 
+      message: 'Source deleted successfully',
+      deletedSourceId: sourceId
+    });
+  } catch (error) {
+    console.error('Error deleting source:', error);
+    res.status(500).json({ 
+      message: error.message || 'Failed to delete source' 
+    });
+  }
+};
+
 // Get words for a specific source
 exports.getSourceWords = async (req, res) => {
   try {

@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { WordListProvider } from './context/WordListContext';
 import Sidebar from './components/Common/Sidebar';
 import Navbar from './components/Common/Navbar';
 import MobileMenuButton from './components/Common/MobileMenuButton';
@@ -113,11 +114,13 @@ function AppContent() {
 function App() {
   return (
     <AuthProvider>
-      <Router>
-        <div className="App">
-          <AppContent />
-        </div>
-      </Router>
+      <WordListProvider>
+        <Router>
+          <div className="App">
+            <AppContent />
+          </div>
+        </Router>
+      </WordListProvider>
     </AuthProvider>
   );
 }

@@ -99,6 +99,8 @@ export const wordAPI = {
   fillWordColumns: (words = null) => api.post('/words/fill-columns', { words }),
   getWordsWithoutTurkish: () => api.get('/words/without-turkish'),
   getSources: () => api.get('/words/sources'),
+  updateSource: (sourceId, data) => api.put(`/words/sources/${sourceId}`, data),
+  deleteSource: (sourceId) => api.delete(`/words/sources/${sourceId}`),
   getSourceWords: (sourceId) => api.get(`/words/sources/${sourceId}/words`),
   getFilterValues: () => api.get('/words/filter-values')
 };
