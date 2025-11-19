@@ -11,6 +11,7 @@ router.post('/generate-description', auth, quizController.generateQuizDescriptio
 router.post('/generate-questions', auth, quizController.generateQuizQuestions);
 router.post('/generate-from-file', auth, quizController.uploadFile, quizController.generateQuizFromFile);
 router.post('/generate-from-youtube', auth, quizController.generateQuizFromYouTube);
+router.post('/generate-from-content', auth, quizController.generateQuizFromContent);
 router.get('/:id', quizController.getQuiz);
 router.post('/', auth, quizController.createQuiz);
 router.put('/:id', auth, quizController.updateQuiz);

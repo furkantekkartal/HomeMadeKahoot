@@ -326,10 +326,11 @@ exports.generateQuizFromFile = async (req, res) => {
       return res.json(result);
     }
     
-    const sourceType = fileExt === '.pdf' ? 'pdf' : 'srt';
+    const sourceType = fileExt === '.pdf' ? 'pdf' : (fileExt === '.txt' ? 'txt' : 'srt');
+    const logs = [];
 
     // Process file and generate quiz
-    const result = await processFileAndGenerateQuiz(filePath, sourceType);
+    const result = await processFileAndGenerateQuiz(filePath, sourceType, logs);
 
     // Clean up uploaded file
     try {
@@ -356,29 +357,70 @@ exports.generateQuizFromFile = async (req, res) => {
   }
 };
 
-// Enhanced AI Quiz Maker - Process YouTube URL
+// Enhanced AI Quiz Maker - Process YouTube URL or Webpage URL
 exports.generateQuizFromYouTube = async (req, res) => {
   try {
     const { videoUrl } = req.body;
 
     if (!videoUrl) {
-      return res.status(400).json({ message: 'YouTube URL is required' });
+      return res.status(400).json({ message: 'URL is required' });
     }
 
-    // Validate YouTube URL
+    // Validate URL format
+    try {
+      new URL(videoUrl);
+    } catch (e) {
+      return res.status(400).json({ message: 'Invalid URL format' });
+    }
+
+    // Check if it's a YouTube URL
     const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+/;
-    if (!youtubeRegex.test(videoUrl)) {
-      return res.status(400).json({ message: 'Invalid YouTube URL' });
-    }
+    const isYouTube = youtubeRegex.test(videoUrl);
 
-    // Process YouTube video and generate quiz
-    const result = await processYouTubeAndGenerateQuiz(videoUrl);
+    const logs = [];
+    let result;
+    if (isYouTube) {
+      // Process YouTube video and generate quiz
+      const { processYouTubeAndGenerateQuiz } = require('../services/enhancedAiQuizService');
+      result = await processYouTubeAndGenerateQuiz(videoUrl, logs);
+    } else {
+      // Process webpage URL and generate quiz
+      const { processWebpageAndGenerateQuiz } = require('../services/enhancedAiQuizService');
+      result = await processWebpageAndGenerateQuiz(videoUrl, logs);
+    }
 
     res.json(result);
   } catch (error) {
-    console.error('Error generating quiz from YouTube:', error);
+    console.error('Error generating quiz from URL:', error);
     res.status(500).json({ 
-      message: error.message || 'Failed to generate quiz from YouTube video' 
+      message: error.message || 'Failed to generate quiz from URL' 
+    });
+  }
+};
+
+// Enhanced AI Quiz Maker - Process raw content directly
+exports.generateQuizFromContent = async (req, res) => {
+  try {
+    const { content, sourceType } = req.body;
+
+    if (!content) {
+      return res.status(400).json({ message: 'Content is required' });
+    }
+
+    const logs = [];
+    const { generateCompleteQuizFromContent } = require('../services/enhancedAiQuizService');
+    
+    // Generate quiz from content (without images)
+    const result = await generateCompleteQuizFromContent(content, sourceType || 'text', logs);
+
+    res.json({
+      ...result,
+      logs // Include logs generated during this step
+    });
+  } catch (error) {
+    console.error('Error generating quiz from content:', error);
+    res.status(500).json({ 
+      message: error.message || 'Failed to generate quiz from content' 
     });
   }
 };

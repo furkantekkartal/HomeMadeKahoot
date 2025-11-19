@@ -95,6 +95,9 @@ const Spelling = () => {
   const [timerActive, setTimerActive] = useState(true);
   const { durationFormatted, isActive, endSession, resetSession } = useStudyTimer('Spelling', timerActive);
 
+  // Show known words checkbox
+  const [showKnown, setShowKnown] = useState(false);
+
   useEffect(() => {
     const initializeSpelling = async () => {
       // First, load decks
@@ -128,7 +131,7 @@ const Spelling = () => {
       loadDefaultCards();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [decks.length, cards.length, loading, currentDeck]);
+  }, [decks.length, cards.length, loading, currentDeck, showKnown]);
 
   useEffect(() => {
     if (currentDeck) {
@@ -138,7 +141,7 @@ const Spelling = () => {
       loadDeckCards();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentDeck]);
+  }, [currentDeck, showKnown]);
 
   // Calculate currentCard for use in effects
   const currentCard = cards.length > 0 && currentIndex < cards.length ? cards[currentIndex] : null;
@@ -305,13 +308,17 @@ const Spelling = () => {
     }
   };
 
-  const loadDeckCards = async () => {
+  const loadDeckCards = async (showKnownOverride = null) => {
     if (!currentDeck) return;
     
     try {
       setLoading(true);
       setShowResults(false); // Reset results when loading new deck
-      const response = await flashcardAPI.getDeck(currentDeck._id, 'spelling');
+      // Use override value if provided, otherwise use state
+      const shouldShowKnown = showKnownOverride !== null ? showKnownOverride : showKnown;
+      // Use 'all' filterType when showKnown is true to get all words including known ones
+      const filterType = shouldShowKnown ? 'all' : 'spelling';
+      const response = await flashcardAPI.getDeck(currentDeck._id, filterType);
       setCards(response.data.words || []);
       
       // Store deck statistics
@@ -336,20 +343,24 @@ const Spelling = () => {
     }
   };
 
-  const loadDefaultCards = async () => {
+  const loadDefaultCards = async (showKnownOverride = null) => {
     try {
       setLoading(true);
       // Reset timer when loading default cards
       resetSession();
+      // Use override value if provided, otherwise use state
+      const shouldShowKnown = showKnownOverride !== null ? showKnownOverride : showKnown;
       const response = await wordAPI.getWordsWithStatus({
         limit: CONSTANTS.WORDS_LIMIT,
-        showKnown: 'false',
+        showKnown: shouldShowKnown ? 'true' : 'false',
         showUnknown: 'true'
       });
 
       let filtered = response.data.words || [];
-      // Filter to show only unknown words
-      filtered = filtered.filter(w => w.isKnown !== true);
+      // Filter to show only unknown words if showKnown is false
+      if (!shouldShowKnown) {
+        filtered = filtered.filter(w => w.isKnown !== true);
+      }
 
       // Shuffle cards for variety
       const shuffled = [...filtered].sort(() => Math.random() - 0.5);
@@ -440,14 +451,15 @@ const Spelling = () => {
     }, 300);
   };
 
-  // Update spelling status without advancing to next card
+  // Update spelling status and always advance to next card
   const updateSpellingStatus = async (isSpelled, card = null) => {
     const targetCard = card || cards[currentIndex];
     if (!targetCard || !targetCard._id) return;
 
+    // Always show animation and sound
     triggerAnimation(isSpelled ? 'known' : 'unknown');
 
-    // Show text animation overlay
+    // Always show text animation overlay
     if (isSpelled) {
       setShowKnownText(true);
       playSuccessSound();
@@ -470,6 +482,23 @@ const Spelling = () => {
       if (currentDeck) {
         await flashcardAPI.updateLastStudied(currentDeck._id);
       }
+      
+      // Always advance to next card after status update
+      // Wait for text overlay animation (300ms) + small buffer (50ms) = 350ms
+      setTimeout(() => {
+        if (cards.length > 0 && currentIndex < cards.length) {
+          // Check if we're not on the last card before advancing
+          if (currentIndex < cards.length - 1) {
+            goToNextCard();
+          } else {
+            // If on last card, show results instead
+            if (!showResults) {
+              setShowResults(true);
+              setTimerActive(false);
+            }
+          }
+        }
+      }, 350);
     } catch (error) {
       console.error('Failed to update spelling status:', error);
     }
@@ -777,6 +806,26 @@ const Spelling = () => {
           />
         </div>
         <div className="header-controls">
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.9rem' }}>
+            <input
+              type="checkbox"
+              checked={showKnown}
+              onChange={(e) => {
+                const newValue = e.target.checked;
+                setShowKnown(newValue);
+                // Reload cards immediately with the new value
+                if (currentDeck) {
+                  // Reload deck cards with new value
+                  loadDeckCards(newValue);
+                } else {
+                  // Reload default cards with new value
+                  loadDefaultCards(newValue);
+                }
+              }}
+              style={{ cursor: 'pointer' }}
+            />
+            <span>Show known</span>
+          </label>
         </div>
       </div>
 

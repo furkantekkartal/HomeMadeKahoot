@@ -2211,24 +2211,20 @@ const CreateDeck = () => {
             }}>
               Upload File (SRT, TXT, or PDF)
             </label>
-            <input
-              type="file"
-              accept=".srt,.txt,.pdf"
-              onChange={handleDebugFileUpload}
-              style={{ 
-                marginBottom: '0.75rem', 
-                width: '100%',
-                padding: '0.75rem',
-                border: '2px solid #e2e8f0',
-                borderRadius: '8px',
-                fontSize: '0.9rem',
-                cursor: 'pointer',
-                transition: 'border-color 0.2s'
-              }}
-              disabled={convertingPDF || convertingWebpage}
-              onMouseEnter={(e) => !convertingPDF && !convertingWebpage && (e.target.style.borderColor = '#667eea')}
-              onMouseLeave={(e) => e.target.style.borderColor = '#e2e8f0'}
-            />
+            <div className="file-upload-group" style={{ width: '100%' }}>
+              <label className="file-upload-label" style={{ width: '100%' }}>
+                <input
+                  type="file"
+                  accept=".srt,.txt,.pdf"
+                  onChange={handleDebugFileUpload}
+                  disabled={convertingPDF || convertingWebpage}
+                  style={{ display: 'none' }}
+                />
+                <span className="file-upload-button">
+                  {debugFile ? `📄 ${debugFile.name}` : '📁 Choose File (PDF, SRT, TXT)'}
+                </span>
+              </label>
+            </div>
           </div>
 
           {/* Webpage URL Input */}
@@ -2254,7 +2250,15 @@ const CreateDeck = () => {
               <input
                 type="text"
                 value={webpageUrl}
-                onChange={(e) => setWebpageUrl(e.target.value)}
+                onChange={(e) => {
+                  setWebpageUrl(e.target.value);
+                  if (e.target.value) {
+                    setDebugFile(null);
+                    setDebugFileContent('');
+                    setDebugConvertedContent('');
+                    setDebugLogs([]);
+                  }
+                }}
                 placeholder="https://example.com/article or https://youtube.com/watch?v=..."
               style={{ 
                 width: '100%', 

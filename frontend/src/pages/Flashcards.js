@@ -97,6 +97,9 @@ const Flashcards = () => {
   const [timerActive, setTimerActive] = useState(true);
   const { durationFormatted, isActive, endSession, resetSession } = useStudyTimer('Flashcards', timerActive);
 
+  // Show known words checkbox
+  const [showKnown, setShowKnown] = useState(false);
+
   // Speech evaluation state
   const [isRecording, setIsRecording] = useState(false);
   const [isRecordingWord, setIsRecordingWord] = useState(false);
@@ -189,7 +192,7 @@ const Flashcards = () => {
       loadDefaultCards();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [decks.length, cards.length, loading, currentDeck]);
+  }, [decks.length, cards.length, loading, currentDeck, showKnown]);
 
   useEffect(() => {
     if (currentDeck && !isUpdatingDeckTypeRef.current) {
@@ -199,7 +202,7 @@ const Flashcards = () => {
       loadDeckCards();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentDeck]);
+  }, [currentDeck, showKnown]);
 
   // Reset evaluation state and audio recordings when card changes
   useEffect(() => {
@@ -369,13 +372,17 @@ const Flashcards = () => {
     }
   };
 
-  const loadDeckCards = async () => {
+  const loadDeckCards = async (showKnownOverride = null) => {
     if (!currentDeck) return;
     
     try {
       setLoading(true);
       setShowResults(false); // Reset results when loading new deck
-      const response = await flashcardAPI.getDeck(currentDeck._id, 'flashcards');
+      // Use override value if provided, otherwise use state
+      const shouldShowKnown = showKnownOverride !== null ? showKnownOverride : showKnown;
+      // Use 'all' filterType when showKnown is true to get all words including known ones
+      const filterType = shouldShowKnown ? 'all' : 'flashcards';
+      const response = await flashcardAPI.getDeck(currentDeck._id, filterType);
       setCards(response.data.words || []);
       setCurrentIndex(0);
       setIsFlipped(false);
@@ -406,20 +413,24 @@ const Flashcards = () => {
     }
   };
 
-  const loadDefaultCards = async () => {
+  const loadDefaultCards = async (showKnownOverride = null) => {
     try {
       setLoading(true);
       // Reset timer when loading default cards
       resetSession();
+      // Use override value if provided, otherwise use state
+      const shouldShowKnown = showKnownOverride !== null ? showKnownOverride : showKnown;
       const response = await wordAPI.getWordsWithStatus({
         limit: CONSTANTS.WORDS_LIMIT,
-        showKnown: 'false',
+        showKnown: shouldShowKnown ? 'true' : 'false',
         showUnknown: 'true'
       });
 
       let filtered = response.data.words || [];
-      // Filter to show only unknown words
-      filtered = filtered.filter(w => w.isKnown !== true);
+      // Filter to show only unknown words if showKnown is false
+      if (!shouldShowKnown) {
+        filtered = filtered.filter(w => w.isKnown !== true);
+      }
 
       // Shuffle cards for variety
       const shuffled = [...filtered].sort(() => Math.random() - 0.5);
@@ -637,14 +648,6 @@ const Flashcards = () => {
     const targetCard = card || cards[currentIndex];
     if (!targetCard || !targetCard._id) return;
 
-    // If already in the desired state, don't do anything
-    if (isKnown && targetCard.isKnown === true) {
-      return;
-    }
-    if (!isKnown && targetCard.isKnown === false) {
-      return;
-    }
-
     // Prevent multiple simultaneous status updates
     if (isUpdatingStatusRef.current) {
       return;
@@ -658,47 +661,19 @@ const Flashcards = () => {
     // Set flag to prevent auto-read during status update
     isUpdatingStatusRef.current = true;
 
-    // Show animation and sound for both known and unknown
+    // Always show animation and sound for both known and unknown
     if (isKnown) {
       triggerAnimation('known');
-      // Show text animation overlay for known
-      if (!showKnownText) {
-        setShowKnownText(true);
-        playSuccessSound();
-        setTimeout(() => setShowKnownText(false), 300);
-        // Manually trigger speaker button to pronounce the NEW card's word after navigation
-        // Wait 400ms to ensure the card has changed (goToNextCard updates index after 300ms)
-        setTimeout(() => {
-          // Access the current card after navigation - use functional update to get latest state
-          setCurrentIndex((prevIndex) => {
-            const newCard = cards[prevIndex];
-            if (newCard && newCard.englishWord) {
-              speakText(newCard.englishWord, 'en-US', 'audioWord');
-            }
-            return prevIndex; // Don't actually change the index, just use this to access current state
-          });
-        }, 400);
-      }
+      // Always show text animation overlay for known
+      setShowKnownText(true);
+      playSuccessSound();
+      setTimeout(() => setShowKnownText(false), 300);
     } else {
       triggerAnimation('unknown');
-      // Show text animation overlay for unknown
-      if (!showUnknownText) {
-        setShowUnknownText(true);
-        playUnknownSound();
-        setTimeout(() => setShowUnknownText(false), 300);
-        // Manually trigger speaker button to pronounce the NEW card's word after navigation
-        // Wait 400ms to ensure the card has changed (goToNextCard updates index after 300ms)
-        setTimeout(() => {
-          // Access the current card after navigation - use functional update to get latest state
-          setCurrentIndex((prevIndex) => {
-            const newCard = cards[prevIndex];
-            if (newCard && newCard.englishWord) {
-              speakText(newCard.englishWord, 'en-US', 'audioWord');
-            }
-            return prevIndex; // Don't actually change the index, just use this to access current state
-          });
-        }, 400);
-      }
+      // Always show text animation overlay for unknown
+      setShowUnknownText(true);
+      playUnknownSound();
+      setTimeout(() => setShowUnknownText(false), 300);
     }
 
     try {
@@ -1157,6 +1132,26 @@ const Flashcards = () => {
           />
         </div>
         <div className="header-controls">
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.9rem' }}>
+            <input
+              type="checkbox"
+              checked={showKnown}
+              onChange={(e) => {
+                const newValue = e.target.checked;
+                setShowKnown(newValue);
+                // Reload cards immediately with the new value
+                if (currentDeck) {
+                  // Reload deck cards with new value
+                  loadDeckCards(newValue);
+                } else {
+                  // Reload default cards with new value
+                  loadDefaultCards(newValue);
+                }
+              }}
+              style={{ cursor: 'pointer' }}
+            />
+            <span>Show known</span>
+          </label>
         </div>
       </div>
 

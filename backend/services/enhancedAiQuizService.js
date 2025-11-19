@@ -1,117 +1,58 @@
-const { GoogleGenerativeAI } = require('@google/generative-ai');
 const axios = require('axios');
 const fs = require('fs').promises;
 const path = require('path');
 const os = require('os');
 const { generateQuestionImage } = require('./imageService');
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+// OpenRouter API key
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 
-if (!GEMINI_API_KEY) {
-  console.warn('GEMINI_API_KEY is not set in environment variables');
+if (!OPENROUTER_API_KEY) {
+  console.warn('OPENROUTER_API_KEY is not set in environment variables');
 }
 
-const genAI = GEMINI_API_KEY ? new GoogleGenerativeAI(GEMINI_API_KEY) : null;
-// Use Gemini 2.0 Flash (latest and fastest)
-// Model can be configured via GEMINI_MODEL env variable
-// Common model names: 'gemini-2.0-flash-exp', 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-2.5-pro'
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.0-flash-exp';
-
-// List of models to try in order (most preferred first)
-const MODEL_FALLBACKS = [
-  'gemini-2.0-flash-exp',
-  'gemini-2.0-flash-thinking-exp',
-  'gemini-1.5-flash',
-  'gemini-1.5-pro',
-  'gemini-2.5-pro'
-];
-
-let cachedModel = null;
-let cachedModelName = null;
-
-const getModel = () => {
-  if (!genAI) return null;
-  
-  // If we have a cached working model, use it
-  if (cachedModel && cachedModelName === GEMINI_MODEL) {
-    return cachedModel;
+// OpenRouter API call function
+const callOpenRouter = async (prompt, systemPrompt = null) => {
+  if (!OPENROUTER_API_KEY) {
+    throw new Error('OpenRouter API key not configured');
   }
-  
-  // Try the configured model first
-  const modelToTry = GEMINI_MODEL;
-  cachedModel = genAI.getGenerativeModel({ model: modelToTry });
-  cachedModelName = modelToTry;
-  return cachedModel;
-};
 
-// Helper function to get a working model with fallback
-// Caches the first working model to avoid repeated tests
-const getWorkingModel = async () => {
-  if (!genAI) return null;
-  
-  // If we already have a cached working model, use it
-  if (cachedModel && cachedModelName) {
-    return cachedModel;
+  const messages = [];
+  if (systemPrompt) {
+    messages.push({ role: 'system', content: systemPrompt });
   }
-  
-  // Try configured model first, then fallbacks
-  const modelsToTry = [GEMINI_MODEL, ...MODEL_FALLBACKS.filter(m => m !== GEMINI_MODEL)];
-  
-  for (const modelName of modelsToTry) {
-    try {
-      const model = genAI.getGenerativeModel({ model: modelName });
-      // Test if model works with a minimal call
-      const testResult = await model.generateContent('Hi');
-      if (testResult && testResult.response) {
-        cachedModel = model;
-        cachedModelName = modelName;
-        console.log(`✓ Using Gemini model: ${modelName}`);
-        return model;
+  messages.push({ role: 'user', content: prompt });
+
+  const response = await axios.post(
+    'https://openrouter.ai/api/v1/chat/completions',
+    {
+      model: 'openai/gpt-4o-mini',
+      messages,
+      temperature: 0.3,
+      max_tokens: 16000
+    },
+    {
+      headers: {
+        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': process.env.APP_URL || 'http://localhost:3000',
+        'X-Title': 'HomeMadeKahoot'
       }
-    } catch (error) {
-      // Model not available, try next one
-      console.warn(`✗ Model ${modelName} not available: ${error.message.split('\n')[0]}`);
-      continue;
     }
-  }
-  
-  throw new Error('No available Gemini models found. Please check your API key and available models. Try setting GEMINI_MODEL in .env to a specific model name.');
-};
+  );
 
-// Retry helper with exponential backoff for rate limiting
-const retryWithBackoff = async (fn, maxRetries = 3, initialDelay = 1000) => {
-  let lastError;
-  
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    try {
-      return await fn();
-    } catch (error) {
-      lastError = error;
-      const errorMessage = error.message || '';
-      
-      // Check if it's a rate limit error (429)
-      if (errorMessage.includes('429') || errorMessage.includes('Too Many Requests') || errorMessage.includes('Resource exhausted')) {
-        if (attempt < maxRetries - 1) {
-          // Exponential backoff: 1s, 2s, 4s, etc.
-          const delay = initialDelay * Math.pow(2, attempt);
-          console.warn(`Rate limit hit. Retrying in ${delay / 1000}s... (attempt ${attempt + 1}/${maxRetries})`);
-          await new Promise(resolve => setTimeout(resolve, delay));
-          continue;
-        } else {
-          throw new Error('Rate limit exceeded. Please wait a few minutes and try again. The API has temporary usage limits.');
-        }
-      }
-      
-      // For other errors, throw immediately
-      throw error;
-    }
-  }
-  
-  throw lastError;
+  return response.data.choices[0]?.message?.content || '';
 };
 
 // Helper to add delay between requests to avoid rate limits
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Helper to add timestamped log entry
+const addLog = (logs, message, indent = false) => {
+  const timestamp = new Date().toLocaleTimeString('en-GB', { hour12: false });
+  const prefix = indent ? `[${timestamp}]    ` : `[${timestamp}]`;
+  logs.push(`${prefix} ${message}`);
+};
 
 /**
  * Extract text from PDF file
@@ -128,159 +69,46 @@ async function extractTextFromPDF(filePath) {
 }
 
 /**
- * Extract text from SRT subtitle file
+ * Extract text from SRT file
  */
 async function extractTextFromSRT(filePath) {
   try {
     const content = await fs.readFile(filePath, 'utf-8');
     // Remove SRT timestamps and formatting, keep only text
-    const text = content
-      .replace(/\d+\n/g, '') // Remove sequence numbers
-      .replace(/\d{2}:\d{2}:\d{2},\d{3}\s*-->\s*\d{2}:\d{2}:\d{2},\d{3}\n/g, '') // Remove timestamps
-      .replace(/<[^>]+>/g, '') // Remove HTML tags
-      .replace(/\n{3,}/g, '\n\n') // Normalize multiple newlines
-      .trim();
-    return text;
+    const lines = content.split('\n');
+    const textLines = [];
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      // Skip empty lines, sequence numbers, and timestamps
+      if (!line || /^\d+$/.test(line) || /^\d{2}:\d{2}:\d{2}/.test(line)) {
+        continue;
+      }
+      // Keep actual subtitle text
+      if (line.length > 0) {
+        textLines.push(line);
+      }
+    }
+    
+    return textLines.join(' ');
   } catch (error) {
     throw new Error(`Failed to extract text from SRT: ${error.message}`);
   }
 }
 
 /**
- * Analyze video file directly using Gemini's video capabilities
- * Gemini 2.0 Flash can process video files (MP4, MOV, etc.)
- */
-async function analyzeVideoFileWithGemini(filePath) {
-  if (!genAI) {
-    throw new Error('Gemini API key is not configured');
-  }
-
-  const currentModel = await getWorkingModel();
-  if (!currentModel) {
-    throw new Error('Failed to initialize Gemini model');
-  }
-
-  try {
-    // Read video file
-    const videoData = await fs.readFile(filePath);
-    const videoBase64 = videoData.toString('base64');
-    
-    // Determine MIME type from file extension
-    const ext = path.extname(filePath).toLowerCase();
-    const mimeTypes = {
-      '.mp4': 'video/mp4',
-      '.mov': 'video/quicktime',
-      '.webm': 'video/webm',
-      '.avi': 'video/x-msvideo'
-    };
-    const mimeType = mimeTypes[ext] || 'video/mp4';
-    
-    // Use Gemini to analyze the video
-    const prompt = `Analyze this video and create a comprehensive study sheet. Extract:
-1. All spoken words and dialogue
-2. Visual content and concepts shown
-3. Key topics and themes
-4. Important vocabulary and terminology
-5. Educational content and explanations
-
-Format as a detailed study guide.`;
-    
-    await delay(500);
-    const result = await retryWithBackoff(async () => {
-      return await currentModel.generateContent([
-        { text: prompt },
-        {
-          inlineData: {
-            data: videoBase64,
-            mimeType: mimeType
-          }
-        }
-      ]);
-    });
-    
-    const analyzedContent = await result.response.text();
-    
-    return analyzedContent;
-  } catch (error) {
-    console.error('Error analyzing video file with Gemini:', error);
-    throw new Error(`Failed to analyze video file: ${error.message}`);
-  }
-}
-
-/**
- * Extract transcript from YouTube video
- * Note: Gemini cannot directly access YouTube URLs, but can analyze video files
- * For YouTube, we extract transcript and use Gemini to analyze it
+ * Extract YouTube video transcript and metadata
  */
 async function extractYouTubeTranscript(videoUrl) {
   try {
-    // Extract video ID from URL
-    let videoId = '';
-    const urlPatterns = [
-      /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
-      /youtube\.com\/watch\?.*v=([^&\n?#]+)/
-    ];
-    
-    for (const pattern of urlPatterns) {
-      const match = videoUrl.match(pattern);
-      if (match && match[1]) {
-        videoId = match[1];
-        break;
-      }
-    }
-    
-    if (!videoId) {
-      throw new Error('Invalid YouTube URL format');
-    }
-    
-    // Try to get transcript using youtube-transcript
-    let transcript = '';
-    try {
-      const { YoutubeTranscript } = require('youtube-transcript');
-      const transcriptData = await YoutubeTranscript.fetchTranscript(videoId);
-      transcript = transcriptData.map(item => item.text).join(' ');
-    } catch (transcriptError) {
-      console.warn('Could not fetch transcript, using alternative method:', transcriptError.message);
-      // Transcript not available, we'll proceed with just title and description
-    }
-    
-    // Get video metadata using oEmbed API (more reliable than ytdl-core)
-    let videoTitle = '';
-    let videoDescription = '';
-    
-    try {
-      const oEmbedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(videoUrl)}&format=json`;
-      const oEmbedResponse = await axios.get(oEmbedUrl);
-      videoTitle = oEmbedResponse.data.title || '';
-    } catch (oEmbedError) {
-      console.warn('Could not fetch video title from oEmbed:', oEmbedError.message);
-      // Fallback: try ytdl-core as last resort
-      try {
-        const ytdl = require('ytdl-core');
-        const info = await ytdl.getInfo(videoUrl);
-        videoTitle = info.videoDetails.title || '';
-        videoDescription = info.videoDetails.description || '';
-      } catch (ytdlError) {
-        console.warn('ytdl-core also failed:', ytdlError.message);
-        // Use video ID as fallback title
-        videoTitle = `YouTube Video ${videoId}`;
-      }
-    }
-    
-    // Combine all available content
-    const contentParts = [];
-    if (videoTitle) contentParts.push(`Video Title: ${videoTitle}`);
-    if (videoDescription) contentParts.push(`Description: ${videoDescription}`);
-    if (transcript) contentParts.push(`Transcript: ${transcript}`);
-    
-    if (contentParts.length === 0) {
-      throw new Error('Could not extract any content from YouTube video. The video may be private or unavailable.');
-    }
+    const { extractYouTubeTranscriptWithPython } = require('./aiDeckWordExtractionService');
+    const logs = [];
+    const result = await extractYouTubeTranscriptWithPython(videoUrl, logs);
     
     return {
-      title: videoTitle || `YouTube Video ${videoId}`,
-      description: videoDescription || '',
-      transcript: contentParts.join('\n\n')
+      title: result.title || '',
+      description: result.description || '',
+      transcript: result.transcript || ''
     };
   } catch (error) {
     throw new Error(`Failed to extract YouTube video info: ${error.message}`);
@@ -288,285 +116,168 @@ async function extractYouTubeTranscript(videoUrl) {
 }
 
 /**
- * Analyze content and create study sheet using Gemini AI
+ * Clean content using AI (same as create-deck)
  */
-async function analyzeContentAndCreateStudySheet(content, sourceType) {
-  if (!genAI) {
-    throw new Error('Gemini API key is not configured');
+async function cleanContentWithAI(markdownContent, sourceType, logs = []) {
+  if (!OPENROUTER_API_KEY) {
+    throw new Error('OpenRouter API key not configured');
   }
 
-  // Get working model with fallback
-  const currentModel = await getWorkingModel();
-  if (!currentModel) {
-    throw new Error('Failed to initialize Gemini model');
-  }
+  let prompt;
+  let systemMessage;
 
-  const prompt = `Analyze the following ${sourceType} content and create a comprehensive study sheet.
-
-Content:
-${content}
-
-Create a detailed study sheet that includes:
-1. Key concepts and topics
-2. Important facts and information
-3. Main themes and ideas
-4. Vocabulary and terminology
-5. Summary of important points
-
-Format the study sheet in a clear, organized manner that can be used to generate educational quiz questions.`;
-
-  try {
-    // Add small delay to avoid rate limits
-    await delay(500);
+  if (sourceType === 'pdf' || sourceType === 'webpage') {
+    addLog(logs, '⏳ AI is cleaning content...', true);
+    const cleaningStartTime = Date.now();
     
-    const result = await retryWithBackoff(async () => {
-      return await currentModel.generateContent(prompt);
-    });
-    
-    const response = await result.response;
-    return response.text();
-  } catch (error) {
-    console.error('Error analyzing content:', error);
-    throw new Error(`Failed to analyze content: ${error.message}`);
+    prompt = `This content was converted from a ${sourceType === 'pdf' ? 'PDF file' : 'webpage'}. Your task is to clean the content:
+
+STEP 1: Clean the content
+* Remove unnecessary parts: table of contents, index, ISBN numbers, page numbers, headers, footers
+* Remove navigation elements: "click here" buttons, links to other pages, advertisement text
+* Remove metadata: publication info, copyright notices (unless relevant to content)
+* Keep only the main readable content about the primary topic
+** If it's a story book, keep only the story text (no index, ISBN, etc.)
+** If it's a newspaper webpage, keep only the news article (no buttons, links, other news)
+** If it's a document, keep only the main content (no headers, footers, page numbers)
+
+Return ONLY the cleaned content. No explanations, no markdown formatting. Just the cleaned text.
+
+Content to clean:
+${markdownContent.substring(0, 50000)}`;
+
+    systemMessage = 'You are a content cleaning tool. Clean the content by removing unnecessary parts (index, ISBN, buttons, links, headers, footers). Return only the cleaned content, no explanations.';
+
+    try {
+      const cleanedContent = await callOpenRouter(prompt, systemMessage);
+      const cleaningTime = ((Date.now() - cleaningStartTime) / 1000).toFixed(2);
+      const cleanedWordCount = cleanedContent.split(/\s+/).filter(w => w.length > 0).length;
+      addLog(logs, `✅ Content cleaned (${cleaningTime}s): ${cleanedContent.length} characters = ${cleanedWordCount} words`, true);
+      return cleanedContent.trim();
+    } catch (error) {
+      console.error('Error cleaning content:', error);
+      // Return original content if cleaning fails
+      addLog(logs, `⚠ Content cleaning failed, using original content`, true);
+      return markdownContent;
+    }
+  } else {
+    // For SRT/YouTube, just return as-is (already cleaned)
+    addLog(logs, 'Content already clean (SRT/YouTube), skipping AI cleaning', true);
+    return markdownContent;
   }
 }
 
 /**
- * Determine quiz parameters based on content analysis
+ * Single AI call to generate complete quiz from cleaned content
+ * Returns JSON with level, skill, task, title, description, and questions
  */
-async function determineQuizParameters(studySheet, content) {
-  if (!genAI) {
-    throw new Error('Gemini API key is not configured');
+async function generateCompleteQuizFromContent(cleanedContent, sourceType, logs = []) {
+  if (!OPENROUTER_API_KEY) {
+    throw new Error('OpenRouter API key not configured');
   }
 
-  const currentModel = await getWorkingModel();
-  if (!currentModel) {
-    throw new Error('Failed to initialize Gemini model');
-  }
+  const sourceTypeLabel = sourceType === 'pdf' ? 'PDF file' : 
+                         sourceType === 'srt' ? 'SRT subtitle file' :
+                         sourceType === 'txt' ? 'text file' :
+                         sourceType === 'youtube' ? 'YouTube video transcript' :
+                         sourceType === 'webpage' ? 'webpage' : sourceType;
 
-  const prompt = `Based on the following study sheet and content, determine the appropriate quiz parameters.
+  const prompt = `Analyze the following ${sourceTypeLabel} content and generate a complete quiz in JSON format.
 
-Study Sheet:
-${studySheet}
+Content:
+${cleanedContent.substring(0, 50000)}
 
-Content Summary:
-${content.substring(0, 1000)}...
+Your task:
+1. Analyze the content depth and complexity to determine the CEFR level (A1, A2, B1, B2, C1, or C2)
+2. Determine the appropriate skill (Speaking, Reading, Writing, or Listening)
+3. Determine the appropriate task (Vocabulary, Grammar, Spelling, Essay, Repeat, or Read Aloud)
+4. Determine how many questions to generate (5-60, based on content depth)
+5. Generate a simple title (3-6 words) matching the detected level
+6. Generate a brief description (1-2 sentences) matching the detected level
+7. Generate multiple-choice quiz questions (each with exactly 4 options)
 
-Analyze the content depth and complexity, then determine:
-1. Category: vocabulary, grammar, reading, or listening
-2. Difficulty: beginner, intermediate, or advanced
-3. Question Number: How many questions should this quiz have? (Consider the depth of the topic - if it's a deep/complex topic, suggest more questions like 40-60. If it's simpler, suggest 10-20)
+CRITICAL REQUIREMENTS:
+- Level detection: Analyze vocabulary complexity, sentence structure, and content difficulty
+  * A1: Very basic, simple words, short sentences (5-10 words)
+  * A2: Basic, common words, simple sentences (8-15 words)
+  * B1: Intermediate, everyday vocabulary, moderate sentences (12-20 words)
+  * B2: Upper-intermediate, varied vocabulary, complex sentences (15-25 words)
+  * C1: Advanced, sophisticated vocabulary, very complex sentences (20-30 words)
+  * C2: Near-native, highly sophisticated vocabulary and structures (25+ words)
 
-Return your response as a JSON object in this exact format:
+- Title and description MUST use vocabulary and sentence complexity matching the detected level
+- Questions, options, and all text MUST strictly match the detected level
+- Each question must have exactly 4 options
+- One option must be the correct answer (correctAnswer: 0, 1, 2, or 3)
+- Questions should test understanding of the content
+
+Return ONLY a JSON object in this exact format:
 {
-  "category": "vocabulary|grammar|reading|listening",
-  "difficulty": "beginner|intermediate|advanced",
+  "level": "A1|A2|B1|B2|C1|C2",
+  "skill": "Speaking|Reading|Writing|Listening",
+  "task": "Vocabulary|Grammar|Spelling|Essay|Repeat|Read Aloud",
   "questionNumber": <number between 5 and 60>,
-  "reasoning": "Brief explanation of why these parameters were chosen"
+  "reasoning": "Brief explanation of why this level was chosen",
+  "title": "Simple title here (3-6 words, matching level)",
+  "description": "Brief description here (1-2 sentences, matching level)",
+  "questions": [
+    {
+      "questionText": "Question text here (matching level complexity)",
+      "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
+      "correctAnswer": 0
+    }
+  ]
 }
 
 Only return the JSON object, no other text.`;
 
+  const systemMessage = 'You are an educational quiz generator. Analyze content, detect CEFR level, and generate complete quizzes. Return only valid JSON, no other text.';
+
   try {
-    // Add small delay to avoid rate limits
-    await delay(500);
+    addLog(logs, '⏳ Sending request to AI for quiz generation...', true);
     
-    const result = await retryWithBackoff(async () => {
-      return await currentModel.generateContent(prompt);
-    });
+    const aiStartTime = Date.now();
+    const rawResponse = await callOpenRouter(prompt, systemMessage);
+    const aiTime = ((Date.now() - aiStartTime) / 1000).toFixed(2);
     
-    const response = await result.response;
-    const text = response.text().trim();
+    addLog(logs, `✅ AI response received (${aiTime}s)`, true);
     
     // Extract JSON from response
-    let jsonString = text;
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    let jsonString = rawResponse;
+    const jsonMatch = rawResponse.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       jsonString = jsonMatch[0];
     }
     
-    const params = JSON.parse(jsonString);
+    const quizData = JSON.parse(jsonString);
     
     // Validate and normalize
-    const validCategories = ['vocabulary', 'grammar', 'reading', 'listening'];
-    const validDifficulties = ['beginner', 'intermediate', 'advanced'];
+    const validLevels = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
+    const validSkills = ['Speaking', 'Reading', 'Writing', 'Listening'];
+    const validTasks = ['Vocabulary', 'Grammar', 'Spelling', 'Essay', 'Repeat', 'Read Aloud'];
     
-    return {
-      category: validCategories.includes(params.category) ? params.category : 'vocabulary',
-      difficulty: validDifficulties.includes(params.difficulty) ? params.difficulty : 'beginner',
-      questionNumber: Math.min(60, Math.max(5, parseInt(params.questionNumber) || 10)),
-      reasoning: params.reasoning || ''
-    };
-  } catch (error) {
-    console.error('Error determining quiz parameters:', error);
-    // Return defaults
-    return {
-      category: 'vocabulary',
-      difficulty: 'intermediate',
-      questionNumber: 10,
-      reasoning: 'Default parameters due to analysis error'
-    };
-  }
-}
-
-/**
- * Generate simplified title and description
- */
-async function generateSimplifiedTitleAndDescription(studySheet, category, difficulty) {
-  if (!genAI) {
-    throw new Error('Gemini API key is not configured');
-  }
-
-  const currentModel = await getWorkingModel();
-  if (!currentModel) {
-    throw new Error('Failed to initialize Gemini model');
-  }
-
-  const prompt = `Based on this study sheet, generate a simple, concise quiz title and description.
-
-Study Sheet:
-${studySheet}
-
-Category: ${category}
-Difficulty: ${difficulty}
-
-- Your sentece structure and vocabulary should match with Difficulty level: ${difficulty}. 
---I mean, if you are prepearing a quiz in A1 level, dont use long sentences and hard words. 
---Write everything in A1 level if you are prepearing a1 level quiz. 
---Same for other leves. If you work in B1, sentence hardness and vocabulary range shold be in B1 level.
-
-Generate:
-1. A short, simple title (3-6 words max). Make it clear and direct.
-2. A brief description (1-2 sentences max). Keep it simple and to the point.
-
-
-Return as JSON:
-{
-  "title": "Simple title here",
-  "description": "Brief description here"
-}
-
-Only return the JSON, no other text.`;
-
-  try {
-    // Add small delay to avoid rate limits
-    await delay(500);
+    const level = validLevels.includes(quizData.level) ? quizData.level : 'A1';
+    const skill = validSkills.includes(quizData.skill) ? quizData.skill : 'Reading';
+    const task = validTasks.includes(quizData.task) ? quizData.task : 'Vocabulary';
+    const questionNumber = Math.min(60, Math.max(5, parseInt(quizData.questionNumber) || 10));
     
-    const result = await retryWithBackoff(async () => {
-      return await currentModel.generateContent(prompt);
-    });
-    
-    const response = await result.response;
-    const text = response.text().trim();
-    
-    // Extract JSON
-    let jsonString = text;
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      jsonString = jsonMatch[0];
-    }
-    
-    const data = JSON.parse(jsonString);
-    
-    return {
-      title: (data.title || 'Quiz').replace(/^["']|["']$/g, '').trim(),
-      description: (data.description || '').replace(/^["']|["']$/g, '').trim()
-    };
-  } catch (error) {
-    console.error('Error generating title/description:', error);
-    return {
-      title: `${category.charAt(0).toUpperCase() + category.slice(1)} Quiz`,
-      description: `Test your ${category} knowledge at ${difficulty} level.`
-    };
-  }
-}
-
-/**
- * Generate quiz questions based on study sheet
- */
-async function generateQuizFromStudySheet(studySheet, title, description, category, difficulty, questionNumber) {
-  if (!genAI) {
-    throw new Error('Gemini API key is not configured');
-  }
-
-  const currentModel = await getWorkingModel();
-  if (!currentModel) {
-    throw new Error('Failed to initialize Gemini model');
-  }
-
-  const prompt = `Generate ${questionNumber} multiple-choice quiz questions based on this study sheet.
-
-Study Sheet:
-${studySheet}
-
-Quiz Title: ${title}
-Description: ${description}
-Category: ${category}
-Difficulty: ${difficulty}
-
-Requirements:
-- Each question must have exactly 4 options
-- One option must be clearly correct
-- Questions should test understanding of the study sheet content
-- Difficulty level: ${difficulty}
-- Focus on: ${category}
-- Your sentece structure and vocabulary should match with Difficulty level: ${difficulty}. 
---I mean, if you are prepearing a quiz in A1 level, dont use long sentences and hard words. 
---Write everything in A1 level if you are prepearing a1 level quiz. 
---Same for other leves. If you work in B1, sentence hardness and vocabulary range shold be in B1 level.
-
-Return as JSON array:
-[
-  {
-    "questionText": "Question here?",
-    "options": ["Option A", "Option B", "Option C", "Option D"],
-    "correctAnswer": 0
-  }
-]
-
-Only return the JSON array, no other text.`;
-
-  try {
-    // Add small delay to avoid rate limits
-    await delay(500);
-    
-    const result = await retryWithBackoff(async () => {
-      return await currentModel.generateContent(prompt);
-    });
-    
-    const response = await result.response;
-    const text = response.text().trim();
-    
-    // Extract JSON array
-    let jsonString = text;
-    const jsonMatch = text.match(/\[[\s\S]*\]/);
-    if (jsonMatch) {
-      jsonString = jsonMatch[0];
-    }
-    
-    const questions = JSON.parse(jsonString);
-    
-    if (!Array.isArray(questions)) {
-      throw new Error('Invalid response format: expected array');
-    }
-    
-    // Calculate default points and time limit
-    const calculatePoints = (cat, diff) => {
-      const catCoef = { vocabulary: 1, grammar: 2, reading: 2, listening: 2 };
-      const diffCoef = { beginner: 1, intermediate: 3, advanced: 5 };
-      return (catCoef[cat] || 1) * (diffCoef[diff] || 1);
+    // Calculate default points and time limit based on level and task
+    const calculatePoints = (lvl, tsk) => {
+      const taskCoef = { Vocabulary: 1, Grammar: 2, Spelling: 1, Essay: 3, Repeat: 2, 'Read Aloud': 2 };
+      const levelCoef = { A1: 1, A2: 2, B1: 3, B2: 4, C1: 5, C2: 6 };
+      return (taskCoef[tsk] || 1) * (levelCoef[lvl] || 1) * 10;
     };
     
-    const calculateTimeLimit = (diff) => {
-      const limits = { beginner: 20, intermediate: 40, advanced: 60 };
-      return limits[diff] || 20;
+    const calculateTimeLimit = (lvl) => {
+      const limits = { A1: 20, A2: 25, B1: 30, B2: 40, C1: 50, C2: 60 };
+      return limits[lvl] || 20;
     };
     
-    const defaultPoints = calculatePoints(category, difficulty);
-    const defaultTimeLimit = calculateTimeLimit(difficulty);
+    const defaultPoints = calculatePoints(level, task);
+    const defaultTimeLimit = calculateTimeLimit(level);
     
     // Format questions
-    const formattedQuestions = questions.map((q, index) => ({
+    const formattedQuestions = (quizData.questions || []).map((q, index) => ({
       questionText: q.questionText || `Question ${index + 1}`,
       options: Array.isArray(q.options) && q.options.length === 4 
         ? q.options 
@@ -579,30 +290,400 @@ Only return the JSON array, no other text.`;
       imageUrl: null
     })).slice(0, questionNumber);
     
-    // Generate images for all questions
-    console.log(`Generating images for ${formattedQuestions.length} questions...`);
-    for (let i = 0; i < formattedQuestions.length; i++) {
-      try {
-        // Add delay between image generations to avoid rate limits
-        if (i > 0) {
-          await delay(500);
+    return {
+      level,
+      skill,
+      task,
+      questionNumber,
+      reasoning: quizData.reasoning || '',
+      title: (quizData.title || 'Quiz').replace(/^["']|["']$/g, '').trim(),
+      description: (quizData.description || '').replace(/^["']|["']$/g, '').trim(),
+      questions: formattedQuestions,
+      prompt,
+      rawResponse
+    };
+  } catch (error) {
+    console.error('Error generating complete quiz:', error);
+    throw new Error(`Failed to generate quiz: ${error.message}`);
+  }
+}
+
+// Keep analyzeVideoFileWithGemini for video file processing (if needed)
+async function analyzeVideoFileWithGemini(filePath) {
+  // This function is kept for video file processing but not used in the main flow
+  // If video file processing is needed, it should be implemented separately
+  throw new Error('Video file analysis not implemented in OpenRouter-only mode');
+}
+
+/**
+ * Process uploaded file and generate complete quiz (matches create-deck flow)
+ */
+async function processFileAndGenerateQuiz(filePath, sourceType, logs = []) {
+  try {
+    const fileName = path.basename(filePath);
+    const fileSize = (await fs.stat(filePath)).size;
+    
+    // Step 1: File taken
+    addLog(logs, `📁 Step 1: File taken | ${sourceType}`);
+    addLog(logs, `✅ Step 1 Completed! File taken: ${fileName} | ${(fileSize / 1024).toFixed(2)} KB`, true);
+    
+    // Step 2: Extract content
+    addLog(logs, `🔄 Step 2: Extracting content`);
+    let markdownContent = '';
+    let originalContent = '';
+    
+    if (sourceType === 'pdf') {
+      addLog(logs, `⏳ Extracting text from PDF...`, true);
+      const pdfStartTime = Date.now();
+      originalContent = await extractTextFromPDF(filePath);
+      const pdfTime = ((Date.now() - pdfStartTime) / 1000).toFixed(2);
+      addLog(logs, `✅ PDF text extracted (${pdfTime}s)`, true);
+      // Convert to Markdown (simple conversion)
+      markdownContent = `# ${fileName.replace(/\.pdf$/i, '')}\n\n${originalContent}`;
+    } else if (sourceType === 'srt' || sourceType === 'txt') {
+      addLog(logs, `⏳ Extracting text from ${sourceType.toUpperCase()} file...`, true);
+      const srtStartTime = Date.now();
+      originalContent = await extractTextFromSRT(filePath);
+      const srtTime = ((Date.now() - srtStartTime) / 1000).toFixed(2);
+      addLog(logs, `✅ ${sourceType.toUpperCase()} text extracted (${srtTime}s)`, true);
+      markdownContent = originalContent; // SRT/TXT can be used as-is
+    } else {
+      throw new Error(`Unsupported file type: ${sourceType}`);
+    }
+    
+    if (!markdownContent || markdownContent.trim().length === 0) {
+      throw new Error('No content extracted from file');
+    }
+    
+    const wordCount = markdownContent.split(/\s+/).filter(w => w.length > 0).length;
+    addLog(logs, `✅ Step 2 Completed! Extracted content: ${markdownContent.length} characters = ${wordCount} words`, true);
+    
+    // Step 3: Convert to MD (already done, but log it)
+    addLog(logs, `🔄 Step 3: Converting to md`);
+    addLog(logs, `✅ Step 3 Completed! ${markdownContent.length} characters = ${wordCount} words`, true);
+    
+    // Step 4: Clean content and send to AI
+    addLog(logs, `🤖 Step 4: Sending to AI...`);
+    const sourceTypeLabel = sourceType === 'pdf' ? 'PDF file' : 
+                           sourceType === 'srt' ? 'SRT subtitle file' :
+                           sourceType === 'txt' ? 'text file' : sourceType;
+    addLog(logs, `${sourceTypeLabel} detected - AI is cleaning and preparing questions.`, true);
+    
+    const cleanedContent = await cleanContentWithAI(markdownContent, sourceType, logs);
+    
+    // Single AI call to generate complete quiz
+    const quizResult = await generateCompleteQuizFromContent(cleanedContent, sourceType, logs);
+    
+    const responseWordCount = quizResult.rawResponse.split(/\s+/).filter(w => w.length > 0).length;
+    addLog(logs, `AI response received. (${quizResult.rawResponse.length} characters = ${responseWordCount} words = ${quizResult.questions.length} Questions)`, true);
+    addLog(logs, `✅ Step 4 Completed! Total: ${quizResult.questions.length} questions added`, true);
+    
+    // Step 5: Generate images
+    addLog(logs, `💾 Step 5: Generating images for ${quizResult.questions.length} questions`);
+    const imageLogs = [];
+    const batchSize = 10;
+    let imagesGenerated = 0;
+    
+    for (let i = 0; i < quizResult.questions.length; i += batchSize) {
+      const batch = quizResult.questions.slice(i, i + batchSize);
+      const batchNumber = Math.floor(i / batchSize) + 1;
+      const batchStart = i + 1;
+      const batchEnd = Math.min(i + batchSize, quizResult.questions.length);
+      
+      addLog(logs, `Generating Images; Batch ${batchNumber}: questions ${batchStart}-${batchEnd} (${batch.length} questions)`, true);
+      
+      for (let j = 0; j < batch.length; j++) {
+        const questionIndex = i + j;
+        try {
+          // Add delay between image generations to avoid rate limits
+          if (questionIndex > 0) {
+            await delay(500);
+          }
+          
+          const question = batch[j];
+          const imageResult = await generateQuestionImage(question.questionText, question.options);
+          quizResult.questions[questionIndex].imageUrl = imageResult.imageUrl;
+          imagesGenerated++;
+          imageLogs.push(`✓ Generated image for question ${questionIndex + 1}/${quizResult.questions.length}`);
+        } catch (error) {
+          console.warn(`⚠ Failed to generate image for question ${questionIndex + 1}: ${error.message}`);
+          quizResult.questions[questionIndex].imageUrl = null;
+          imageLogs.push(`⚠ Failed to generate image for question ${questionIndex + 1}: ${error.message}`);
         }
-        
-        const question = formattedQuestions[i];
-        const imageResult = await generateQuestionImage(question.questionText, question.options);
-        formattedQuestions[i].imageUrl = imageResult.imageUrl;
-        console.log(`✓ Generated image for question ${i + 1}/${formattedQuestions.length}`);
-      } catch (error) {
-        console.warn(`⚠ Failed to generate image for question ${i + 1}: ${error.message}`);
-        // Continue with other questions even if one fails
-        formattedQuestions[i].imageUrl = null;
       }
     }
     
-    return formattedQuestions;
+    addLog(logs, `✅ Step 5 Completed! Total: ${imagesGenerated} images added`, true);
+    
+    // Step 6: Completed
+    addLog(logs, `✅ All Steps Completed! | Source: ${wordCount} words | AI Response: ${responseWordCount} words = ${quizResult.questions.length} Questions Added`);
+    
+    return {
+      title: quizResult.title,
+      description: quizResult.description,
+      level: quizResult.level,
+      skill: quizResult.skill,
+      task: quizResult.task,
+      detectedLevel: quizResult.level,
+      questions: quizResult.questions,
+      cleanedContent: cleanedContent,
+      originalContent: originalContent.substring(0, 500), // First 500 chars for preview
+      markdownContent: markdownContent.substring(0, 500), // First 500 chars for preview
+      aiPrompt: quizResult.prompt,
+      aiResponse: quizResult.rawResponse,
+      imageLogs: imageLogs,
+      reasoning: quizResult.reasoning,
+      logs: logs,
+      sourceSummary: {
+        fileName: fileName,
+        fileSize: fileSize,
+        sourceType: sourceType,
+        wordCount: wordCount
+      }
+    };
   } catch (error) {
-    console.error('Error generating quiz questions:', error);
-    throw new Error(`Failed to generate quiz questions: ${error.message}`);
+    throw error;
+  }
+}
+
+/**
+ * Process YouTube URL and generate complete quiz (matches create-deck flow)
+ */
+async function processYouTubeAndGenerateQuiz(videoUrl, logs = []) {
+  try {
+    // Step 1: URL taken
+    addLog(logs, `📁 Step 1: URL taken | youtube`);
+    addLog(logs, `✅ Step 1 Completed! URL taken: ${videoUrl}`, true);
+    
+    // Step 2: Extract YouTube transcript
+    addLog(logs, `🔄 Step 2: Extracting content`);
+    addLog(logs, `⏳ Extracting YouTube transcript...`, true);
+    const transcriptStartTime = Date.now();
+    const videoData = await extractYouTubeTranscript(videoUrl);
+    const transcriptTime = ((Date.now() - transcriptStartTime) / 1000).toFixed(2);
+    addLog(logs, `✅ Step 2 Completed! Extracted YouTube video content (${transcriptTime}s)`, true);
+    
+    // Step 3: Convert to Markdown
+    addLog(logs, `🔄 Step 3: Converting to md`);
+    const markdownContent = `# ${videoData.title || 'YouTube Video'}\n\n${videoData.description || ''}\n\n${videoData.transcript}`;
+    
+    if (!markdownContent || markdownContent.trim().length === 0) {
+      throw new Error('No content extracted from YouTube video. Please ensure the video has captions enabled.');
+    }
+    
+    const wordCount = markdownContent.split(/\s+/).filter(w => w.length > 0).length;
+    addLog(logs, `✅ Step 3 Completed! ${markdownContent.length} characters = ${wordCount} words`, true);
+    
+    // Step 4: Clean content and send to AI
+    addLog(logs, `🤖 Step 4: Sending to AI...`);
+    addLog(logs, `YouTube transcript detected - AI is cleaning and preparing questions.`, true);
+    
+    const cleanedContent = await cleanContentWithAI(markdownContent, 'youtube');
+    
+    // Single AI call to generate complete quiz
+    const quizResult = await generateCompleteQuizFromContent(cleanedContent, 'youtube', logs);
+    
+    const responseWordCount = quizResult.rawResponse.split(/\s+/).filter(w => w.length > 0).length;
+    addLog(logs, `AI response received. (${quizResult.rawResponse.length} characters = ${responseWordCount} words = ${quizResult.questions.length} Questions)`, true);
+    addLog(logs, `✅ Step 4 Completed! Total: ${quizResult.questions.length} questions added`, true);
+    
+    // Step 5: Generate images
+    addLog(logs, `💾 Step 5: Generating images for ${quizResult.questions.length} questions`);
+    const imageLogs = [];
+    const batchSize = 10;
+    let imagesGenerated = 0;
+    
+    for (let i = 0; i < quizResult.questions.length; i += batchSize) {
+      const batch = quizResult.questions.slice(i, i + batchSize);
+      const batchNumber = Math.floor(i / batchSize) + 1;
+      const batchStart = i + 1;
+      const batchEnd = Math.min(i + batchSize, quizResult.questions.length);
+      
+      addLog(logs, `Generating Images; Batch ${batchNumber}: questions ${batchStart}-${batchEnd} (${batch.length} questions)`, true);
+      
+      for (let j = 0; j < batch.length; j++) {
+        const questionIndex = i + j;
+        try {
+          if (questionIndex > 0) {
+            await delay(500);
+          }
+          
+          const question = batch[j];
+          const imageResult = await generateQuestionImage(question.questionText, question.options);
+          quizResult.questions[questionIndex].imageUrl = imageResult.imageUrl;
+          imagesGenerated++;
+          imageLogs.push(`✓ Generated image for question ${questionIndex + 1}/${quizResult.questions.length}`);
+        } catch (error) {
+          console.warn(`⚠ Failed to generate image for question ${questionIndex + 1}: ${error.message}`);
+          quizResult.questions[questionIndex].imageUrl = null;
+          imageLogs.push(`⚠ Failed to generate image for question ${questionIndex + 1}: ${error.message}`);
+        }
+      }
+    }
+    
+    addLog(logs, `✅ Step 5 Completed! Total: ${imagesGenerated} images added`, true);
+    
+    // Step 6: Completed
+    addLog(logs, `✅ All Steps Completed! | Source: ${wordCount} words | AI Response: ${responseWordCount} words = ${quizResult.questions.length} Questions Added`);
+    
+    return {
+      title: quizResult.title,
+      description: quizResult.description,
+      level: quizResult.level,
+      skill: quizResult.skill,
+      task: quizResult.task,
+      detectedLevel: quizResult.level,
+      questions: quizResult.questions,
+      cleanedContent: cleanedContent,
+      originalContent: markdownContent.substring(0, 500), // First 500 chars for preview
+      markdownContent: markdownContent.substring(0, 500), // First 500 chars for preview
+      videoTitle: videoData.title,
+      aiPrompt: quizResult.prompt,
+      aiResponse: quizResult.rawResponse,
+      imageLogs: imageLogs,
+      reasoning: quizResult.reasoning,
+      logs: logs,
+      sourceSummary: {
+        url: videoUrl,
+        videoTitle: videoData.title,
+        wordCount: wordCount
+      }
+    };
+  } catch (error) {
+    throw error;
+  }
+}
+
+/**
+ * Process webpage URL and generate complete quiz (matches create-deck flow)
+ */
+async function processWebpageAndGenerateQuiz(webpageUrl, logs = []) {
+  try {
+    // Step 1: URL taken
+    addLog(logs, `📁 Step 1: URL taken | webpage`);
+    addLog(logs, `✅ Step 1 Completed! URL taken: ${webpageUrl}`, true);
+    
+    // Step 2: Convert webpage to Markdown using Firecrawl
+    addLog(logs, `🔄 Step 2: Extracting content`);
+    addLog(logs, `⏳ Calling Firecrawl API to scrape webpage...`, true);
+    
+    const FIRECRAWL_API_KEY = process.env.FIRECRAWL_API_KEY;
+    
+    if (!FIRECRAWL_API_KEY) {
+      throw new Error('Firecrawl API key is not configured');
+    }
+
+    const firecrawlStartTime = Date.now();
+    const response = await axios.post(
+      'https://api.firecrawl.dev/v0/scrape',
+      {
+        url: webpageUrl.trim(),
+        formats: ['markdown'],
+        onlyMainContent: true
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${FIRECRAWL_API_KEY}`
+        },
+        timeout: 60000
+      }
+    );
+    const firecrawlTime = ((Date.now() - firecrawlStartTime) / 1000).toFixed(2);
+    addLog(logs, `✅ Firecrawl API responded in ${firecrawlTime}s`, true);
+
+    const firecrawlData = response.data?.data || response.data;
+    const markdownContent = firecrawlData?.markdown || response.data?.markdown || '';
+    const pageTitle = firecrawlData?.metadata?.title || firecrawlData?.title || '';
+    
+    if (!markdownContent || markdownContent.trim() === '') {
+      throw new Error('Failed to extract content from webpage');
+    }
+    
+    const wordCount = markdownContent.split(/\s+/).filter(w => w.length > 0).length;
+    addLog(logs, `✅ Step 2 Completed! Extracted webpage content: ${markdownContent.length} characters = ${wordCount} words`, true);
+    
+    // Step 3: Convert to MD (already done, but log it)
+    addLog(logs, `🔄 Step 3: Converting to md`);
+    addLog(logs, `✅ Step 3 Completed! ${markdownContent.length} characters = ${wordCount} words`, true);
+    
+    // Step 4: Clean content and send to AI
+    addLog(logs, `🤖 Step 4: Sending to AI...`);
+    addLog(logs, `Webpage detected - AI is cleaning and preparing questions.`, true);
+    
+    const cleanedContent = await cleanContentWithAI(markdownContent, 'webpage');
+    
+    // Single AI call to generate complete quiz
+    const quizResult = await generateCompleteQuizFromContent(cleanedContent, 'webpage', logs);
+    
+    const responseWordCount = quizResult.rawResponse.split(/\s+/).filter(w => w.length > 0).length;
+    addLog(logs, `AI response received. (${quizResult.rawResponse.length} characters = ${responseWordCount} words = ${quizResult.questions.length} Questions)`, true);
+    addLog(logs, `✅ Step 4 Completed! Total: ${quizResult.questions.length} questions added`, true);
+    
+    // Step 5: Generate images
+    addLog(logs, `💾 Step 5: Generating images for ${quizResult.questions.length} questions`);
+    const imageLogs = [];
+    const batchSize = 10;
+    let imagesGenerated = 0;
+    
+    for (let i = 0; i < quizResult.questions.length; i += batchSize) {
+      const batch = quizResult.questions.slice(i, i + batchSize);
+      const batchNumber = Math.floor(i / batchSize) + 1;
+      const batchStart = i + 1;
+      const batchEnd = Math.min(i + batchSize, quizResult.questions.length);
+      
+      addLog(logs, `Generating Images; Batch ${batchNumber}: questions ${batchStart}-${batchEnd} (${batch.length} questions)`, true);
+      
+      for (let j = 0; j < batch.length; j++) {
+        const questionIndex = i + j;
+        try {
+          if (questionIndex > 0) {
+            await delay(500);
+          }
+          
+          const question = batch[j];
+          const imageResult = await generateQuestionImage(question.questionText, question.options);
+          quizResult.questions[questionIndex].imageUrl = imageResult.imageUrl;
+          imagesGenerated++;
+          imageLogs.push(`✓ Generated image for question ${questionIndex + 1}/${quizResult.questions.length}`);
+        } catch (error) {
+          console.warn(`⚠ Failed to generate image for question ${questionIndex + 1}: ${error.message}`);
+          quizResult.questions[questionIndex].imageUrl = null;
+          imageLogs.push(`⚠ Failed to generate image for question ${questionIndex + 1}: ${error.message}`);
+        }
+      }
+    }
+    
+    addLog(logs, `✅ Step 5 Completed! Total: ${imagesGenerated} images added`, true);
+    
+    // Step 6: Completed
+    addLog(logs, `✅ All Steps Completed! | Source: ${wordCount} words | AI Response: ${responseWordCount} words = ${quizResult.questions.length} Questions Added`);
+    
+    return {
+      title: quizResult.title,
+      description: quizResult.description,
+      level: quizResult.level,
+      skill: quizResult.skill,
+      task: quizResult.task,
+      detectedLevel: quizResult.level,
+      questions: quizResult.questions,
+      cleanedContent: cleanedContent,
+      originalContent: markdownContent.substring(0, 500), // First 500 chars for preview
+      markdownContent: markdownContent.substring(0, 500), // First 500 chars for preview
+      pageTitle: pageTitle,
+      aiPrompt: quizResult.prompt,
+      aiResponse: quizResult.rawResponse,
+      imageLogs: imageLogs,
+      reasoning: quizResult.reasoning,
+      logs: logs,
+      sourceSummary: {
+        url: webpageUrl,
+        pageTitle: pageTitle,
+        wordCount: wordCount
+      }
+    };
+  } catch (error) {
+    throw error;
   }
 }
 
@@ -615,181 +696,8 @@ async function processVideoFileAndGenerateQuiz(filePath) {
     console.log('Analyzing video file with Gemini...');
     const videoAnalysis = await analyzeVideoFileWithGemini(filePath);
     
-    // Step 2: Create study sheet from video analysis
-    const studySheet = await analyzeContentAndCreateStudySheet(videoAnalysis, 'video file');
-    
-    // Add delay between steps
-    await delay(1000);
-    
-    // Step 3: Determine quiz parameters
-    const params = await determineQuizParameters(studySheet, videoAnalysis);
-    
-    // Add delay between steps
-    await delay(1000);
-    
-    // Step 4: Generate simplified title and description
-    const { title, description } = await generateSimplifiedTitleAndDescription(
-      studySheet,
-      params.category,
-      params.difficulty
-    );
-    
-    // Add delay between steps
-    await delay(1000);
-    
-    // Step 5: Generate quiz questions
-    const questions = await generateQuizFromStudySheet(
-      studySheet,
-      title,
-      description,
-      params.category,
-      params.difficulty,
-      params.questionNumber
-    );
-    
-    return {
-      title,
-      description,
-      category: params.category,
-      difficulty: params.difficulty,
-      questions,
-      studySheet,
-      reasoning: params.reasoning
-    };
-  } catch (error) {
-    throw error;
-  }
-}
-
-/**
- * Process uploaded file and generate complete quiz
- */
-async function processFileAndGenerateQuiz(filePath, sourceType) {
-  try {
-    // Extract content based on file type
-    let content = '';
-    if (sourceType === 'pdf') {
-      content = await extractTextFromPDF(filePath);
-    } else if (sourceType === 'srt') {
-      content = await extractTextFromSRT(filePath);
-    } else {
-      throw new Error(`Unsupported file type: ${sourceType}`);
-    }
-    
-    if (!content || content.trim().length === 0) {
-      throw new Error('No content extracted from file');
-    }
-    
-    // Step 1: Analyze content and create study sheet
-    const studySheet = await analyzeContentAndCreateStudySheet(content, sourceType);
-    
-    // Add delay between steps to avoid rate limits
-    await delay(1000);
-    
-    // Step 2: Determine quiz parameters
-    const params = await determineQuizParameters(studySheet, content);
-    
-    // Add delay between steps
-    await delay(1000);
-    
-    // Step 3: Generate simplified title and description
-    const { title, description } = await generateSimplifiedTitleAndDescription(
-      studySheet,
-      params.category,
-      params.difficulty
-    );
-    
-    // Add delay between steps
-    await delay(1000);
-    
-    // Step 4: Generate quiz questions
-    const questions = await generateQuizFromStudySheet(
-      studySheet,
-      title,
-      description,
-      params.category,
-      params.difficulty,
-      params.questionNumber
-    );
-    
-    return {
-      title,
-      description,
-      category: params.category,
-      difficulty: params.difficulty,
-      questions,
-      studySheet,
-      reasoning: params.reasoning
-    };
-  } catch (error) {
-    throw error;
-  }
-}
-
-/**
- * Process YouTube URL and generate complete quiz
- */
-async function processYouTubeAndGenerateQuiz(videoUrl) {
-  try {
-    // Try to use Gemini's video analysis capabilities
-    // First attempt: Use Gemini to analyze transcript if available
-    let videoData;
-    try {
-      videoData = await analyzeYouTubeVideoWithGemini(videoUrl);
-      console.log('✓ Used Gemini to analyze YouTube video content');
-    } catch (geminiError) {
-      console.warn('Gemini video analysis failed, using fallback:', geminiError.message);
-      // Fallback to basic extraction
-      videoData = await extractYouTubeTranscript(videoUrl);
-    }
-    
-    const content = `${videoData.title}\n\n${videoData.description}\n\n${videoData.transcript}`;
-    
-    if (!content || content.trim().length === 0) {
-      throw new Error('No content extracted from YouTube video. Please ensure the video has captions enabled.');
-    }
-    
-    // Step 1: Analyze content and create study sheet
-    const studySheet = await analyzeContentAndCreateStudySheet(content, 'YouTube video');
-    
-    // Add delay between steps to avoid rate limits
-    await delay(1000);
-    
-    // Step 2: Determine quiz parameters
-    const params = await determineQuizParameters(studySheet, content);
-    
-    // Add delay between steps
-    await delay(1000);
-    
-    // Step 3: Generate simplified title and description
-    const { title, description } = await generateSimplifiedTitleAndDescription(
-      studySheet,
-      params.category,
-      params.difficulty
-    );
-    
-    // Add delay between steps
-    await delay(1000);
-    
-    // Step 4: Generate quiz questions
-    const questions = await generateQuizFromStudySheet(
-      studySheet,
-      title,
-      description,
-      params.category,
-      params.difficulty,
-      params.questionNumber
-    );
-    
-    return {
-      title,
-      description,
-      category: params.category,
-      difficulty: params.difficulty,
-      questions,
-      studySheet,
-      reasoning: params.reasoning
-    };
+    // This would need to be updated to use the new single-call approach
+    throw new Error('Video file processing not yet implemented with single-call approach');
   } catch (error) {
     throw error;
   }
@@ -799,9 +707,10 @@ module.exports = {
   processFileAndGenerateQuiz,
   processVideoFileAndGenerateQuiz,
   processYouTubeAndGenerateQuiz,
+  processWebpageAndGenerateQuiz,
   extractTextFromPDF,
   extractTextFromSRT,
   extractYouTubeTranscript,
-  analyzeVideoFileWithGemini
+  analyzeVideoFileWithGemini,
+  generateCompleteQuizFromContent
 };
-

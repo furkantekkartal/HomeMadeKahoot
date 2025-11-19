@@ -2,18 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { quizAPI } from '../services/api';
 import { QUIZ_LEVELS, QUIZ_SKILLS, QUIZ_TASKS, formatLevel, formatSkill, formatTask } from '../constants/quizConstants';
-import './QuizForm.css';
+import './EditQuiz.css';
 
 const EditQuiz = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [formData, setFormData] = useState(null);
+  const [quizData, setQuizData] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [generatingImages, setGeneratingImages] = useState({});
-  // Store image history for each question: { questionIndex: { history: [], currentIndex: -1 } }
-  const [imageHistory, setImageHistory] = useState({});
 
   useEffect(() => {
     loadQuiz();
@@ -21,216 +18,51 @@ const EditQuiz = () => {
 
   const loadQuiz = async () => {
     try {
+      setLoading(true);
       const response = await quizAPI.getQuiz(id);
-      const quizData = response.data;
-      setFormData(quizData);
+      const quiz = response.data;
       
-      // Initialize image history for existing images
-      const initialHistory = {};
-      if (quizData.questions) {
-        quizData.questions.forEach((question, index) => {
-          if (question.imageUrl) {
-            initialHistory[index] = {
-              history: [question.imageUrl],
-              currentIndex: 0
-            };
-          } else {
-            initialHistory[index] = {
-              history: [],
-              currentIndex: -1
-            };
-          }
-        });
-      }
-      setImageHistory(initialHistory);
+      setQuizData({
+        title: quiz.title || '',
+        description: quiz.description || '',
+        level: quiz.level || '',
+        skill: quiz.skill || '',
+        task: quiz.task || '',
+        questions: quiz.questions || []
+      });
     } catch (error) {
       setError('Error loading quiz');
+      console.error('Error loading quiz:', error);
     } finally {
       setLoading(false);
     }
-  };
-
-  // Calculate default points based on task and level
-  const calculateDefaultPoints = (task, level) => {
-    const taskCoefficients = {
-      Vocabulary: 1,
-      Grammar: 2,
-      Spelling: 1,
-      Essay: 3,
-      Repeat: 2,
-      'Read Aloud': 2
-    };
-    const levelCoefficients = {
-      A1: 1,
-      A2: 2,
-      B1: 3,
-      B2: 4,
-      C1: 5,
-      C2: 6
-    };
-    return (taskCoefficients[task] || 1) * (levelCoefficients[level] || 1);
-  };
-
-  // Calculate default time limit based on level
-  const calculateDefaultTimeLimit = (level) => {
-    const timeLimits = {
-      A1: 20,
-      A2: 30,
-      B1: 40,
-      B2: 50,
-      C1: 60,
-      C2: 70
-    };
-    return timeLimits[level] || 20;
-  };
-
-  const addQuestion = () => {
-    // Use new fields if available, fallback to legacy
-    const task = formData.task || (formData.category === 'vocabulary' ? 'Vocabulary' : formData.category === 'grammar' ? 'Grammar' : 'Vocabulary');
-    const level = formData.level || (formData.difficulty === 'beginner' ? 'A1' : formData.difficulty === 'intermediate' ? 'B1' : formData.difficulty === 'advanced' ? 'C1' : 'A1');
-    const defaultPoints = calculateDefaultPoints(task, level);
-    const defaultTimeLimit = calculateDefaultTimeLimit(level);
-
-    setFormData({
-      ...formData,
-      questions: [
-        ...formData.questions,
-        {
-          questionText: '',
-          options: ['', '', '', ''],
-          correctAnswer: 0,
-          points: defaultPoints,
-          timeLimit: defaultTimeLimit,
-          imageUrl: null
-        }
-      ]
-    });
-    
-    // Initialize image history for new question
-    setImageHistory({
-      ...imageHistory,
-      [formData.questions.length]: { history: [], currentIndex: -1 }
-    });
-  };
-
-  const updateQuestion = (index, field, value) => {
-    const questions = [...formData.questions];
-    questions[index] = { ...questions[index], [field]: value };
-    setFormData({ ...formData, questions });
-  };
-
-  const updateOption = (questionIndex, optionIndex, value) => {
-    const questions = [...formData.questions];
-    questions[questionIndex].options[optionIndex] = value;
-    setFormData({ ...formData, questions });
-  };
-
-  const removeQuestion = (index) => {
-    setFormData({
-      ...formData,
-      questions: formData.questions.filter((_, i) => i !== index)
-    });
-  };
-
-  const generateImage = async (questionIndex) => {
-    const question = formData.questions[questionIndex];
-    
-    if (!question.questionText.trim()) {
-      setError('Please enter question text before generating an image');
-      return;
-    }
-
-    setGeneratingImages({ ...generatingImages, [questionIndex]: true });
-    setError('');
-
-    try {
-      const response = await quizAPI.generateQuestionImage(
-        question.questionText,
-        question.options
-      );
-      const newImageUrl = response.data.imageUrl;
-      
-      // Get current history for this question
-      const currentHistory = imageHistory[questionIndex] || { history: [], currentIndex: -1 };
-      const newHistory = [...currentHistory.history, newImageUrl];
-      const newCurrentIndex = newHistory.length - 1; // Point to the new image
-      
-      // Update image history
-      setImageHistory({
-        ...imageHistory,
-        [questionIndex]: { history: newHistory, currentIndex: newCurrentIndex }
-      });
-      
-      // Update question with the new image
-      const questions = [...formData.questions];
-      questions[questionIndex] = { ...questions[questionIndex], imageUrl: newImageUrl };
-      setFormData({ ...formData, questions });
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to generate image');
-    } finally {
-      setGeneratingImages({ ...generatingImages, [questionIndex]: false });
-    }
-  };
-
-  const navigateImage = (questionIndex, direction) => {
-    const currentHistory = imageHistory[questionIndex];
-    if (!currentHistory || currentHistory.history.length === 0) return;
-    
-    const { history, currentIndex } = currentHistory;
-    let newIndex = currentIndex;
-    
-    if (direction === 'prev' && currentIndex > 0) {
-      newIndex = currentIndex - 1;
-    } else if (direction === 'next' && currentIndex < history.length - 1) {
-      newIndex = currentIndex + 1;
-    } else {
-      return; // Can't navigate further
-    }
-    
-    const newImageUrl = history[newIndex];
-    
-    // Update image history
-    setImageHistory({
-      ...imageHistory,
-      [questionIndex]: { history, currentIndex: newIndex }
-    });
-    
-    // Update question with the navigated image
-    const questions = [...formData.questions];
-    questions[questionIndex] = { ...questions[questionIndex], imageUrl: newImageUrl };
-    setFormData({ ...formData, questions });
-  };
-
-  const removeImage = (questionIndex) => {
-    const questions = [...formData.questions];
-    questions[questionIndex] = { ...questions[questionIndex], imageUrl: null };
-    setFormData({ ...formData, questions });
-    
-    // Clear image history for this question
-    setImageHistory({
-      ...imageHistory,
-      [questionIndex]: { history: [], currentIndex: -1 }
-    });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
-    if (!formData.title.trim()) {
+    if (!quizData.title.trim()) {
       setError('Quiz title is required');
       return;
     }
 
-    if (formData.questions.length === 0) {
+    if (!quizData.questions || quizData.questions.length === 0) {
       setError('Quiz must have at least one question');
       return;
     }
 
     setSaving(true);
     try {
-      await quizAPI.updateQuiz(id, formData);
-      navigate('/quiz');
+      await quizAPI.updateQuiz(id, {
+        title: quizData.title,
+        description: quizData.description,
+        level: quizData.level,
+        skill: quizData.skill,
+        task: quizData.task,
+        questions: quizData.questions
+      });
+      navigate('/quizzes');
     } catch (err) {
       setError(err.response?.data?.message || 'Error updating quiz');
     } finally {
@@ -238,256 +70,221 @@ const EditQuiz = () => {
     }
   };
 
+  const handleQuestionChange = (index, field, value) => {
+    const updatedQuestions = [...quizData.questions];
+    if (field === 'questionText') {
+      updatedQuestions[index].questionText = value;
+    } else if (field === 'options') {
+      updatedQuestions[index].options = value;
+    } else if (field === 'correctAnswer') {
+      updatedQuestions[index].correctAnswer = parseInt(value);
+    } else if (field === 'points') {
+      updatedQuestions[index].points = parseInt(value) || 100;
+    } else if (field === 'timeLimit') {
+      updatedQuestions[index].timeLimit = parseInt(value) || 20;
+    }
+    setQuizData({ ...quizData, questions: updatedQuestions });
+  };
+
+  const handleDeleteQuestion = (index) => {
+    const updatedQuestions = quizData.questions.filter((_, i) => i !== index);
+    setQuizData({ ...quizData, questions: updatedQuestions });
+  };
+
   if (loading) {
     return <div className="loading">Loading...</div>;
   }
 
-  if (!formData) {
+  if (!quizData) {
     return <div className="error-message">Quiz not found</div>;
   }
 
   return (
-    <div className="quiz-form-container">
-      <div className="quiz-form">
-        <h1>Edit Quiz</h1>
-        {error && <div className="error-message">{error}</div>}
-        
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label className="form-label">Quiz Title *</label>
-            <input
-              type="text"
-              className="form-input"
-              value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              required
-            />
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">Description</label>
-            <textarea
-              className="form-input"
-              rows="3"
-              value={formData.description || ''}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-            />
-          </div>
-
-          <div className="form-row">
+    <div className="edit-quiz-container">
+      <div className="edit-quiz-layout">
+        {/* Pane 1: Edit Quiz Information */}
+        <div className="edit-quiz-pane">
+          <h1>Edit Quiz</h1>
+          {error && <div className="error-message">{error}</div>}
+          
+          <form onSubmit={handleSubmit}>
             <div className="form-group">
-              <label className="form-label">Level *</label>
-              <select
-                className="form-select"
-                value={formData.level || (formData.difficulty === 'beginner' ? 'A1' : formData.difficulty === 'intermediate' ? 'B1' : formData.difficulty === 'advanced' ? 'C1' : 'A1')}
-                onChange={(e) => setFormData({ ...formData, level: e.target.value })}
-              >
-                {QUIZ_LEVELS.map(level => (
-                  <option key={level} value={level}>
-                    {formatLevel(level)}
-                  </option>
-                ))}
-              </select>
+              <label className="form-label">Quiz Title *</label>
+              <input
+                type="text"
+                className="form-input"
+                value={quizData.title}
+                onChange={(e) => setQuizData({ ...quizData, title: e.target.value })}
+                required
+              />
             </div>
 
             <div className="form-group">
-              <label className="form-label">Skill *</label>
-              <select
-                className="form-select"
-                value={formData.skill || (formData.category === 'reading' ? 'Reading' : formData.category === 'listening' ? 'Listening' : 'Reading')}
-                onChange={(e) => setFormData({ ...formData, skill: e.target.value })}
-              >
-                {QUIZ_SKILLS.map(skill => (
-                  <option key={skill} value={skill}>
-                    {formatSkill(skill)}
-                  </option>
-                ))}
-              </select>
+              <label className="form-label">Description</label>
+              <textarea
+                className="form-input"
+                rows="3"
+                value={quizData.description || ''}
+                onChange={(e) => setQuizData({ ...quizData, description: e.target.value })}
+              />
             </div>
 
-            <div className="form-group">
-              <label className="form-label">Task *</label>
-              <select
-                className="form-select"
-                value={formData.task || (formData.category === 'vocabulary' ? 'Vocabulary' : formData.category === 'grammar' ? 'Grammar' : 'Vocabulary')}
-                onChange={(e) => setFormData({ ...formData, task: e.target.value })}
-              >
-                {QUIZ_TASKS.map(task => (
-                  <option key={task} value={task}>
-                    {formatTask(task)}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">Level</label>
+                <select
+                  className="form-select"
+                  value={quizData.level}
+                  onChange={(e) => setQuizData({ ...quizData, level: e.target.value })}
+                >
+                  <option value="">Select Level</option>
+                  {QUIZ_LEVELS.map(level => (
+                    <option key={level} value={level}>
+                      {formatLevel(level)}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-          <div className="questions-section">
-            <div className="questions-header">
-              <h2>Questions ({formData.questions.length})</h2>
-              <button type="button" onClick={addQuestion} className="btn btn-primary">
-                + Add Question
+              <div className="form-group">
+                <label className="form-label">Skill</label>
+                <select
+                  className="form-select"
+                  value={quizData.skill}
+                  onChange={(e) => setQuizData({ ...quizData, skill: e.target.value })}
+                >
+                  <option value="">Select Skill</option>
+                  {QUIZ_SKILLS.map(skill => (
+                    <option key={skill} value={skill}>
+                      {formatSkill(skill)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Task</label>
+                <select
+                  className="form-select"
+                  value={quizData.task}
+                  onChange={(e) => setQuizData({ ...quizData, task: e.target.value })}
+                >
+                  <option value="">Select Task</option>
+                  {QUIZ_TASKS.map(task => (
+                    <option key={task} value={task}>
+                      {formatTask(task)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="form-actions">
+              <button type="submit" className="btn btn-primary btn-large" disabled={saving}>
+                {saving ? 'Saving...' : 'Save Changes'}
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('/quizzes')}
+                className="btn btn-secondary btn-large"
+              >
+                Cancel
               </button>
             </div>
+          </form>
+        </div>
 
-            {formData.questions.map((question, qIndex) => (
-              <div key={qIndex} className="question-card">
-                <div className="question-header">
-                  <h3>Question {qIndex + 1}</h3>
-                  <button
-                    type="button"
-                    onClick={() => removeQuestion(qIndex)}
-                    className="btn btn-danger btn-sm"
-                  >
-                    Remove
-                  </button>
-                </div>
+        {/* Pane 2: Questions Section */}
+        <div className="questions-pane">
+          <div className="questions-header">
+            <h2>Questions ({quizData.questions.length})</h2>
+          </div>
 
-                <div className="form-group">
-                  <label className="form-label">Question Text *</label>
-                  <textarea
-                    className="form-input"
-                    rows="2"
-                    value={question.questionText}
-                    onChange={(e) => updateQuestion(qIndex, 'questionText', e.target.value)}
-                    required
-                  />
-                </div>
-
-                <div className="form-group">
-                  <div className="image-section">
-                    <label className="form-label">Question Image</label>
-                    <div className="image-controls">
-                      {(() => {
-                        const history = imageHistory[qIndex];
-                        const hasHistory = history && history.history.length > 0;
-                        const canGoBack = hasHistory && history.currentIndex > 0;
-                        const canGoForward = hasHistory && history.currentIndex < history.history.length - 1;
-                        const currentImageNum = hasHistory ? history.currentIndex + 1 : 0;
-                        const totalImages = hasHistory ? history.history.length : 0;
-                        
-                        return (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => navigateImage(qIndex, 'prev')}
-                              className="btn btn-secondary btn-sm"
-                              disabled={!canGoBack}
-                              title="Previous image"
-                            >
-                              ◀ Back
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => generateImage(qIndex)}
-                              className="btn btn-secondary btn-sm"
-                              disabled={generatingImages[qIndex] || !question.questionText.trim()}
-                            >
-                              {generatingImages[qIndex] ? 'Generating...' : '🖼️ Generate Image'}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => navigateImage(qIndex, 'next')}
-                              className="btn btn-secondary btn-sm"
-                              disabled={!canGoForward}
-                              title="Next image"
-                            >
-                              Forward ▶
-                            </button>
-                            {hasHistory && (
-                              <span className="image-counter">
-                                {currentImageNum} / {totalImages}
-                              </span>
-                            )}
-                            {question.imageUrl && (
-                              <button
-                                type="button"
-                                onClick={() => removeImage(qIndex)}
-                                className="btn btn-danger btn-sm"
-                              >
-                                Remove Image
-                              </button>
-                            )}
-                          </>
-                        );
-                      })()}
+          {quizData.questions.length === 0 ? (
+            <div className="no-questions-message">
+              <p>No questions in this quiz. Add questions from the Create Quiz page.</p>
+            </div>
+          ) : (
+            <div className="questions-grid">
+              {quizData.questions.map((question, index) => (
+                <div key={index} className="question-card">
+                  <div className="question-card-header">
+                    <h3>Question {index + 1}</h3>
+                    <button
+                      onClick={() => handleDeleteQuestion(index)}
+                      className="btn btn-danger btn-sm"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                  
+                  <div className="question-card-body">
+                    <div className="form-group">
+                      <label className="form-label">Question Text *</label>
+                      <textarea
+                        className="form-input"
+                        rows="2"
+                        value={question.questionText || ''}
+                        onChange={(e) => handleQuestionChange(index, 'questionText', e.target.value)}
+                        placeholder="Enter question..."
+                      />
                     </div>
-                    {question.imageUrl && (
-                      <div className="question-image-preview">
-                        <img 
-                          src={question.imageUrl} 
-                          alt="Question" 
-                          onError={(e) => {
-                            e.target.style.display = 'none';
-                            setError('Failed to load image');
-                          }}
+
+                    <div className="form-group">
+                      <label className="form-label">Options (one per line) *</label>
+                      <textarea
+                        className="form-input"
+                        rows="4"
+                        value={question.options?.join('\n') || ''}
+                        onChange={(e) => {
+                          const options = e.target.value.split('\n').filter(opt => opt.trim());
+                          handleQuestionChange(index, 'options', options);
+                        }}
+                        placeholder="Option 1&#10;Option 2&#10;Option 3&#10;Option 4"
+                      />
+                    </div>
+
+                    <div className="form-row">
+                      <div className="form-group">
+                        <label className="form-label">Correct Answer (0-{question.options?.length - 1 || 3}) *</label>
+                        <input
+                          type="number"
+                          className="form-input"
+                          min="0"
+                          max={question.options?.length - 1 || 3}
+                          value={question.correctAnswer !== undefined ? question.correctAnswer : 0}
+                          onChange={(e) => handleQuestionChange(index, 'correctAnswer', e.target.value)}
                         />
                       </div>
-                    )}
-                  </div>
-                </div>
 
-                <div className="form-group">
-                  <label className="form-label">Options *</label>
-                  {question.options.map((option, oIndex) => (
-                    <div key={oIndex} className="option-row">
-                      <input
-                        type="radio"
-                        name={`correct-${qIndex}`}
-                        checked={question.correctAnswer === oIndex}
-                        onChange={() => updateQuestion(qIndex, 'correctAnswer', oIndex)}
-                      />
-                      <input
-                        type="text"
-                        className="form-input option-input"
-                        placeholder={`Option ${oIndex + 1}`}
-                        value={option}
-                        onChange={(e) => updateOption(qIndex, oIndex, e.target.value)}
-                        required
-                      />
+                      <div className="form-group">
+                        <label className="form-label">Points</label>
+                        <input
+                          type="number"
+                          className="form-input"
+                          min="1"
+                          value={question.points || 100}
+                          onChange={(e) => handleQuestionChange(index, 'points', e.target.value)}
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label className="form-label">Time Limit (seconds)</label>
+                        <input
+                          type="number"
+                          className="form-input"
+                          min="1"
+                          value={question.timeLimit || 20}
+                          onChange={(e) => handleQuestionChange(index, 'timeLimit', e.target.value)}
+                        />
+                      </div>
                     </div>
-                  ))}
-                </div>
-
-                <div className="form-row">
-                  <div className="form-group">
-                    <label className="form-label">Points</label>
-                    <input
-                      type="number"
-                      className="form-input"
-                      min="1"
-                      value={question.points}
-                      onChange={(e) => updateQuestion(qIndex, 'points', parseInt(e.target.value))}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Time Limit (seconds)</label>
-                    <input
-                      type="number"
-                      className="form-input"
-                      min="5"
-                      max="60"
-                      value={question.timeLimit}
-                      onChange={(e) => updateQuestion(qIndex, 'timeLimit', parseInt(e.target.value))}
-                    />
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="form-actions">
-            <button type="submit" className="btn btn-primary btn-large" disabled={saving}>
-              {saving ? 'Saving...' : 'Save Changes'}
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate('/quiz')}
-              className="btn btn-secondary btn-large"
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

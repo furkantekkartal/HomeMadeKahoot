@@ -51,6 +51,7 @@ export const quizAPI = {
     });
   },
   generateQuizFromYouTube: (videoUrl) => api.post('/quizzes/generate-from-youtube', { videoUrl }),
+  generateQuizFromContent: (content, sourceType) => api.post('/quizzes/generate-from-content', { content, sourceType }),
 };
 
 // Session API
