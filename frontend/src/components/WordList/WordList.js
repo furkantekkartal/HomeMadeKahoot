@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useWordList } from '../../context/WordListContext';
 import { FaHourglassHalf } from 'react-icons/fa';
 import '../../pages/WordDatabase.css';
@@ -109,7 +109,7 @@ const ColumnFilterDropdown = ({ columnKey, columnLabel, uniqueValues, selectedVa
   );
 };
 
-const WordList = ({ showFilters = true, showDeleteButton = true, onWordSelect, activeSourceId }) => {
+const WordList = ({ showFilters = true, showDeleteButton = true, onWordSelect, activeSourceId, initialColumnVisibility = null }) => {
   const {
     words,
     loading,
@@ -129,6 +129,10 @@ const WordList = ({ showFilters = true, showDeleteButton = true, onWordSelect, a
     editingField,
     openFilterDropdown,
     contextMenu,
+    imageHistory,
+    generatingImages,
+    generatingAllImages,
+    imageService,
     setPage,
     setPageInput,
     setSelectedWords,
@@ -154,8 +158,46 @@ const WordList = ({ showFilters = true, showDeleteButton = true, onWordSelect, a
     isColumnFilterActive,
     handleToggleColumn,
     handleContextMenu,
-    getUniqueValues
+    getUniqueValues,
+    setColumnVisibility: setColumnVisibilityContext,
+    handleGenerateImage,
+    navigateImage,
+    handleDeleteImage,
+    handleGenerateAllImages,
+    handleImageServiceChange
   } = useWordList();
+
+  // Image size state
+  const [imageSize, setImageSize] = useState(() => {
+    const saved = localStorage.getItem('wordImageSize');
+    return saved ? parseInt(saved) : 100; // Default 100px
+  });
+
+  // Custom query state for each word
+  const [customQueries, setCustomQueries] = useState({});
+
+  // Set initial column visibility if provided (only once on mount, and only if no saved preferences exist)
+  const hasSetInitialVisibility = useRef(false);
+  useEffect(() => {
+    if (initialColumnVisibility && !hasSetInitialVisibility.current) {
+      // Check if there are saved preferences in localStorage
+      const saved = localStorage.getItem('wordListColumnVisibility');
+      // Only apply initialColumnVisibility if there are no saved preferences
+      if (!saved) {
+        setColumnVisibilityContext(initialColumnVisibility);
+      }
+      hasSetInitialVisibility.current = true;
+    }
+  }, [initialColumnVisibility, setColumnVisibilityContext]);
+
+  // Save image size to localStorage
+  useEffect(() => {
+    localStorage.setItem('wordImageSize', imageSize.toString());
+  }, [imageSize]);
+
+  const handleImageSizeChange = (delta) => {
+    setImageSize(prev => Math.max(40, Math.min(300, prev + delta))); // Min 40px, Max 300px
+  };
 
   const handleFieldBlur = (wordId, field, value, originalValue) => {
     if (value !== originalValue) {
@@ -268,6 +310,86 @@ const WordList = ({ showFilters = true, showDeleteButton = true, onWordSelect, a
                 <span style={{ fontSize: '0.85rem', color: '#667eea' }}>Loading...</span>
               )}
             </label>
+            {columnVisibility.image && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginLeft: '0.5rem', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                  <button
+                    type="button"
+                    onClick={() => handleImageSizeChange(-10)}
+                    style={{
+                      padding: '0.25rem 0.5rem',
+                      fontSize: '1rem',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '4px',
+                      background: 'white',
+                      cursor: 'pointer',
+                      minWidth: '32px'
+                    }}
+                    title="Decrease image size"
+                  >
+                    ➖
+                  </button>
+                  <span style={{ fontSize: '0.85rem', color: '#666', minWidth: '40px', textAlign: 'center' }}>
+                    {imageSize}px
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleImageSizeChange(10)}
+                    style={{
+                      padding: '0.25rem 0.5rem',
+                      fontSize: '1rem',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '4px',
+                      background: 'white',
+                      cursor: 'pointer',
+                      minWidth: '32px'
+                    }}
+                    title="Increase image size"
+                  >
+                    ➕
+                  </button>
+                </div>
+                <div className="image-service-selector" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <label className="image-service-label" style={{ fontSize: '0.8rem', color: '#4a5568', margin: 0 }}>
+                    Image Service:
+                  </label>
+                  <div className="radio-group" style={{ display: 'flex', gap: '0.5rem' }}>
+                    <label className="radio-label" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', cursor: 'pointer' }}>
+                      <input
+                        type="radio"
+                        name="imageService"
+                        value="google"
+                        checked={imageService === 'google'}
+                        onChange={(e) => handleImageServiceChange(e.target.value)}
+                      />
+                      <span style={{ fontSize: '0.8rem' }}>Google</span>
+                    </label>
+                    <label className="radio-label" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', cursor: 'pointer' }}>
+                      <input
+                        type="radio"
+                        name="imageService"
+                        value="unsplash"
+                        checked={imageService === 'unsplash'}
+                        onChange={(e) => handleImageServiceChange(e.target.value)}
+                      />
+                      <span style={{ fontSize: '0.8rem' }}>Unsplash</span>
+                    </label>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleGenerateAllImages}
+                  className="btn btn-primary btn-sm"
+                  disabled={generatingAllImages}
+                  style={{
+                    padding: '0.25rem 0.5rem',
+                    fontSize: '0.8rem'
+                  }}
+                >
+                  {generatingAllImages ? 'Generating All...' : '🖼️ Generate All Images'}
+                </button>
+              </div>
+            )}
           </div>
           {activeSourceId && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -338,7 +460,10 @@ const WordList = ({ showFilters = true, showDeleteButton = true, onWordSelect, a
             <select
               id="items-per-page"
               value={itemsPerPage}
-              onChange={(e) => setItemsPerPage(parseInt(e.target.value))}
+              onChange={(e) => {
+                const value = e.target.value;
+                setItemsPerPage(value === '-1' ? -1 : parseInt(value));
+              }}
               style={{
                 padding: '0.25rem 0.5rem',
                 border: '1px solid #cbd5e1',
@@ -354,6 +479,12 @@ const WordList = ({ showFilters = true, showDeleteButton = true, onWordSelect, a
               <option value={50}>50</option>
               <option value={100}>100</option>
               <option value={250}>250</option>
+              <option value={500}>500</option>
+              <option value={1000}>1000</option>
+              <option value={2500}>2500</option>
+              <option value={5000}>5000</option>
+              <option value={10000}>10000</option>
+              <option value={-1}>All</option>
             </select>
           </div>
           {totalPages > 1 && (
@@ -411,12 +542,13 @@ const WordList = ({ showFilters = true, showDeleteButton = true, onWordSelect, a
                     onChange={handleSelectAll}
                   />
                 </th>
-                <th 
-                  className="filterable-header"
-                  onContextMenu={(e) => handleContextMenu(e, null)}
-                >
-                  <div className="header-content">
-                    <span>English Word</span>
+                {columnVisibility.englishWord && (
+                  <th 
+                    className="filterable-header"
+                    onContextMenu={(e) => handleContextMenu(e, 'englishWord')}
+                  >
+                    <div className="header-content">
+                      <span>English Word</span>
                     <button
                       className={`filter-icon ${isColumnFilterActive('englishWord') ? 'active' : ''}`}
                       onClick={(e) => {
@@ -440,13 +572,15 @@ const WordList = ({ showFilters = true, showDeleteButton = true, onWordSelect, a
                       onClose={() => setOpenFilterDropdown(null)}
                     />
                   )}
-                </th>
-                <th 
-                  className="filterable-header"
-                  onContextMenu={(e) => handleContextMenu(e, null)}
-                >
-                  <div className="header-content">
-                    <span>Turkish Meaning</span>
+                  </th>
+                )}
+                {columnVisibility.turkishMeaning && (
+                  <th 
+                    className="filterable-header"
+                    onContextMenu={(e) => handleContextMenu(e, 'turkishMeaning')}
+                  >
+                    <div className="header-content">
+                      <span>Turkish Meaning</span>
                     <button
                       className={`filter-icon ${isColumnFilterActive('turkishMeaning') ? 'active' : ''}`}
                       onClick={(e) => {
@@ -470,13 +604,15 @@ const WordList = ({ showFilters = true, showDeleteButton = true, onWordSelect, a
                       onClose={() => setOpenFilterDropdown(null)}
                     />
                   )}
-                </th>
-                <th 
-                  className="filterable-header"
-                  onContextMenu={(e) => handleContextMenu(e, null)}
-                >
-                  <div className="header-content">
-                    <span>Word Type</span>
+                  </th>
+                )}
+                {columnVisibility.wordType && (
+                  <th 
+                    className="filterable-header"
+                    onContextMenu={(e) => handleContextMenu(e, 'wordType')}
+                  >
+                    <div className="header-content">
+                      <span>Word Type</span>
                     <button
                       className={`filter-icon ${isColumnFilterActive('wordType') ? 'active' : ''}`}
                       onClick={(e) => {
@@ -501,36 +637,39 @@ const WordList = ({ showFilters = true, showDeleteButton = true, onWordSelect, a
                     />
                   )}
                 </th>
-                <th 
-                  className="filterable-header"
-                  onContextMenu={(e) => handleContextMenu(e, null)}
-                >
-                  <div className="header-content">
-                    <span>English Level</span>
-                    <button
-                      className={`filter-icon ${isColumnFilterActive('englishLevel') ? 'active' : ''}`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setOpenFilterDropdown(openFilterDropdown === 'englishLevel' ? null : 'englishLevel');
-                      }}
-                      title="Filter column"
-                    >
-                      ▼
-                    </button>
-                  </div>
-                  {openFilterDropdown === 'englishLevel' && (
-                    <ColumnFilterDropdown
-                      columnKey="englishLevel"
-                      columnLabel="English Level"
-                      uniqueValues={getUniqueValues('englishLevel')}
-                      selectedValues={columnFilters.englishLevel}
-                      onFilterChange={handleColumnFilterChange}
-                      onSelectAll={() => handleSelectAllColumnFilter('englishLevel')}
-                      onDeselectAll={() => handleDeselectAllColumnFilter('englishLevel')}
-                      onClose={() => setOpenFilterDropdown(null)}
-                    />
-                  )}
-                </th>
+                )}
+                {columnVisibility.englishLevel && (
+                  <th 
+                    className="filterable-header"
+                    onContextMenu={(e) => handleContextMenu(e, 'englishLevel')}
+                  >
+                    <div className="header-content">
+                      <span>English Level</span>
+                      <button
+                        className={`filter-icon ${isColumnFilterActive('englishLevel') ? 'active' : ''}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenFilterDropdown(openFilterDropdown === 'englishLevel' ? null : 'englishLevel');
+                        }}
+                        title="Filter column"
+                      >
+                        ▼
+                      </button>
+                    </div>
+                    {openFilterDropdown === 'englishLevel' && (
+                      <ColumnFilterDropdown
+                        columnKey="englishLevel"
+                        columnLabel="English Level"
+                        uniqueValues={getUniqueValues('englishLevel')}
+                        selectedValues={columnFilters.englishLevel}
+                        onFilterChange={handleColumnFilterChange}
+                        onSelectAll={() => handleSelectAllColumnFilter('englishLevel')}
+                        onDeselectAll={() => handleDeselectAllColumnFilter('englishLevel')}
+                        onClose={() => setOpenFilterDropdown(null)}
+                      />
+                    )}
+                  </th>
+                )}
                 {columnVisibility.category1 && (
                   <th 
                     className="filterable-header"
@@ -691,96 +830,112 @@ const WordList = ({ showFilters = true, showDeleteButton = true, onWordSelect, a
                     )}
                   </th>
                 )}
-                <th 
-                  className="filterable-header"
-                  onContextMenu={(e) => handleContextMenu(e, null)}
-                >
-                  <div className="header-content">
-                    <span>Source</span>
-                    <button
-                      className={`filter-icon ${isColumnFilterActive('source') ? 'active' : ''}`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setOpenFilterDropdown(openFilterDropdown === 'source' ? null : 'source');
-                      }}
-                      title="Filter column"
-                    >
-                      ▼
-                    </button>
-                  </div>
-                  {openFilterDropdown === 'source' && (
-                    <ColumnFilterDropdown
-                      columnKey="source"
-                      columnLabel="Source"
-                      uniqueValues={getUniqueValues('source')}
-                      selectedValues={columnFilters.source}
-                      onFilterChange={handleColumnFilterChange}
-                      onSelectAll={() => handleSelectAllColumnFilter('source')}
-                      onDeselectAll={() => handleDeselectAllColumnFilter('source')}
-                      onClose={() => setOpenFilterDropdown(null)}
-                    />
-                  )}
-                </th>
-                <th 
-                  className="filterable-header"
-                  onContextMenu={(e) => handleContextMenu(e, null)}
-                >
-                  <div className="header-content">
-                    <span>IsKnown?</span>
-                    <button
-                      className={`filter-icon ${isColumnFilterActive('isKnown') ? 'active' : ''}`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setOpenFilterDropdown(openFilterDropdown === 'isKnown' ? null : 'isKnown');
-                      }}
-                      title="Filter column"
-                    >
-                      ▼
-                    </button>
-                  </div>
-                  {openFilterDropdown === 'isKnown' && (
-                    <ColumnFilterDropdown
-                      columnKey="isKnown"
-                      columnLabel="IsKnown?"
-                      uniqueValues={getUniqueValues('isKnown')}
-                      selectedValues={columnFilters.isKnown}
-                      onFilterChange={handleColumnFilterChange}
-                      onSelectAll={() => handleSelectAllColumnFilter('isKnown')}
-                      onDeselectAll={() => handleDeselectAllColumnFilter('isKnown')}
-                      onClose={() => setOpenFilterDropdown(null)}
-                    />
-                  )}
-                </th>
-                <th 
-                  className="filterable-header"
-                  onContextMenu={(e) => handleContextMenu(e, null)}
-                >
-                  <div className="header-content">
-                    <span>IsSpelled</span>
-                    <button
-                      className={`filter-icon ${isColumnFilterActive('isSpelled') ? 'active' : ''}`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setOpenFilterDropdown(openFilterDropdown === 'isSpelled' ? null : 'isSpelled');
-                      }}
-                      title="Filter column"
-                    >
-                      ▼
-                    </button>
-                  </div>
-                  {openFilterDropdown === 'isSpelled' && (
-                    <ColumnFilterDropdown
-                      columnKey="isSpelled"
-                      columnLabel="IsSpelled"
-                      uniqueValues={getUniqueValues('isSpelled')}
-                      selectedValues={columnFilters.isSpelled}
-                      onFilterChange={handleColumnFilterChange}
-                      onSelectAll={() => handleSelectAllColumnFilter('isSpelled')}
-                      onDeselectAll={() => handleDeselectAllColumnFilter('isSpelled')}
-                      onClose={() => setOpenFilterDropdown(null)}
-                    />
-                  )}
-                </th>
+                {columnVisibility.source && (
+                  <th 
+                    className="filterable-header"
+                    onContextMenu={(e) => handleContextMenu(e, 'source')}
+                  >
+                    <div className="header-content">
+                      <span>Source</span>
+                      <button
+                        className={`filter-icon ${isColumnFilterActive('source') ? 'active' : ''}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenFilterDropdown(openFilterDropdown === 'source' ? null : 'source');
+                        }}
+                        title="Filter column"
+                      >
+                        ▼
+                      </button>
+                    </div>
+                    {openFilterDropdown === 'source' && (
+                      <ColumnFilterDropdown
+                        columnKey="source"
+                        columnLabel="Source"
+                        uniqueValues={getUniqueValues('source')}
+                        selectedValues={columnFilters.source}
+                        onFilterChange={handleColumnFilterChange}
+                        onSelectAll={() => handleSelectAllColumnFilter('source')}
+                        onDeselectAll={() => handleDeselectAllColumnFilter('source')}
+                        onClose={() => setOpenFilterDropdown(null)}
+                      />
+                    )}
+                  </th>
+                )}
+                {columnVisibility.isKnown && (
+                  <th 
+                    className="filterable-header"
+                    onContextMenu={(e) => handleContextMenu(e, 'isKnown')}
+                  >
+                    <div className="header-content">
+                      <span>IsKnown?</span>
+                      <button
+                        className={`filter-icon ${isColumnFilterActive('isKnown') ? 'active' : ''}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenFilterDropdown(openFilterDropdown === 'isKnown' ? null : 'isKnown');
+                        }}
+                        title="Filter column"
+                      >
+                        ▼
+                      </button>
+                    </div>
+                    {openFilterDropdown === 'isKnown' && (
+                      <ColumnFilterDropdown
+                        columnKey="isKnown"
+                        columnLabel="IsKnown?"
+                        uniqueValues={getUniqueValues('isKnown')}
+                        selectedValues={columnFilters.isKnown}
+                        onFilterChange={handleColumnFilterChange}
+                        onSelectAll={() => handleSelectAllColumnFilter('isKnown')}
+                        onDeselectAll={() => handleDeselectAllColumnFilter('isKnown')}
+                        onClose={() => setOpenFilterDropdown(null)}
+                      />
+                    )}
+                  </th>
+                )}
+                {columnVisibility.isSpelled && (
+                  <th 
+                    className="filterable-header"
+                    onContextMenu={(e) => handleContextMenu(e, 'isSpelled')}
+                  >
+                    <div className="header-content">
+                      <span>IsSpelled</span>
+                      <button
+                        className={`filter-icon ${isColumnFilterActive('isSpelled') ? 'active' : ''}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenFilterDropdown(openFilterDropdown === 'isSpelled' ? null : 'isSpelled');
+                        }}
+                        title="Filter column"
+                      >
+                        ▼
+                      </button>
+                    </div>
+                    {openFilterDropdown === 'isSpelled' && (
+                      <ColumnFilterDropdown
+                        columnKey="isSpelled"
+                        columnLabel="IsSpelled"
+                        uniqueValues={getUniqueValues('isSpelled')}
+                        selectedValues={columnFilters.isSpelled}
+                        onFilterChange={handleColumnFilterChange}
+                        onSelectAll={() => handleSelectAllColumnFilter('isSpelled')}
+                        onDeselectAll={() => handleDeselectAllColumnFilter('isSpelled')}
+                        onClose={() => setOpenFilterDropdown(null)}
+                      />
+                    )}
+                  </th>
+                )}
+                {columnVisibility.image && (
+                  <th 
+                    className="filterable-header"
+                    onContextMenu={(e) => handleContextMenu(e, 'image')}
+                  >
+                    <div className="header-content">
+                      <span>Image</span>
+                    </div>
+                  </th>
+                )}
                 {showDeleteButton && (
                   <th 
                     onContextMenu={(e) => handleContextMenu(e, null)}
@@ -822,103 +977,111 @@ const WordList = ({ showFilters = true, showDeleteButton = true, onWordSelect, a
                       onChange={() => handleWordSelectInternal(word._id)}
                     />
                   </td>
-                  <td className="word-english-cell">
-                    {editingField === `${word._id}-englishWord` ? (
-                      <input
-                        type="text"
-                        defaultValue={word.englishWord}
-                        onBlur={(e) => handleFieldBlur(word._id, 'englishWord', e.target.value, word.englishWord)}
-                        onKeyPress={(e) => {
-                          if (e.key === 'Enter') {
-                            handleFieldBlur(word._id, 'englishWord', e.target.value, word.englishWord);
-                          }
-                        }}
-                        autoFocus
-                        className="editable-input"
-                      />
-                    ) : (
-                      <strong
-                        onClick={() => setEditingField(`${word._id}-englishWord`)}
-                        className="editable-field"
-                      >
-                        {word.englishWord}
-                      </strong>
-                    )}
-                  </td>
-                  <td className="word-meaning-cell">
-                    {editingField === `${word._id}-turkishMeaning` ? (
-                      <input
-                        type="text"
-                        defaultValue={word.turkishMeaning || ''}
-                        onBlur={(e) => handleFieldBlur(word._id, 'turkishMeaning', e.target.value, word.turkishMeaning)}
-                        onKeyPress={(e) => {
-                          if (e.key === 'Enter') {
-                            handleFieldBlur(word._id, 'turkishMeaning', e.target.value, word.turkishMeaning);
-                          }
-                        }}
-                        autoFocus
-                        className="editable-input"
-                      />
-                    ) : (
-                      <span
-                        onClick={() => setEditingField(`${word._id}-turkishMeaning`)}
-                        className="editable-field"
-                      >
-                        {word.turkishMeaning || '-'}
-                      </span>
-                    )}
-                  </td>
-                  <td className="word-type-cell">
-                    {editingField === `${word._id}-wordType` ? (
-                      <input
-                        type="text"
-                        defaultValue={word.wordType || ''}
-                        onBlur={(e) => handleFieldBlur(word._id, 'wordType', e.target.value, word.wordType)}
-                        onKeyPress={(e) => {
-                          if (e.key === 'Enter') {
-                            handleFieldBlur(word._id, 'wordType', e.target.value, word.wordType);
-                          }
-                        }}
-                        autoFocus
-                        className="editable-input"
-                      />
-                    ) : (
-                      <span
-                        onClick={() => setEditingField(`${word._id}-wordType`)}
-                        className="editable-field"
-                      >
-                        {word.wordType || '-'}
-                      </span>
-                    )}
-                  </td>
-                  <td className="word-level-cell">
-                    {editingField === `${word._id}-englishLevel` ? (
-                      <select
-                        defaultValue={word.englishLevel || ''}
-                        onBlur={(e) => handleFieldBlur(word._id, 'englishLevel', e.target.value, word.englishLevel)}
-                        onChange={(e) => handleFieldChange(word._id, 'englishLevel', e.target.value)}
-                        autoFocus
-                        className="editable-select"
-                      >
-                        <option value="">-</option>
-                        <option value="A1">A1</option>
-                        <option value="A2">A2</option>
-                        <option value="B1">B1</option>
-                        <option value="B2">B2</option>
-                        <option value="C1">C1</option>
-                        <option value="C2">C2</option>
-                      </select>
-                    ) : (
-                      <span
-                        onClick={() => setEditingField(`${word._id}-englishLevel`)}
-                        className="editable-field"
-                      >
-                        {word.englishLevel ? (
-                          <span className="word-level-badge">{word.englishLevel}</span>
-                        ) : '-'}
-                      </span>
-                    )}
-                  </td>
+                  {columnVisibility.englishWord && (
+                    <td className="word-english-cell">
+                      {editingField === `${word._id}-englishWord` ? (
+                        <input
+                          type="text"
+                          defaultValue={word.englishWord}
+                          onBlur={(e) => handleFieldBlur(word._id, 'englishWord', e.target.value, word.englishWord)}
+                          onKeyPress={(e) => {
+                            if (e.key === 'Enter') {
+                              handleFieldBlur(word._id, 'englishWord', e.target.value, word.englishWord);
+                            }
+                          }}
+                          autoFocus
+                          className="editable-input"
+                        />
+                      ) : (
+                        <strong
+                          onClick={() => setEditingField(`${word._id}-englishWord`)}
+                          className="editable-field"
+                        >
+                          {word.englishWord}
+                        </strong>
+                      )}
+                    </td>
+                  )}
+                  {columnVisibility.turkishMeaning && (
+                    <td className="word-meaning-cell">
+                      {editingField === `${word._id}-turkishMeaning` ? (
+                        <input
+                          type="text"
+                          defaultValue={word.turkishMeaning || ''}
+                          onBlur={(e) => handleFieldBlur(word._id, 'turkishMeaning', e.target.value, word.turkishMeaning)}
+                          onKeyPress={(e) => {
+                            if (e.key === 'Enter') {
+                              handleFieldBlur(word._id, 'turkishMeaning', e.target.value, word.turkishMeaning);
+                            }
+                          }}
+                          autoFocus
+                          className="editable-input"
+                        />
+                      ) : (
+                        <span
+                          onClick={() => setEditingField(`${word._id}-turkishMeaning`)}
+                          className="editable-field"
+                        >
+                          {word.turkishMeaning || '-'}
+                        </span>
+                      )}
+                    </td>
+                  )}
+                  {columnVisibility.wordType && (
+                    <td className="word-type-cell">
+                      {editingField === `${word._id}-wordType` ? (
+                        <input
+                          type="text"
+                          defaultValue={word.wordType || ''}
+                          onBlur={(e) => handleFieldBlur(word._id, 'wordType', e.target.value, word.wordType)}
+                          onKeyPress={(e) => {
+                            if (e.key === 'Enter') {
+                              handleFieldBlur(word._id, 'wordType', e.target.value, word.wordType);
+                            }
+                          }}
+                          autoFocus
+                          className="editable-input"
+                        />
+                      ) : (
+                        <span
+                          onClick={() => setEditingField(`${word._id}-wordType`)}
+                          className="editable-field"
+                        >
+                          {word.wordType || '-'}
+                        </span>
+                      )}
+                    </td>
+                  )}
+                  {columnVisibility.englishLevel && (
+                    <td className="word-level-cell">
+                      {editingField === `${word._id}-englishLevel` ? (
+                        <select
+                          defaultValue={word.englishLevel || ''}
+                          onBlur={(e) => handleFieldBlur(word._id, 'englishLevel', e.target.value, word.englishLevel)}
+                          onChange={(e) => handleFieldChange(word._id, 'englishLevel', e.target.value)}
+                          autoFocus
+                          className="editable-select"
+                        >
+                          <option value="">-</option>
+                          <option value="A1">A1</option>
+                          <option value="A2">A2</option>
+                          <option value="B1">B1</option>
+                          <option value="B2">B2</option>
+                          <option value="C1">C1</option>
+                          <option value="C2">C2</option>
+                        </select>
+                      ) : (
+                        <span
+                          onClick={() => setEditingField(`${word._id}-englishLevel`)}
+                          className="editable-field"
+                        >
+                          {word.englishLevel ? (
+                            <span className="word-level-badge">{word.englishLevel}</span>
+                          ) : '-'}
+                        </span>
+                      )}
+                    </td>
+                  )}
                   {columnVisibility.category1 && (
                     <td className="word-category-cell">
                       {editingField === `${word._id}-category1` ? (
@@ -1044,41 +1207,353 @@ const WordList = ({ showFilters = true, showDeleteButton = true, onWordSelect, a
                       )}
                     </td>
                   )}
-                  <td className="word-category-cell">
-                    {word.sources && word.sources.length > 0 ? (
-                      <span className="source-badge" title={word.sources.join(', ')}>
-                        {word.sources.length === 1 
-                          ? word.sources[0] 
-                          : `${word.sources[0]} (+${word.sources.length - 1})`}
-                      </span>
-                    ) : '-'}
-                  </td>
-                  <td className="word-status-cell">
-                    <button
-                      onClick={() => handleToggleWord(word._id, word.isKnown)}
-                      className={`btn btn-sm ${word.isKnown === true ? 'btn-success' : word.isKnown === false ? 'btn-warning' : 'btn-secondary'}`}
-                      style={{ 
-                        padding: '0.25rem 0.5rem',
-                        fontSize: '0.8rem',
-                        minWidth: '80px'
-                      }}
-                    >
-                      {word.isKnown === true ? '✓ Known' : word.isKnown === false ? '✗ Unknown' : 'Not Set'}
-                    </button>
-                  </td>
-                  <td className="word-status-cell">
-                    <button
-                      onClick={() => handleToggleSpelling(word._id, word.isSpelled)}
-                      className={`btn btn-sm ${word.isSpelled === true ? 'btn-success' : word.isSpelled === false ? 'btn-warning' : 'btn-secondary'}`}
-                      style={{ 
-                        padding: '0.25rem 0.5rem',
-                        fontSize: '0.8rem',
-                        minWidth: '80px'
-                      }}
-                    >
-                      {word.isSpelled === true ? '✓ Yes' : word.isSpelled === false ? '✗ No' : 'Not Set'}
-                    </button>
-                  </td>
+                  {columnVisibility.source && (
+                    <td className="word-category-cell">
+                      {word.sources && word.sources.length > 0 ? (
+                        <span className="source-badge" title={word.sources.join(', ')}>
+                          {word.sources.length === 1 
+                            ? word.sources[0] 
+                            : `${word.sources[0]} (+${word.sources.length - 1})`}
+                        </span>
+                      ) : '-'}
+                    </td>
+                  )}
+                  {columnVisibility.isKnown && (
+                    <td className="word-status-cell">
+                      <button
+                        onClick={() => handleToggleWord(word._id, word.isKnown)}
+                        className={`btn btn-sm ${word.isKnown === true ? 'btn-success' : word.isKnown === false ? 'btn-warning' : 'btn-secondary'}`}
+                        style={{ 
+                          padding: '0.25rem 0.5rem',
+                          fontSize: '0.8rem',
+                          minWidth: '80px'
+                        }}
+                      >
+                        {word.isKnown === true ? '✓ Known' : word.isKnown === false ? '✗ Unknown' : 'Not Set'}
+                      </button>
+                    </td>
+                  )}
+                  {columnVisibility.isSpelled && (
+                    <td className="word-status-cell">
+                      <button
+                        onClick={() => handleToggleSpelling(word._id, word.isSpelled)}
+                        className={`btn btn-sm ${word.isSpelled === true ? 'btn-success' : word.isSpelled === false ? 'btn-warning' : 'btn-secondary'}`}
+                        style={{ 
+                          padding: '0.25rem 0.5rem',
+                          fontSize: '0.8rem',
+                          minWidth: '80px'
+                        }}
+                      >
+                        {word.isSpelled === true ? '✓ Yes' : word.isSpelled === false ? '✗ No' : 'Not Set'}
+                      </button>
+                    </td>
+                  )}
+                  {columnVisibility.image && (
+                    <td className="word-image-cell" style={{ padding: '0.5rem' }}>
+                      <div style={{ position: 'relative', display: 'inline-block' }}>
+                        {word.imageUrl ? (
+                          <>
+                            <img 
+                              src={word.imageUrl} 
+                              alt={word.englishWord}
+                              style={{ 
+                                width: `${imageSize}px`, 
+                                height: `${imageSize}px`, 
+                                objectFit: 'cover',
+                                borderRadius: '4px',
+                                border: '1px solid #e2e8f0',
+                                cursor: 'pointer',
+                                display: 'block'
+                              }}
+                              onClick={() => window.open(word.imageUrl, '_blank')}
+                              onError={(e) => {
+                                e.target.src = 'https://img.freepik.com/free-vector/illustration-gallery-icon_53876-27002.jpg?semt=ais_hybrid&w=740&q=80';
+                              }}
+                            />
+                            {/* Bottom controls container */}
+                            <div style={{
+                              position: 'absolute',
+                              bottom: '4px',
+                              left: '50%',
+                              transform: 'translateX(-50%)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.25rem',
+                              zIndex: 10,
+                              background: 'rgba(255, 255, 255, 0.95)',
+                              padding: '0.25rem',
+                              borderRadius: '4px',
+                              border: '1px solid #e2e8f0'
+                            }}>
+                              {imageHistory[word._id] && (() => {
+                                const history = imageHistory[word._id];
+                                const canGoBack = history.currentIndex > 0;
+                                const canGoForward = history.currentIndex < history.history.length - 1;
+                                return (
+                                  <>
+                                    {/* ⬅️ Left/Bottom - Previous */}
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        navigateImage(word._id, 'prev');
+                                      }}
+                                      disabled={!canGoBack}
+                                      style={{
+                                        background: canGoBack ? 'rgba(255, 255, 255, 0.9)' : 'rgba(240, 240, 240, 0.9)',
+                                        border: '1px solid #e2e8f0',
+                                        borderRadius: '4px',
+                                        padding: '0.25rem',
+                                        fontSize: '1rem',
+                                        cursor: canGoBack ? 'pointer' : 'not-allowed',
+                                        opacity: canGoBack ? 1 : 0.5,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        width: '28px',
+                                        height: '28px'
+                                      }}
+                                      title="Previous image"
+                                    >
+                                      ⬅️
+                                    </button>
+                                  </>
+                                );
+                              })()}
+                              {/* Search query input */}
+                              {(
+                                <>
+                                  <input
+                                    type="text"
+                                    placeholder="Search query or image URL..."
+                                    value={customQueries[word._id] || ''}
+                                    onChange={(e) => {
+                                      e.stopPropagation();
+                                      setCustomQueries({
+                                        ...customQueries,
+                                        [word._id]: e.target.value
+                                      });
+                                    }}
+                                    onPaste={(e) => {
+                                      e.stopPropagation();
+                                      // Allow paste to complete, then check if it's a URL
+                                      setTimeout(() => {
+                                        const pastedValue = e.clipboardData.getData('text');
+                                        const trimmed = pastedValue.trim();
+                                        if (trimmed && (trimmed.startsWith('http://') || trimmed.startsWith('https://'))) {
+                                          setCustomQueries({
+                                            ...customQueries,
+                                            [word._id]: trimmed
+                                          });
+                                          handleGenerateImage(word._id, trimmed);
+                                        }
+                                      }, 50);
+                                    }}
+                                    onKeyPress={(e) => {
+                                      if (e.key === 'Enter') {
+                                        e.stopPropagation();
+                                        const query = customQueries[word._id]?.trim() || null;
+                                        handleGenerateImage(word._id, query);
+                                      }
+                                    }}
+                                    onClick={(e) => e.stopPropagation()}
+                                    style={{
+                                      padding: '0.25rem 0.5rem',
+                                      fontSize: '0.75rem',
+                                      border: '1px solid #e2e8f0',
+                                      borderRadius: '4px',
+                                      width: '80px',
+                                      minWidth: '60px',
+                                      background: 'white'
+                                    }}
+                                    title="Enter custom search query or paste image URL"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const query = customQueries[word._id]?.trim() || null;
+                                      handleGenerateImage(word._id, query);
+                                    }}
+                                    disabled={generatingImages[word._id]}
+                                    style={{
+                                      background: generatingImages[word._id] ? 'rgba(240, 240, 240, 0.9)' : 'rgba(255, 255, 255, 0.9)',
+                                      border: '1px solid #e2e8f0',
+                                      borderRadius: '4px',
+                                      padding: '0.25rem',
+                                      fontSize: '1rem',
+                                      cursor: generatingImages[word._id] ? 'not-allowed' : 'pointer',
+                                      opacity: generatingImages[word._id] ? 0.5 : 1,
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      width: '28px',
+                                      height: '28px'
+                                    }}
+                                    title={generatingImages[word._id] ? 'Generating...' : 'Generate image'}
+                                  >
+                                    {generatingImages[word._id] ? '⏳' : '🔄'}
+                                  </button>
+                                  {/* 🗑️ Delete image - shown even when no image exists */}
+                                  {word.imageUrl && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (window.confirm('Are you sure you want to delete this image?')) {
+                                          handleDeleteImage(word._id);
+                                        }
+                                      }}
+                                      style={{
+                                        background: 'rgba(255, 255, 255, 0.9)',
+                                        border: '1px solid #e2e8f0',
+                                        borderRadius: '4px',
+                                        padding: '0.25rem',
+                                        fontSize: '1rem',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        width: '28px',
+                                        height: '28px'
+                                      }}
+                                      title="Delete image"
+                                    >
+                                      🗑️
+                                    </button>
+                                  )}
+                              {imageHistory[word._id] && (() => {
+                                const history = imageHistory[word._id];
+                                const canGoForward = history.currentIndex < history.history.length - 1;
+                                return (
+                                  <>
+                                    {/* ➡️ Right/Bottom - Next */}
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        navigateImage(word._id, 'next');
+                                      }}
+                                      disabled={!canGoForward}
+                                      style={{
+                                        background: canGoForward ? 'rgba(255, 255, 255, 0.9)' : 'rgba(240, 240, 240, 0.9)',
+                                        border: '1px solid #e2e8f0',
+                                        borderRadius: '4px',
+                                        padding: '0.25rem',
+                                        fontSize: '1rem',
+                                        cursor: canGoForward ? 'pointer' : 'not-allowed',
+                                        opacity: canGoForward ? 1 : 0.5,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        width: '28px',
+                                        height: '28px'
+                                      }}
+                                      title="Next image"
+                                    >
+                                      ➡️
+                                    </button>
+                                  </>
+                                );
+                              })()}
+                                </>
+                              )}
+                              </div>
+                            </>
+                          ) : (
+                          <div style={{ position: 'relative', width: `${imageSize}px`, height: `${imageSize}px`, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #e2e8f0', borderRadius: '4px', background: '#f7fafc' }}>
+                            <span style={{ color: '#999', fontSize: '0.85rem' }}>-</span>
+                            <div style={{
+                              position: 'absolute',
+                              bottom: '4px',
+                              left: '50%',
+                              transform: 'translateX(-50%)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.25rem',
+                              zIndex: 10,
+                              background: 'rgba(255, 255, 255, 0.95)',
+                              padding: '0.25rem',
+                              borderRadius: '4px',
+                              border: '1px solid #e2e8f0'
+                            }}>
+                              <input
+                                type="text"
+                                placeholder="Search query or image URL..."
+                                value={customQueries[word._id] || ''}
+                                onChange={(e) => {
+                                  e.stopPropagation();
+                                  setCustomQueries({
+                                    ...customQueries,
+                                    [word._id]: e.target.value
+                                  });
+                                }}
+                                onPaste={(e) => {
+                                  e.stopPropagation();
+                                  // Allow paste to complete, then check if it's a URL
+                                  setTimeout(() => {
+                                    const pastedValue = e.clipboardData.getData('text');
+                                    const trimmed = pastedValue.trim();
+                                    if (trimmed && (trimmed.startsWith('http://') || trimmed.startsWith('https://'))) {
+                                      setCustomQueries({
+                                        ...customQueries,
+                                        [word._id]: trimmed
+                                      });
+                                      handleGenerateImage(word._id, trimmed);
+                                    }
+                                  }, 50);
+                                }}
+                                onKeyPress={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.stopPropagation();
+                                    const query = customQueries[word._id]?.trim() || null;
+                                    handleGenerateImage(word._id, query);
+                                  }
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                                style={{
+                                  padding: '0.25rem 0.5rem',
+                                  fontSize: '0.75rem',
+                                  border: '1px solid #e2e8f0',
+                                  borderRadius: '4px',
+                                  width: '80px',
+                                  minWidth: '60px',
+                                  background: 'white'
+                                }}
+                                title="Enter custom search query or paste image URL"
+                              />
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const query = customQueries[word._id]?.trim() || null;
+                                  handleGenerateImage(word._id, query);
+                                }}
+                                disabled={generatingImages[word._id]}
+                                style={{
+                                  background: generatingImages[word._id] ? 'rgba(240, 240, 240, 0.9)' : 'rgba(255, 255, 255, 0.9)',
+                                  border: '1px solid #e2e8f0',
+                                  borderRadius: '4px',
+                                  padding: '0.25rem',
+                                  fontSize: '1rem',
+                                  cursor: generatingImages[word._id] ? 'not-allowed' : 'pointer',
+                                  opacity: generatingImages[word._id] ? 0.5 : 1,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  width: '28px',
+                                  height: '28px'
+                                }}
+                                title={generatingImages[word._id] ? 'Generating...' : 'Generate image'}
+                              >
+                                {generatingImages[word._id] ? '⏳' : '🔄'}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                  )}
                   {showDeleteButton && (
                     <td className="word-action-cell">
                       <button
@@ -1125,6 +1600,62 @@ const WordList = ({ showFilters = true, showDeleteButton = true, onWordSelect, a
         >
           <div
             className="context-menu-item"
+            onClick={() => handleToggleColumn('englishWord')}
+            style={{
+              padding: '0.5rem 1rem',
+              cursor: 'pointer',
+              backgroundColor: columnVisibility.englishWord ? '#e6f3ff' : 'transparent'
+            }}
+          >
+            {columnVisibility.englishWord ? '✓' : ''} English Word
+          </div>
+          <div
+            className="context-menu-item"
+            onClick={() => handleToggleColumn('turkishMeaning')}
+            style={{
+              padding: '0.5rem 1rem',
+              cursor: 'pointer',
+              backgroundColor: columnVisibility.turkishMeaning ? '#e6f3ff' : 'transparent'
+            }}
+          >
+            {columnVisibility.turkishMeaning ? '✓' : ''} Turkish Meaning
+          </div>
+          <div
+            className="context-menu-item"
+            onClick={() => handleToggleColumn('wordType')}
+            style={{
+              padding: '0.5rem 1rem',
+              cursor: 'pointer',
+              backgroundColor: columnVisibility.wordType ? '#e6f3ff' : 'transparent'
+            }}
+          >
+            {columnVisibility.wordType ? '✓' : ''} Word Type
+          </div>
+          <div
+            className="context-menu-item"
+            onClick={() => handleToggleColumn('englishLevel')}
+            style={{
+              padding: '0.5rem 1rem',
+              cursor: 'pointer',
+              backgroundColor: columnVisibility.englishLevel ? '#e6f3ff' : 'transparent'
+            }}
+          >
+            {columnVisibility.englishLevel ? '✓' : ''} English Level
+          </div>
+          <div
+            className="context-menu-item"
+            onClick={() => handleToggleColumn('image')}
+            style={{
+              padding: '0.5rem 1rem',
+              cursor: 'pointer',
+              backgroundColor: columnVisibility.image ? '#e6f3ff' : 'transparent'
+            }}
+          >
+            {columnVisibility.image ? '✓' : ''} Image
+          </div>
+          <div style={{ borderTop: '1px solid #e2e8f0', margin: '0.25rem 0' }}></div>
+          <div
+            className="context-menu-item"
             onClick={() => handleToggleColumn('category1')}
             style={{
               padding: '0.5rem 1rem',
@@ -1156,7 +1687,6 @@ const WordList = ({ showFilters = true, showDeleteButton = true, onWordSelect, a
           >
             {columnVisibility.category3 ? '✓' : ''} Category 3
           </div>
-          <div style={{ borderTop: '1px solid #e2e8f0', margin: '0.25rem 0' }}></div>
           <div
             className="context-menu-item"
             onClick={() => handleToggleColumn('sampleSentenceEn')}
@@ -1179,6 +1709,40 @@ const WordList = ({ showFilters = true, showDeleteButton = true, onWordSelect, a
           >
             {columnVisibility.sampleSentenceTr ? '✓' : ''} Sample Sentence (TR)
           </div>
+          <div style={{ borderTop: '1px solid #e2e8f0', margin: '0.25rem 0' }}></div>
+          <div
+            className="context-menu-item"
+            onClick={() => handleToggleColumn('source')}
+            style={{
+              padding: '0.5rem 1rem',
+              cursor: 'pointer',
+              backgroundColor: columnVisibility.source ? '#e6f3ff' : 'transparent'
+            }}
+          >
+            {columnVisibility.source ? '✓' : ''} Source
+          </div>
+          <div
+            className="context-menu-item"
+            onClick={() => handleToggleColumn('isKnown')}
+            style={{
+              padding: '0.5rem 1rem',
+              cursor: 'pointer',
+              backgroundColor: columnVisibility.isKnown ? '#e6f3ff' : 'transparent'
+            }}
+          >
+            {columnVisibility.isKnown ? '✓' : ''} Is Known
+          </div>
+          <div
+            className="context-menu-item"
+            onClick={() => handleToggleColumn('isSpelled')}
+            style={{
+              padding: '0.5rem 1rem',
+              cursor: 'pointer',
+              backgroundColor: columnVisibility.isSpelled ? '#e6f3ff' : 'transparent'
+            }}
+          >
+            {columnVisibility.isSpelled ? '✓' : ''} Is Spelled
+          </div>
         </div>
       )}
 
@@ -1192,7 +1756,10 @@ const WordList = ({ showFilters = true, showDeleteButton = true, onWordSelect, a
             <select
               id="items-per-page-bottom"
               value={itemsPerPage}
-              onChange={(e) => setItemsPerPage(parseInt(e.target.value))}
+              onChange={(e) => {
+                const value = e.target.value;
+                setItemsPerPage(value === '-1' ? -1 : parseInt(value));
+              }}
               style={{
                 padding: '0.25rem 0.5rem',
                 border: '1px solid #cbd5e1',
@@ -1208,6 +1775,12 @@ const WordList = ({ showFilters = true, showDeleteButton = true, onWordSelect, a
               <option value={50}>50</option>
               <option value={100}>100</option>
               <option value={250}>250</option>
+              <option value={500}>500</option>
+              <option value={1000}>1000</option>
+              <option value={2500}>2500</option>
+              <option value={5000}>5000</option>
+              <option value={10000}>10000</option>
+              <option value={-1}>All</option>
             </select>
           </div>
           {totalPages > 1 && (

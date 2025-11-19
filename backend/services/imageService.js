@@ -636,9 +636,14 @@ function extractKeywordsFromSentence(sentence, targetWord) {
 async function generateWordImage(englishWord, wordType = '', sampleSentence = '', customKeywords = '', service = 'google', wordIndex = null) {
   let searchQuery = englishWord.toLowerCase();
   
-  // For Unsplash, always use just the word itself
+  // For Unsplash, use custom keywords if provided, otherwise use the word itself
   if (service === 'unsplash') {
-    searchQuery = englishWord.toLowerCase();
+    // If custom keywords are provided, use them (same as Google)
+    if (customKeywords && customKeywords.trim()) {
+      searchQuery = customKeywords.trim().toLowerCase();
+    } else {
+      searchQuery = englishWord.toLowerCase();
+    }
     const fallbackQueries = []; // No fallback queries needed, just the word
     
     try {

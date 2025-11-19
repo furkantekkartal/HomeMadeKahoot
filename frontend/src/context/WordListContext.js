@@ -71,21 +71,66 @@ export const WordListProvider = ({ children }) => {
     isKnown: new Set(),
     isSpelled: new Set()
   });
-  const [columnVisibility, setColumnVisibility] = useState({
-    category1: true,
-    category2: true,
-    category3: false,
-    sampleSentenceEn: false,
-    sampleSentenceTr: false
+  // Load column visibility from localStorage or use defaults
+  const [columnVisibility, setColumnVisibility] = useState(() => {
+    const saved = localStorage.getItem('wordListColumnVisibility');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        // Ensure all columns are present (merge with defaults for new columns)
+        return {
+          englishWord: true,
+          turkishMeaning: true,
+          wordType: true,
+          englishLevel: true,
+          image: false, // Hidden by default, can be shown via right-click
+          category1: true,
+          category2: true,
+          category3: false,
+          sampleSentenceEn: false,
+          sampleSentenceTr: false,
+          source: true,
+          isKnown: true,
+          isSpelled: true,
+          ...parsed // Override with saved preferences
+        };
+      } catch (e) {
+        console.error('Error parsing saved column visibility:', e);
+      }
+    }
+    // Default visibility
+    return {
+      englishWord: true,
+      turkishMeaning: true,
+      wordType: true,
+      englishLevel: true,
+      image: false, // Hidden by default, can be shown via right-click
+      category1: true,
+      category2: true,
+      category3: false,
+      sampleSentenceEn: false,
+      sampleSentenceTr: false,
+      source: true,
+      isKnown: true,
+      isSpelled: true
+    };
   });
   
   // Filtering and pagination
   const [allWordsForFiltering, setAllWordsForFiltering] = useState([]);
   const [allFilteredWords, setAllFilteredWords] = useState([]);
-  const [itemsPerPage, setItemsPerPage] = useState(50);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const [editingField, setEditingField] = useState(null);
   const [openFilterDropdown, setOpenFilterDropdown] = useState(null);
   const [contextMenu, setContextMenu] = useState({ show: false, x: 0, y: 0, column: null });
+  
+  // Image generation state
+  const [imageHistory, setImageHistory] = useState({}); // { wordId: { history: [], currentIndex: -1 } }
+  const [generatingImages, setGeneratingImages] = useState({}); // { wordId: boolean }
+  const [generatingAllImages, setGeneratingAllImages] = useState(false);
+  const [imageService, setImageService] = useState(() => {
+    return localStorage.getItem('imageService') || 'google';
+  });
 
   // Load sources
   const loadSources = useCallback(async () => {
@@ -286,11 +331,17 @@ export const WordListProvider = ({ children }) => {
   useEffect(() => {
     if (allFilteredWords.length > 0) {
       setLoading(true);
-      const startIndex = (page - 1) * itemsPerPage;
-      const endIndex = startIndex + itemsPerPage;
-      const paginatedWords = allFilteredWords.slice(startIndex, endIndex);
-      setWords(paginatedWords);
-      setTotalPages(Math.ceil(allFilteredWords.length / itemsPerPage));
+      // If itemsPerPage is -1, show all items (no pagination)
+      if (itemsPerPage === -1) {
+        setWords(allFilteredWords);
+        setTotalPages(1);
+      } else {
+        const startIndex = (page - 1) * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage;
+        const paginatedWords = allFilteredWords.slice(startIndex, endIndex);
+        setWords(paginatedWords);
+        setTotalPages(Math.ceil(allFilteredWords.length / itemsPerPage));
+      }
       setLoading(false);
     } else if (allFilteredWords.length === 0 && allWordsForFiltering.length > 0) {
       setWords([]);
@@ -514,7 +565,9 @@ export const WordListProvider = ({ children }) => {
         }
       }
 
-      const allWordIds = allWords.map(word => word._id);
+      // Apply column filters to the fetched words (client-side filtering)
+      const filteredWords = applyColumnFilters(allWords);
+      const allWordIds = filteredWords.map(word => word._id);
       const allWordIdsSet = new Set(allWordIds);
       setAllFilteredWordIds(allWordIdsSet);
       setSelectedWords(prev => new Set([...prev, ...allWordIds]));
@@ -524,7 +577,7 @@ export const WordListProvider = ({ children }) => {
     } finally {
       setSelectingAllFiltered(false);
     }
-  }, [allFilteredWordIds, selectedWords, appliedFilters]);
+  }, [allFilteredWordIds, selectedWords, appliedFilters, applyColumnFilters]);
 
   const handleSelectActiveSource = useCallback(async (sourceId) => {
     if (!sourceId) {
@@ -674,11 +727,21 @@ export const WordListProvider = ({ children }) => {
     return selectedValues.size < allValues.length;
   }, [columnFilters, getUniqueValues]);
 
+  // Save column visibility to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('wordListColumnVisibility', JSON.stringify(columnVisibility));
+  }, [columnVisibility]);
+
   const handleToggleColumn = useCallback((column) => {
-    setColumnVisibility(prev => ({
-      ...prev,
-      [column]: !prev[column]
-    }));
+    setColumnVisibility(prev => {
+      const newVisibility = {
+        ...prev,
+        [column]: !prev[column]
+      };
+      // Save to localStorage immediately
+      localStorage.setItem('wordListColumnVisibility', JSON.stringify(newVisibility));
+      return newVisibility;
+    });
     setContextMenu({ show: false, x: 0, y: 0, column: null });
   }, []);
 
@@ -690,6 +753,189 @@ export const WordListProvider = ({ children }) => {
       y: e.clientY,
       column
     });
+  }, []);
+
+  // Helper function to check if a string is a URL
+  const isImageUrl = useCallback((str) => {
+    if (!str || typeof str !== 'string') return false;
+    const trimmed = str.trim();
+    return trimmed.startsWith('http://') || trimmed.startsWith('https://');
+  }, []);
+
+  // Initialize image history when words are loaded
+  useEffect(() => {
+    if (words.length > 0) {
+      setImageHistory(prevHistory => {
+        const newHistory = {};
+        let hasChanges = false;
+        
+        words.forEach((word) => {
+          if (word._id) {
+            if (word.imageUrl) {
+              // If word has image, check if it's already in history
+              const existingHistory = prevHistory[word._id];
+              if (existingHistory && existingHistory.history.includes(word.imageUrl)) {
+                newHistory[word._id] = existingHistory;
+              } else {
+                newHistory[word._id] = {
+                  history: [word.imageUrl],
+                  currentIndex: 0
+                };
+                hasChanges = true;
+              }
+            } else if (!prevHistory[word._id]) {
+              // Initialize empty history for words without images
+              newHistory[word._id] = {
+                history: [],
+                currentIndex: -1
+              };
+              hasChanges = true;
+            } else {
+              // Keep existing history
+              newHistory[word._id] = prevHistory[word._id];
+            }
+          }
+        });
+        
+        // Only update if there are changes
+        return hasChanges ? newHistory : prevHistory;
+      });
+    }
+  }, [words]); // Only depend on words, not imageHistory to avoid loops
+
+  // Image generation handlers
+  const handleGenerateImage = useCallback(async (wordId, customQuery = null) => {
+    const wordIndex = words.findIndex(w => w._id === wordId);
+    if (wordIndex === -1) return;
+    
+    setGeneratingImages(prev => ({ ...prev, [wordId]: true }));
+
+    try {
+      const word = words[wordIndex];
+      const customKeyword = customQuery !== null 
+        ? customQuery.trim() 
+        : (word.customKeyword?.trim() || '');
+      
+      // Check if the customKeyword is a direct image URL
+      if (customKeyword && isImageUrl(customKeyword)) {
+        const imageUrl = customKeyword.trim();
+        
+        setImageHistory(prev => {
+          const currentHistory = prev[wordId] || { history: [], currentIndex: -1 };
+          const newHistory = [...currentHistory.history, imageUrl];
+          const newCurrentIndex = newHistory.length - 1;
+          return {
+            ...prev,
+            [wordId]: { history: newHistory, currentIndex: newCurrentIndex }
+          };
+        });
+        
+        handleFieldChange(wordId, 'imageUrl', imageUrl);
+      } else {
+        const response = await wordAPI.generateWordImage(wordId, customKeyword, imageService);
+        const newImageUrl = response.data.imageUrl;
+        
+        setImageHistory(prev => {
+          const currentHistory = prev[wordId] || { history: [], currentIndex: -1 };
+          const newHistory = [...currentHistory.history, newImageUrl];
+          const newCurrentIndex = newHistory.length - 1;
+          return {
+            ...prev,
+            [wordId]: { history: newHistory, currentIndex: newCurrentIndex }
+          };
+        });
+        
+        handleFieldChange(wordId, 'imageUrl', newImageUrl);
+      }
+    } catch (err) {
+      console.error('Failed to generate image:', err);
+    } finally {
+      setGeneratingImages(prev => ({ ...prev, [wordId]: false }));
+    }
+  }, [words, imageService, isImageUrl, handleFieldChange]);
+
+  const navigateImage = useCallback((wordId, direction) => {
+    setImageHistory(prev => {
+      const currentHistory = prev[wordId];
+      if (!currentHistory || currentHistory.history.length === 0) return prev;
+      
+      const { history, currentIndex } = currentHistory;
+      let newIndex = currentIndex;
+      
+      if (direction === 'prev' && currentIndex > 0) {
+        newIndex = currentIndex - 1;
+      } else if (direction === 'next' && currentIndex < history.length - 1) {
+        newIndex = currentIndex + 1;
+      } else {
+        return prev;
+      }
+      
+      const newImageUrl = history[newIndex];
+      handleFieldChange(wordId, 'imageUrl', newImageUrl);
+      
+      return {
+        ...prev,
+        [wordId]: { history, currentIndex: newIndex }
+      };
+    });
+  }, [handleFieldChange]);
+
+  const handleDeleteImage = useCallback((wordId) => {
+    handleFieldChange(wordId, 'imageUrl', '');
+    setImageHistory(prev => ({
+      ...prev,
+      [wordId]: { history: [], currentIndex: -1 }
+    }));
+  }, [handleFieldChange]);
+
+  const handleGenerateAllImages = useCallback(async () => {
+    if (words.length === 0) return;
+
+    const wordsNeedingImages = words.filter((word) => {
+      return word._id && (!word.imageUrl || word.imageUrl.trim() === '');
+    });
+
+    if (wordsNeedingImages.length === 0) return;
+
+    setGeneratingAllImages(true);
+
+    try {
+      for (const word of words) {
+        if (!word._id || (word.imageUrl && word.imageUrl.trim() !== '')) {
+          continue;
+        }
+
+        setGeneratingImages(prev => ({ ...prev, [word._id]: true }));
+        try {
+          const customKeyword = word.customKeyword?.trim();
+          const response = await wordAPI.generateWordImage(word._id, customKeyword, imageService);
+          const newImageUrl = response.data.imageUrl;
+          
+          // Update image history
+          setImageHistory(prev => {
+            const currentHistory = prev[word._id] || { history: [], currentIndex: -1 };
+            const newHistory = [...currentHistory.history, newImageUrl];
+            return {
+              ...prev,
+              [word._id]: { history: newHistory, currentIndex: newHistory.length - 1 }
+            };
+          });
+          
+          handleFieldChange(word._id, 'imageUrl', newImageUrl);
+        } catch (err) {
+          console.error(`Failed to generate image for word ${word.englishWord}:`, err);
+        } finally {
+          setGeneratingImages(prev => ({ ...prev, [word._id]: false }));
+        }
+      }
+    } finally {
+      setGeneratingAllImages(false);
+    }
+  }, [words, imageService, handleFieldChange]);
+
+  const handleImageServiceChange = useCallback((service) => {
+    setImageService(service);
+    localStorage.setItem('imageService', service);
   }, []);
 
   const value = {
@@ -714,6 +960,10 @@ export const WordListProvider = ({ children }) => {
     editingField,
     openFilterDropdown,
     contextMenu,
+    imageHistory,
+    generatingImages,
+    generatingAllImages,
+    imageService,
     
     // Setters
     setPage,
@@ -724,6 +974,10 @@ export const WordListProvider = ({ children }) => {
     setOpenFilterDropdown,
     setItemsPerPage,
     setContextMenu,
+    setWords,
+    setColumnVisibility,
+    setAllWordsForFiltering,
+    setAllFilteredWords,
     
     // Handlers
     handleToggleWord,
@@ -744,6 +998,13 @@ export const WordListProvider = ({ children }) => {
     handleToggleColumn,
     handleContextMenu,
     getUniqueValues,
+    
+    // Image handlers
+    handleGenerateImage,
+    navigateImage,
+    handleDeleteImage,
+    handleGenerateAllImages,
+    handleImageServiceChange,
     
     // Actions
     refreshWords: loadAllWordsForFiltering

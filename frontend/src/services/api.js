@@ -94,7 +94,7 @@ export const wordAPI = {
     });
   },
   generateWordImage: (wordId, customKeywords, service = 'google') => api.post(`/words/${wordId}/generate-image`, { customKeywords, service }),
-  addWordsFromAI: (words, sourceName, sourceType, fileSize, contentPreview, url, pageTitle) => api.post('/words/add-from-ai', { words, sourceName, sourceType, fileSize, contentPreview, url, pageTitle }),
+  addWordsFromAI: (words, sourceName, sourceType, fileSize, contentPreview, url, pageTitle, sourceId) => api.post('/words/add-from-ai', { words, sourceName, sourceType, fileSize, contentPreview, url, pageTitle, sourceId }),
   testSourceTitle: (sourceName, sourceType, contentPreview, url, pageTitle) => api.post('/words/test-source-title', { sourceName, sourceType, contentPreview, url, pageTitle }),
   fillWordColumns: (words = null) => api.post('/words/fill-columns', { words }),
   getWordsWithoutTurkish: () => api.get('/words/without-turkish'),

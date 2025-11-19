@@ -734,15 +734,15 @@ function isValidWord(word) {
 exports.addWordsFromAI = async (req, res) => {
   console.log('addWordsFromAI called');
   try {
-    const { words, sourceName, sourceType, fileSize, contentPreview, url, pageTitle } = req.body; // Array of word strings, source file name, type, size, content preview, URL, and page title
+    const { words, sourceName, sourceType, fileSize, contentPreview, url, pageTitle, sourceId } = req.body; // Array of word strings, source file name, type, size, content preview, URL, page title, and optional sourceId
     const userId = req.user.userId;
 
     if (!words || !Array.isArray(words) || words.length === 0) {
       return res.status(400).json({ message: 'Words array is required' });
     }
 
-    if (!sourceName) {
-      return res.status(400).json({ message: 'Source name is required' });
+    if (!sourceName && !sourceId) {
+      return res.status(400).json({ message: 'Source name or sourceId is required' });
     }
 
     // Determine source type from file extension if not provided
@@ -758,66 +758,108 @@ exports.addWordsFromAI = async (req, res) => {
       else detectedSourceType = 'other';
     }
 
-    // Generate meaningful title and description FIRST using AI
-    let generatedTitle = sourceName; // Fallback to original name
-    let generatedDescription = `English learning content from ${sourceName}`;
+    let source = null;
     
-    try {
-      const { generateSourceInfo } = require('../services/aiDeckService');
-      const sourceInfo = await generateSourceInfo(sourceName, detectedSourceType, contentPreview || '', url || '', pageTitle || '');
-      generatedTitle = sourceInfo.title;
-      generatedDescription = sourceInfo.description;
-    } catch (error) {
-      console.error('Error generating source info:', error);
-      // Use fallback title based on type
+    // If sourceId is provided, find and use that source (for subsequent batches)
+    if (sourceId) {
+      source = await Source.findOne({ _id: sourceId, userId });
+      if (!source) {
+        return res.status(404).json({ message: 'Source not found' });
+      }
+    } else {
+      // First batch: Generate meaningful title and description using AI
+      // Use pageTitle or url as fallback if sourceName is "Unknown Source"
+      const effectiveSourceName = (sourceName === 'Unknown Source' && (pageTitle || url)) 
+        ? (pageTitle || url) 
+        : sourceName;
+      
+      let generatedTitle = effectiveSourceName; // Fallback to effective source name
+      let generatedDescription = `English learning content from ${effectiveSourceName}`;
+      
+      try {
+        const { generateSourceInfo } = require('../services/aiDeckService');
+        const sourceInfo = await generateSourceInfo(effectiveSourceName, detectedSourceType, contentPreview || '', url || '', pageTitle || '');
+        generatedTitle = sourceInfo.title;
+        generatedDescription = sourceInfo.description;
+      } catch (error) {
+        console.error('Error generating source info:', error);
+        // Use fallback title based on type
+        if (pageTitle) {
+          generatedTitle = pageTitle;
+        } else if (url) {
+          // Extract domain or meaningful part from URL
+          try {
+            const urlObj = new URL(url);
+            generatedTitle = urlObj.hostname.replace('www.', '') || url;
+          } catch {
+            generatedTitle = url;
+          }
+        } else if (detectedSourceType === 'srt') {
+          generatedTitle = `TvSeries | ${effectiveSourceName.replace(/\.srt$/i, '')}`;
+        } else if (detectedSourceType === 'other' && effectiveSourceName.includes('news')) {
+          generatedTitle = `7News | ${effectiveSourceName.replace(/\.md$/i, '')}`;
+        } else {
+          generatedTitle = effectiveSourceName;
+        }
+      }
+      
+      // Ensure we never use "Unknown Source" as the final title
+      if (generatedTitle === 'Unknown Source' || !generatedTitle || generatedTitle.trim() === '') {
+        generatedTitle = pageTitle || url || `Content from ${detectedSourceType.toUpperCase()}`;
+      }
+
+      // Determine skill based on source type
+      let detectedSkill = null;
       if (detectedSourceType === 'srt') {
-        generatedTitle = `TvSeries | ${sourceName.replace(/\.srt$/i, '')}`;
-      } else if (detectedSourceType === 'other' && sourceName.includes('news')) {
-        generatedTitle = `7News | ${sourceName.replace(/\.md$/i, '')}`;
+        detectedSkill = 'Listening';
+      } else if (['pdf', 'txt', 'other'].includes(detectedSourceType)) {
+        detectedSkill = 'Reading';
       } else {
-        generatedTitle = sourceName;
+        detectedSkill = 'Reading'; // Default
       }
-    }
 
-    // Use generated title as sourceName (meaningful name instead of filename)
-    const meaningfulSourceName = generatedTitle;
-
-    // Determine skill based on source type
-    let detectedSkill = null;
-    if (detectedSourceType === 'srt') {
-      detectedSkill = 'Listening';
-    } else if (['pdf', 'txt', 'other'].includes(detectedSourceType)) {
-      detectedSkill = 'Reading';
-    } else {
-      detectedSkill = 'Reading'; // Default
-    }
-
-    // Create or find source using the meaningful name
-    let source = await Source.findOne({ userId, sourceName: meaningfulSourceName });
-    if (!source) {
-      source = await Source.create({
-        userId,
-        sourceName: meaningfulSourceName, // Use generated title as sourceName
-        sourceType: detectedSourceType,
-        fileSize: fileSize || 0,
-        totalWords: 0,
-        newWords: 0,
-        duplicateWords: 0,
-        title: generatedTitle,
-        description: generatedDescription,
-        skill: detectedSkill, // Set skill immediately
-        task: 'Vocabulary',
-        cardQty: 0
-        // level will be calculated later and set when available
-      });
-    } else {
-      // Update existing source with new info if needed
-      if (!source.title) {
-        source.title = generatedTitle;
-        source.description = generatedDescription;
-      }
-      if (!source.skill) {
-        source.skill = detectedSkill;
+      // Find or create source using AI-generated title as sourceName (unique identifier)
+      source = await Source.findOne({ userId, sourceName: generatedTitle });
+      
+      if (!source) {
+        // Create new source using AI-generated title as sourceName
+        try {
+          source = await Source.create({
+            userId,
+            sourceName: generatedTitle, // Use AI-generated title as sourceName
+            sourceType: detectedSourceType,
+            fileSize: fileSize || 0,
+            totalWords: 0,
+            newWords: 0,
+            duplicateWords: 0,
+            title: generatedTitle, // Also store in title field
+            description: generatedDescription,
+            skill: detectedSkill,
+            task: 'Vocabulary',
+            cardQty: 0
+          });
+        } catch (createError) {
+          // Handle race condition: if source was created by another batch, find it
+          if (createError.code === 11000 || createError.name === 'MongoServerError') {
+            source = await Source.findOne({ userId, sourceName: generatedTitle });
+            if (!source) {
+              throw createError; // Re-throw if it's a different error
+            }
+            // Source exists, update fileSize if needed
+            if (fileSize && fileSize > (source.fileSize || 0)) {
+              source.fileSize = fileSize;
+              await source.save();
+            }
+          } else {
+            throw createError;
+          }
+        }
+      } else {
+        // Source exists, update fileSize if it's larger (in case of re-upload)
+        if (fileSize && fileSize > (source.fileSize || 0)) {
+          source.fileSize = fileSize;
+          await source.save();
+        }
       }
     }
 
@@ -974,8 +1016,8 @@ exports.addWordsFromAI = async (req, res) => {
       results,
       sourceInfo: {
         sourceId: source._id,
-        sourceName: source.sourceName, // This is now the meaningful title
-        title: source.title,
+        sourceName: source.sourceName, // Original filename (unique identifier)
+        title: source.title, // AI-generated meaningful title
         description: source.description,
         level: source.level,
         skill: source.skill,

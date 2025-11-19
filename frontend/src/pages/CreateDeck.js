@@ -915,7 +915,7 @@ const CreateDeck = () => {
           isProcessing: true
         });
         
-        addDebugLog(`Processing batch ${batchNumber}: words ${startIndex}-${endIndex} (${batch.length} words)`, true);
+        addDebugLog(`Adding to Database; Batch ${batchNumber}: words ${startIndex}-${endIndex} (${batch.length} words)`, true);
         
         try {
           // Get content preview for AI title/description generation (use more for news articles)
@@ -923,8 +923,11 @@ const CreateDeck = () => {
           // Pass URL and page title for news articles so AI can extract title from URL or use page title
           const urlForTitle = (webpageUrl && webpageUrl.trim() !== '') ? webpageUrl.trim() : null;
           const pageTitleForAI = webpagePageTitle || null;
-          // Send first 1000 chars for better headline extraction from news articles
-          const response = await wordAPI.addWordsFromAI(batch, sourceName, sourceType, fileSize, contentPreview.substring(0, 1000), urlForTitle, pageTitleForAI);
+          // For first batch, don't pass sourceId. For subsequent batches, pass the sourceId from first batch
+          const currentSourceId = (batchNumber === 1) ? null : (sourceInfoFromAPI?.sourceId || null);
+          // Send first 1000 chars for better headline extraction from news articles (only for first batch)
+          const contentPreviewToSend = (batchNumber === 1) ? contentPreview.substring(0, 1000) : '';
+          const response = await wordAPI.addWordsFromAI(batch, sourceName, sourceType, fileSize, contentPreviewToSend, urlForTitle, pageTitleForAI, currentSourceId);
           const results = response.data.results;
           
           // Capture sourceInfo from first batch (contains AI-generated title and description)
@@ -1080,7 +1083,7 @@ const CreateDeck = () => {
           isProcessing: true
         });
         
-        addDebugLog(`Processing batch ${batchNumber}: words ${startIndex}-${endIndex} (${batch.length} words)`, true);
+        addDebugLog(`Adding missing informations; Batch ${batchNumber}: words ${startIndex}-${endIndex} (${batch.length} words)`, true);
         
         try {
           // Call backend with this batch of words
