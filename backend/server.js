@@ -56,9 +56,53 @@ app.use('/api/flashcards', flashcardRoutes);
 app.use('/api/pronunciation', pronunciationRoutes);
 app.use('/api/statistics', statisticsRoutes);
 
-// Health check
+// Health check - basic
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'HomeMadeKahoot API is running' });
+});
+
+// Health check with database connection test
+app.get('/api/health/check', async (req, res) => {
+  try {
+    const mongoose = require('mongoose');
+    const dbState = mongoose.connection.readyState;
+    
+    // 0 = disconnected, 1 = connected, 2 = connecting, 3 = disconnecting
+    const isDbConnected = dbState === 1;
+    
+    const healthStatus = {
+      backend: 'ok',
+      database: isDbConnected ? 'ok' : 'error',
+      databaseState: dbState,
+      timestamp: new Date().toISOString()
+    };
+    
+    if (isDbConnected) {
+      // Try a simple database operation to verify connection
+      try {
+        await mongoose.connection.db.admin().ping();
+        healthStatus.database = 'ok';
+        healthStatus.message = 'Backend and database are connected';
+      } catch (dbError) {
+        healthStatus.database = 'error';
+        healthStatus.databaseError = dbError.message;
+        healthStatus.message = 'Backend is running but database ping failed';
+      }
+    } else {
+      healthStatus.message = 'Backend is running but database is not connected';
+    }
+    
+    const statusCode = isDbConnected ? 200 : 503;
+    res.status(statusCode).json(healthStatus);
+  } catch (error) {
+    res.status(503).json({
+      backend: 'error',
+      database: 'unknown',
+      error: error.message,
+      message: 'Health check failed',
+      timestamp: new Date().toISOString()
+    });
+  }
 });
 
 // Initialize socket handlers
