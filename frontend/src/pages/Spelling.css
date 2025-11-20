@@ -188,7 +188,7 @@
   background: linear-gradient(90deg, #f093fb 0%, #f5576c 100%);
   height: 100%;
   border-radius: 10px;
-  transition: width 0.3s ease;
+  transition: width 0.15s ease;
 }
 
 .card-counter {
@@ -226,7 +226,8 @@
   justify-content: center;
   color: white;
   box-sizing: border-box;
-  transition: transform 0.3s ease-out;
+  transition: opacity 0.15s ease-in-out, transform 0.15s ease-out, scale 0.15s ease-out;
+  transform-origin: center;
 }
 
 /* Writing Pane Styles */
@@ -293,7 +294,7 @@
   color: white;
   text-align: center;
   box-sizing: border-box;
-  transition: all 0.3s ease;
+  transition: all 0.15s ease;
   backdrop-filter: blur(10px);
 }
 
@@ -329,7 +330,7 @@
   font-size: 1rem;
   font-weight: 600;
   text-align: center;
-  animation: fadeIn 0.3s ease-out;
+  animation: fadeIn 0.15s ease-out;
 }
 
 .feedback-correct {
@@ -423,7 +424,7 @@
   display: block;
   border-radius: 0;
   box-sizing: border-box;
-  transition: all 0.3s ease;
+  transition: all 0.15s ease;
 }
 
 .known-text-overlay {
@@ -437,7 +438,7 @@
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
   pointer-events: none;
   z-index: 100;
-  animation: known-text-animation 0.3s ease-out forwards;
+  animation: known-text-animation 0.2s ease-out forwards;
 }
 
 .writing-pane {
@@ -470,7 +471,7 @@
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
   pointer-events: none;
   z-index: 100;
-  animation: unknown-text-animation 0.3s ease-out forwards;
+  animation: unknown-text-animation 0.2s ease-out forwards;
 }
 
 @keyframes unknown-text-animation {
@@ -489,11 +490,11 @@
 }
 
 .animate-image-known {
-  animation: image-pulse-known 0.6s ease-out;
+  animation: image-pulse-known 0.3s ease-out;
 }
 
 .animate-image-unknown {
-  animation: image-pulse-unknown 0.6s ease-out;
+  animation: image-pulse-unknown 0.3s ease-out;
 }
 
 @keyframes image-pulse-known {
@@ -564,7 +565,7 @@
   font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s;
+  transition: all 0.15s;
 }
 
 .image-pane-placeholder .generate-image-btn:hover:not(:disabled) {
@@ -700,7 +701,7 @@
   color: white;
   font-size: 1.2rem;
   cursor: pointer;
-  transition: all 0.3s;
+  transition: all 0.15s;
   backdrop-filter: blur(10px);
   display: flex;
   align-items: center;
@@ -723,7 +724,7 @@
   background: rgba(255, 255, 255, 0.4);
   transform: translate(-50%, -50%);
   pointer-events: none;
-  transition: width 0.5s, height 0.5s, opacity 0.5s;
+  transition: width 0.3s, height 0.3s, opacity 0.3s;
 }
 
 .audio-btn-inline:active::after {
@@ -739,7 +740,7 @@
 }
 
 .audio-btn-inline:active {
-  animation: sound-wave 0.5s ease-out;
+  animation: sound-wave 0.3s ease-out;
 }
 
 @keyframes sound-wave {
@@ -792,7 +793,7 @@
   border: none !important;
   border-radius: 12px;
   color: #667eea;
-  transition: all 0.3s;
+  transition: all 0.15s;
   cursor: pointer;
   box-sizing: border-box;
 }
@@ -803,7 +804,7 @@
 }
 
 .nav-btn:active:not(:disabled) {
-  animation: button-press 0.3s ease-out;
+  animation: button-press 0.15s ease-out;
 }
 
 @keyframes button-press {
@@ -820,19 +821,19 @@
 
 /* Animation classes for keyboard triggers */
 .animate-press {
-  animation: button-press 0.3s ease-out;
+  animation: button-press 0.15s ease-out;
 }
 
 .animate-pulse-status {
-  animation: pulse-known 0.6s ease-out;
+  animation: pulse-known 0.3s ease-out;
 }
 
 .status-unknown.animate-pulse-status {
-  animation: pulse-unknown 0.6s ease-out;
+  animation: pulse-unknown 0.3s ease-out;
 }
 
 .animate-sound-wave {
-  animation: sound-wave 0.5s ease-out;
+  animation: sound-wave 0.3s ease-out;
 }
 
 .nav-btn:disabled {
@@ -946,7 +947,7 @@
   font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s;
+  transition: all 0.15s;
   text-align: left;
   position: relative;
   overflow: hidden;
@@ -962,7 +963,7 @@
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.5);
   transform: translate(-50%, -50%);
-  transition: width 0.6s, height 0.6s;
+  transition: width 0.3s, height 0.3s;
 }
 
 .status-btn:active::before {
@@ -982,7 +983,7 @@
 }
 
 .status-btn.status-unknown:active {
-  animation: pulse-unknown 0.6s ease-out;
+  animation: pulse-unknown 0.3s ease-out;
 }
 
 .status-btn.status-known {
@@ -997,7 +998,7 @@
 }
 
 .status-btn.status-known:active {
-  animation: pulse-known 0.6s ease-out;
+  animation: pulse-known 0.3s ease-out;
 }
 
 @keyframes pulse-known {

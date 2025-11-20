@@ -9,9 +9,9 @@ import './Spelling.css';
 // Constants
 const CONSTANTS = {
   MIN_SWIPE_DISTANCE: 50,
-  AUTO_ADVANCE_DELAY: 300,
-  ANIMATION_DURATION: 600,
-  AUDIO_ANIMATION_DURATION: 500,
+  AUTO_ADVANCE_DELAY: 150,
+  ANIMATION_DURATION: 300,
+  AUDIO_ANIMATION_DURATION: 300,
   SWIPE_RESET_DELAY: 100,
   DEFAULT_IMAGE_URL: 'https://img.freepik.com/free-vector/illustration-gallery-icon_53876-27002.jpg?semt=ais_hybrid&w=740&q=80',
   WORDS_LIMIT: 1000
@@ -57,6 +57,8 @@ const Spelling = () => {
   // State for writing pane animation
   const [writingPaneOffset, setWritingPaneOffset] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
+  const [writingPaneOpacity, setWritingPaneOpacity] = useState(1);
+  const [writingPaneScale, setWritingPaneScale] = useState(1);
 
   // Shared AudioContext for all sounds (mobile-friendly)
   const audioContextRef = useRef(null);
@@ -157,6 +159,8 @@ const Spelling = () => {
   useEffect(() => {
     setUserAnswer('');
     setShowAnswer(false);
+    setWritingPaneOpacity(1);
+    setWritingPaneScale(1);
   }, [currentIndex]);
 
   // Auto-read English word when new card appears
@@ -407,7 +411,7 @@ const Spelling = () => {
       setTimeout(() => {
         setWritingPaneOffset({ x: 0, y: 0 });
       }, 10);
-    }, 300);
+    }, 150);
   };
 
   const goToPrevCard = () => {
@@ -423,7 +427,7 @@ const Spelling = () => {
       setTimeout(() => {
         setWritingPaneOffset({ x: 0, y: 0 });
       }, 10);
-    }, 300);
+    }, 150);
   };
 
   const nextCard = () => {
@@ -448,7 +452,7 @@ const Spelling = () => {
       const randomIndex = Math.floor(Math.random() * cards.length);
       setCurrentIndex(randomIndex);
       setWritingPaneOffset({ x: 0, y: 0 });
-    }, 300);
+    }, 150);
   };
 
   // Update spelling status and always advance to next card
@@ -459,15 +463,21 @@ const Spelling = () => {
     // Always show animation and sound
     triggerAnimation(isSpelled ? 'known' : 'unknown');
 
+    // Start fade/scale transition immediately, at the same time as sound and text overlay
+    if (currentIndex < cards.length - 1) {
+      setWritingPaneScale(1.05);
+      setWritingPaneOpacity(0);
+    }
+
     // Always show text animation overlay
     if (isSpelled) {
       setShowKnownText(true);
       playSuccessSound();
-      setTimeout(() => setShowKnownText(false), 300);
+      setTimeout(() => setShowKnownText(false), 200);
     } else {
       setShowUnknownText(true);
       playUnknownSound();
-      setTimeout(() => setShowUnknownText(false), 300);
+      setTimeout(() => setShowUnknownText(false), 200);
     }
 
     try {
@@ -483,13 +493,16 @@ const Spelling = () => {
         await flashcardAPI.updateLastStudied(currentDeck._id);
       }
       
-      // Always advance to next card after status update
-      // Wait for text overlay animation (300ms) + small buffer (50ms) = 350ms
+      // Wait for fade transition to complete (150ms) before showing new word
       setTimeout(() => {
         if (cards.length > 0 && currentIndex < cards.length) {
           // Check if we're not on the last card before advancing
           if (currentIndex < cards.length - 1) {
-            goToNextCard();
+            setCurrentIndex((prevIndex) => prevIndex + 1);
+            setWritingPaneOffset({ x: 0, y: 0 });
+            setWritingPaneScale(1);
+            setWritingPaneOpacity(1);
+            playTickSound();
           } else {
             // If on last card, show results instead
             if (!showResults) {
@@ -498,7 +511,7 @@ const Spelling = () => {
             }
           }
         }
-      }, 350);
+      }, 150);
     } catch (error) {
       console.error('Failed to update spelling status:', error);
     }
@@ -520,7 +533,7 @@ const Spelling = () => {
     // Wait a bit, then mark spelling status (but don't advance)
     setTimeout(async () => {
       await updateSpellingStatus(isCorrect);
-    }, 1000);
+    }, 200);
   };
 
   // Function to play success sound (for known words)
@@ -933,8 +946,9 @@ const Spelling = () => {
                 <div
                   className="writing-pane"
                   style={{
-                    transform: `translateX(${writingPaneOffset.x}px) translateY(${writingPaneOffset.y}px)`,
-                    transition: isDragging ? 'none' : 'transform 0.3s ease-out'
+                    transform: `translateX(${writingPaneOffset.x}px) translateY(${writingPaneOffset.y}px) scale(${writingPaneScale})`,
+                    opacity: writingPaneOpacity,
+                    transition: isDragging ? 'none' : 'opacity 0.15s ease-in-out, transform 0.15s ease-out, scale 0.15s ease-out'
                   }}
                   onTouchStart={handleTouchStart}
                   onTouchMove={handleTouchMove}
@@ -990,36 +1004,7 @@ const Spelling = () => {
                       disabled={showAnswer}
                       autoFocus
                     />
-                    {showAnswer && (
-                      <div className={`answer-feedback ${isAnswerCorrect ? 'feedback-correct' : 'feedback-incorrect'}`}>
-                        {isAnswerCorrect ? (
-                          <span>✅ Correct! The answer is: <strong>{currentCard?.englishWord}</strong></span>
-                        ) : (
-                          <span>❌ Incorrect. The correct answer is: <strong>{currentCard?.englishWord}</strong></span>
-                        )}
-                      </div>
-                    )}
                   </div>
-
-                  {/* Sample sentence - only show after answer */}
-                  {showAnswer && currentCard?.sampleSentenceEn && (
-                    <div className="writing-sentence">
-                      <div className="sentence-text-container">
-                        <p className="sentence-label">Example:</p>
-                        <p className="sentence-text">"{currentCard.sampleSentenceEn}"</p>
-                        <button
-                          onClick={(e) => { 
-                            e.stopPropagation(); 
-                            speakText(currentCard.sampleSentenceEn);
-                          }}
-                          className={`audio-btn-inline ${animations.audioSentence ? 'animate-sound-wave' : ''}`}
-                          title="Pronounce sentence"
-                        >
-                          🔊
-                        </button>
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
 
