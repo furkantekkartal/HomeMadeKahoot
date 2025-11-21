@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import api from '../services/api';
 import './Auth.css';
 
 const LoggedInLogin = () => {
@@ -8,8 +9,31 @@ const LoggedInLogin = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState({ backend: false, database: false, env: '' });
   const { login } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const checkConnection = async () => {
+      try {
+        const response = await api.get('/health');
+        if (response.data) {
+          setConnectionStatus({
+            backend: true,
+            database: response.data.database?.connected || false,
+            env: response.data.environment || 'unknown'
+          });
+        }
+      } catch (err) {
+        setConnectionStatus({
+          backend: false,
+          database: false,
+          env: 'unknown'
+        });
+      }
+    };
+    checkConnection();
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -30,6 +54,20 @@ const LoggedInLogin = () => {
     <div className="auth-container">
       <div className="auth-card">
         <h2 className="auth-title">Login</h2>
+        <div className="connection-status">
+          <div className="status-item">
+            <span className="status-label">Backend connection:</span>
+            <span className={connectionStatus.backend ? 'status-success' : 'status-error'}>
+              {connectionStatus.backend ? 'Successful' : 'Failed'} ({connectionStatus.env})
+            </span>
+          </div>
+          <div className="status-item">
+            <span className="status-label">Database connection:</span>
+            <span className={connectionStatus.database ? 'status-success' : 'status-error'}>
+              {connectionStatus.database ? 'Successful' : 'Failed'} ({connectionStatus.env})
+            </span>
+          </div>
+        </div>
         {error && <div className="error-message">{error}</div>}
         <form onSubmit={handleSubmit}>
           <div className="form-group">

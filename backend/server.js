@@ -109,7 +109,22 @@ app.use('/api/statistics', statisticsRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', message: 'HomeMadeKahoot API is running' });
+  const mongoose = require('mongoose');
+  const dbStatus = mongoose.connection.readyState;
+  const dbConnected = dbStatus === 1; // 1 = connected
+  const dbName = mongoose.connection.name || 'unknown';
+  const env = process.env.NODE_ENV || 'development';
+  
+  res.json({ 
+    status: 'ok', 
+    message: 'HomeMadeKahoot API is running',
+    environment: env,
+    database: {
+      connected: dbConnected,
+      name: dbName,
+      status: dbConnected ? 'connected' : 'disconnected'
+    }
+  });
 });
 
 // Initialize socket handlers

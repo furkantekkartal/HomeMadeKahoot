@@ -75,3 +75,38 @@
   text-decoration: underline;
 }
 
+.connection-status {
+  background: #f7fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 1.5rem;
+  font-size: 0.875rem;
+}
+
+.status-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.status-item:last-child {
+  margin-bottom: 0;
+}
+
+.status-label {
+  color: #4a5568;
+  font-weight: 500;
+}
+
+.status-success {
+  color: #38a169;
+  font-weight: 600;
+}
+
+.status-error {
+  color: #e53e3e;
+  font-weight: 600;
+}
+
