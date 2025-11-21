@@ -17,6 +17,8 @@
   },
   "scripts": {
     "start": "react-scripts start",
+    "start:dev": "env-cmd -f .env.development cross-env PORT=3000 react-scripts start",
+    "start:prod": "env-cmd -f .env.production cross-env PORT=3001 react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
@@ -39,6 +41,8 @@
     ]
   },
   "devDependencies": {
+    "cross-env": "^7.0.3",
+    "env-cmd": "^10.1.0",
     "react-scripts": "5.0.1"
   }
 }

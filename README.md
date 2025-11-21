@@ -94,54 +94,138 @@ cd ../frontend && npm install
 
 ### 2. Environment Variables
 
-Create `backend/.env`:
+The app supports running both development and production simultaneously. Create these files:
 
+**Backend `.env.dev` (Development):**
 ```env
 PORT=5000
-MONGODB_URI=mongodb://localhost:27017/homemadekahoot
-# Or for MongoDB Atlas:
-# MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/homemadekahoot?appName=homemadekahoot
 NODE_ENV=development
-JWT_SECRET=your_secret_jwt_key
+MONGODB_URI=mongodb://localhost:27017/homemadekahoot
+JWT_SECRET=your_dev_secret_key
 FRONTEND_URL=http://localhost:3000
 
-# AI Services (for quiz and deck generation)
-OPENROUTER_API_KEY=your_openrouter_key
-GEMINI_API_KEY=your_gemini_api_key
+# API Keys
+OPENROUTER_API_KEY=your_key
+GEMINI_API_KEY=your_key
+UNSPLASH_ACCESS_KEY=your_key
+```
 
-# Image Services (choose one or both)
-UNSPLASH_ACCESS_KEY=your_unsplash_key
-# OR Google Custom Search API (alternative to Unsplash)
-GOOGLE_API_KEY=your_google_api_key
-GOOGLE_CX=your_search_engine_id
-GOOGLE_DAILY_LIMIT=100
+**Backend `.env.prod` (Production):**
+```env
+PORT=5001
+NODE_ENV=production
+MONGODB_URI=mongodb://localhost:27017/homemadekahoot
+JWT_SECRET=your_prod_secret_key
+FRONTEND_URL=http://localhost:3001
 
-# Optional: Azure Speech Service (for pronunciation assessment)
-AZURE_SPEECH_KEY=your_azure_speech_key
-AZURE_SPEECH_REGION=your_azure_region
+# API Keys (same as dev)
+OPENROUTER_API_KEY=your_key
+GEMINI_API_KEY=your_key
+UNSPLASH_ACCESS_KEY=your_key
+```
+
+**Frontend `.env.development`:**
+```env
+REACT_APP_API_URL=http://localhost:5000/api
+REACT_APP_SOCKET_URL=http://localhost:5000
+PORT=3000
+```
+
+**Frontend `.env.production`:**
+```env
+REACT_APP_API_URL=http://localhost:5001/api
+REACT_APP_SOCKET_URL=http://localhost:5001
+PORT=3001
 ```
 
 **Note:** The app automatically uses `homemadekahoot_dev` for development and `homemadekahoot_prod` for production based on `NODE_ENV`.
 
 ### 3. Run the Application
 
-**Option 1: Use the batch script (Windows)**
-```bash
-start-dev.bat
-```
-
-**Option 2: Manual start**
+**Single Environment (Development):**
 ```bash
 # Terminal 1 - Backend
-cd backend && npm run dev
+cd backend && npm run dev:dev
 
 # Terminal 2 - Frontend
-cd frontend && npm start
+cd frontend && npm run start:dev
 ```
 
-The app will be available at:
-- Frontend: http://localhost:3000
-- Backend: http://localhost:5000
+**Both Environments (Development + Production):**
+```bash
+# Terminal 1 - Dev Backend
+cd backend && npm run dev:dev
+
+# Terminal 2 - Prod Backend
+cd backend && npm run dev:prod
+
+# Terminal 3 - Dev Frontend
+cd frontend && npm run start:dev
+
+# Terminal 4 - Prod Frontend
+cd frontend && npm run start:prod
+```
+
+Access:
+- Development: http://localhost:3000 (frontend) + http://localhost:5000 (backend)
+- Production: http://localhost:3001 (frontend) + http://localhost:5001 (backend)
+
+---
+
+## Exposing to Internet (Cloudflare)
+
+To access your app from outside your network using Cloudflare tunnels:
+
+### 1. Install cloudflared
+Download from: https://github.com/cloudflare/cloudflared/releases
+
+### 2. Start Cloudflare Tunnels
+Open 4 terminals and run:
+```bash
+# Terminal 1 - Dev Backend
+cloudflared tunnel --url http://localhost:5000
+
+# Terminal 2 - Prod Backend
+cloudflared tunnel --url http://localhost:5001
+
+# Terminal 3 - Dev Frontend
+cloudflared tunnel --url http://localhost:3000
+
+# Terminal 4 - Prod Frontend
+cloudflared tunnel --url http://localhost:3001
+```
+
+Copy the HTTPS URLs from each terminal.
+
+### 3. Update Environment Files
+
+**Backend `.env.dev`:**
+```env
+FRONTEND_URL=https://your-dev-frontend-cloudflare-url.trycloudflare.com
+```
+
+**Backend `.env.prod`:**
+```env
+FRONTEND_URL=https://your-prod-frontend-cloudflare-url.trycloudflare.com
+```
+
+**Frontend `.env.development`:**
+```env
+REACT_APP_API_URL=https://your-dev-backend-cloudflare-url.trycloudflare.com/api
+REACT_APP_SOCKET_URL=https://your-dev-backend-cloudflare-url.trycloudflare.com
+```
+
+**Frontend `.env.production`:**
+```env
+REACT_APP_API_URL=https://your-prod-backend-cloudflare-url.trycloudflare.com/api
+REACT_APP_SOCKET_URL=https://your-prod-backend-cloudflare-url.trycloudflare.com
+```
+
+**Important:**
+- Use HTTPS URLs (Cloudflare provides HTTPS)
+- NO trailing slashes
+- Access frontend via Cloudflare URL, not localhost
+- Restart all servers after updating `.env` files
 
 ---
 
@@ -433,18 +517,29 @@ When GitHub is connected, Render automatically deploys on every `git push`.
 
 **CORS Errors**
 - Verify `FRONTEND_URL` has no trailing slash
-- Check backend CORS includes frontend URL
+- If using Cloudflare, access frontend via Cloudflare URL (not localhost)
+- Backend `FRONTEND_URL` must match where you access the frontend
+
+**Can't Login in Production**
+- Check backend `.env.prod` has correct `FRONTEND_URL`
+- Check frontend `.env.production` points to correct backend URL
+- Access frontend via Cloudflare URL if using Cloudflare tunnels
+- Restart servers after changing `.env` files
+
+**Wrong Environment Loading**
+- Backend: Use `.env.dev` and `.env.prod` (not `.env.production`)
+- Frontend: Use `.env.development` and `.env.production` (not `.env.prod`)
+- Check console: Backend should show "Loaded environment file: .env.prod (production)"
+
+**MongoDB Connection Failed**
+- Verify Network Access allows `0.0.0.0/0` (if MongoDB Atlas)
+- Check connection string has correct password
+- Verify `NODE_ENV` is set correctly
+- Database name automatically gets `_dev` or `_prod` suffix
 
 **Empty Page on Refresh**
 - Ensure rewrite (not redirect) is configured in Render
 - Check `_redirects` file exists in `frontend/public/`
-
-**MongoDB Connection Failed**
-- Verify Network Access allows `0.0.0.0/0`
-- Check connection string has correct password
-- Wait 1-2 minutes after IP changes
-- Verify `NODE_ENV` is set correctly (production vs development)
-- Check that the database name in connection string doesn't already have `_prod` or `_dev` suffix (the app adds it automatically)
 
 **Socket.io Connection Fails**
 - Verify `FRONTEND_URL` matches frontend URL exactly
@@ -553,9 +648,15 @@ cd frontend
 npm start            # Start development server
 ```
 
-**Both (Windows):**
+**Both Environments:**
 ```bash
-start-dev.bat        # Start both backend and frontend
+# Development
+cd backend && npm run dev:dev
+cd frontend && npm run start:dev
+
+# Production
+cd backend && npm run dev:prod
+cd frontend && npm run start:prod
 ```
 
 ---

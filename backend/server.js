@@ -1,4 +1,21 @@
-require('dotenv').config();
+// Load environment variables based on NODE_ENV
+// This allows running both dev and prod simultaneously
+const env = process.env.NODE_ENV || 'development';
+const envFile = env === 'production' ? '.env.prod' : '.env.dev';
+const fs = require('fs');
+const path = require('path');
+
+// Try to load the environment-specific file, fallback to .env if not found
+const envPath = path.join(__dirname, envFile);
+if (fs.existsSync(envPath)) {
+  require('dotenv').config({ path: envPath });
+  console.log(`Loaded environment file: ${envFile} (${env})`);
+} else {
+  // Fallback to default .env
+  require('dotenv').config();
+  console.log(`Warning: ${envFile} not found, using default .env`);
+}
+
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
@@ -28,9 +45,46 @@ const server = http.createServer(app);
 // Normalize FRONTEND_URL - remove trailing slash to avoid CORS issues
 const frontendUrl = (process.env.FRONTEND_URL || "http://localhost:3000").replace(/\/$/, '');
 
+// Support multiple origins: configured frontend URL + localhost variants
+// This allows access from both Cloudflare tunnels and localhost
+const allowedOrigins = [
+  frontendUrl,
+  'http://localhost:3000',
+  'http://localhost:3001',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:3001'
+];
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // Check if origin matches any allowed origin
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      // Also allow if origin starts with any allowed origin (for subdomains)
+      const isAllowed = allowedOrigins.some(allowed => origin.startsWith(allowed.replace('http://', 'https://')));
+      if (isAllowed) {
+        callback(null, true);
+      } else {
+        // For development, allow localhost origins
+        const env = process.env.NODE_ENV || 'development';
+        if (env === 'development' && (origin.includes('localhost') || origin.includes('127.0.0.1'))) {
+          callback(null, true);
+        } else {
+          callback(new Error('Not allowed by CORS'));
+        }
+      }
+    }
+  },
+  credentials: true
+};
+
 const io = socketIo(server, {
   cors: {
-    origin: frontendUrl,
+    origin: corsOptions.origin,
     methods: ["GET", "POST"],
     credentials: true
   },
@@ -39,10 +93,7 @@ const io = socketIo(server, {
 });
 
 // Middleware - configure CORS to match Socket.io
-app.use(cors({
-  origin: frontendUrl,
-  credentials: true
-}));
+app.use(cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
@@ -56,53 +107,9 @@ app.use('/api/flashcards', flashcardRoutes);
 app.use('/api/pronunciation', pronunciationRoutes);
 app.use('/api/statistics', statisticsRoutes);
 
-// Health check - basic
+// Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'HomeMadeKahoot API is running' });
-});
-
-// Health check with database connection test
-app.get('/api/health/check', async (req, res) => {
-  try {
-    const mongoose = require('mongoose');
-    const dbState = mongoose.connection.readyState;
-    
-    // 0 = disconnected, 1 = connected, 2 = connecting, 3 = disconnecting
-    const isDbConnected = dbState === 1;
-    
-    const healthStatus = {
-      backend: 'ok',
-      database: isDbConnected ? 'ok' : 'error',
-      databaseState: dbState,
-      timestamp: new Date().toISOString()
-    };
-    
-    if (isDbConnected) {
-      // Try a simple database operation to verify connection
-      try {
-        await mongoose.connection.db.admin().ping();
-        healthStatus.database = 'ok';
-        healthStatus.message = 'Backend and database are connected';
-      } catch (dbError) {
-        healthStatus.database = 'error';
-        healthStatus.databaseError = dbError.message;
-        healthStatus.message = 'Backend is running but database ping failed';
-      }
-    } else {
-      healthStatus.message = 'Backend is running but database is not connected';
-    }
-    
-    const statusCode = isDbConnected ? 200 : 503;
-    res.status(statusCode).json(healthStatus);
-  } catch (error) {
-    res.status(503).json({
-      backend: 'error',
-      database: 'unknown',
-      error: error.message,
-      message: 'Health check failed',
-      timestamp: new Date().toISOString()
-    });
-  }
 });
 
 // Initialize socket handlers
