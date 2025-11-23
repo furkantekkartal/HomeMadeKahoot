@@ -188,7 +188,7 @@
   background: linear-gradient(90deg, #f093fb 0%, #f5576c 100%);
   height: 100%;
   border-radius: 10px;
-  transition: width 0.3s ease;
+  transition: width 0.2s ease;
 }
 
 .card-counter {
@@ -266,7 +266,7 @@
   display: block;
   border-radius: 0;
   box-sizing: border-box;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
 }
 
 .known-text-overlay {
@@ -280,7 +280,7 @@
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
   pointer-events: none;
   z-index: 100;
-  animation: known-text-animation 0.3s ease-out forwards;
+  animation: known-text-animation 0.2s ease-out forwards;
 }
 
 @keyframes known-text-animation {
@@ -309,7 +309,7 @@
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
   pointer-events: none;
   z-index: 100;
-  animation: unknown-text-animation 0.3s ease-out forwards;
+  animation: unknown-text-animation 0.2s ease-out forwards;
 }
 
 @keyframes unknown-text-animation {
@@ -328,11 +328,11 @@
 }
 
 .animate-image-known {
-  animation: image-pulse-known 0.6s ease-out;
+  animation: image-pulse-known 0.4s ease-out;
 }
 
 .animate-image-unknown {
-  animation: image-pulse-unknown 0.6s ease-out;
+  animation: image-pulse-unknown 0.4s ease-out;
 }
 
 @keyframes image-pulse-known {
@@ -429,7 +429,7 @@
   margin-bottom: 0.75rem;
   box-sizing: border-box;
   flex-shrink: 0;
-  transition: transform 0.3s ease-out, opacity 0.3s ease-out;
+  transition: transform 0.2s ease-out, opacity 0.2s ease-out;
   touch-action: pan-y pan-x; /* Allow both vertical and horizontal panning */
   position: relative;
 }
@@ -458,7 +458,7 @@
   position: relative;
   width: 100%;
   height: 100%;
-  transition: transform 0.6s;
+  transition: transform 0.4s;
   transform-style: preserve-3d;
 }
 
@@ -598,7 +598,7 @@
 }
 
 .audio-btn-inline:active {
-  animation: sound-wave 0.5s ease-out;
+  animation: sound-wave 0.3s ease-out;
 }
 
 @keyframes sound-wave {
@@ -664,7 +664,7 @@
 }
 
 .nav-btn:active:not(:disabled) {
-  animation: button-press 0.3s ease-out;
+  animation: button-press 0.2s ease-out;
 }
 
 @keyframes button-press {
@@ -681,19 +681,19 @@
 
 /* Animation classes for keyboard triggers */
 .animate-press {
-  animation: button-press 0.3s ease-out;
+  animation: button-press 0.2s ease-out;
 }
 
 .animate-pulse-status {
-  animation: pulse-known 0.6s ease-out;
+  animation: pulse-known 0.4s ease-out;
 }
 
 .status-unknown.animate-pulse-status {
-  animation: pulse-unknown 0.6s ease-out;
+  animation: pulse-unknown 0.4s ease-out;
 }
 
 .animate-sound-wave {
-  animation: sound-wave 0.5s ease-out;
+  animation: sound-wave 0.3s ease-out;
 }
 
 .nav-btn:disabled {
@@ -833,7 +833,7 @@
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.5);
   transform: translate(-50%, -50%);
-  transition: width 0.6s, height 0.6s;
+  transition: width 0.4s, height 0.4s;
 }
 
 .status-btn:active::before {
@@ -853,7 +853,7 @@
 }
 
 .status-btn.status-unknown:active {
-  animation: pulse-unknown 0.6s ease-out;
+  animation: pulse-unknown 0.4s ease-out;
 }
 
 .status-btn.status-known {
@@ -868,7 +868,7 @@
 }
 
 .status-btn.status-known:active {
-  animation: pulse-known 0.6s ease-out;
+  animation: pulse-known 0.4s ease-out;
 }
 
 @keyframes pulse-known {
@@ -1875,7 +1875,7 @@
   border-radius: 16px;
   padding: 1.5rem;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-  animation: fadeIn 0.5s ease-in;
+  animation: fadeIn 0.3s ease-in;
 }
 
 @keyframes fadeIn {
@@ -2062,7 +2062,7 @@
 .metric-fill {
   height: 100%;
   border-radius: 6px;
-  transition: width 0.5s ease;
+  transition: width 0.3s ease;
 }
 
 /* Mobile styles for speech evaluation */
