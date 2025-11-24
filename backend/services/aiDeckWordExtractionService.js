@@ -758,6 +758,9 @@ async function processFileAndExtractWords(filePath, fileName, logs = []) {
 /**
  * Extract YouTube transcript using Python script (3rd party tool)
  * This function calls the Python script and reads the transcript file
+ * 
+ * IMPORTANT: The script prioritizes the ORIGINAL LANGUAGE of the video
+ * (not English). It will extract subtitles in the video's original language.
  */
 async function extractYouTubeTranscriptWithPython(videoUrl, logs = []) {
   try {
@@ -845,12 +848,25 @@ async function extractYouTubeTranscriptWithPython(videoUrl, logs = []) {
       logs.push(`⚠️ Python script stderr: ${stderr.trim()}`);
     }
     
+    // Extract language from Python script output
+    let detectedLanguage = 'unknown';
+    if (stdout && stdout.includes('language:')) {
+      const languageMatch = stdout.match(/language:\s*(\w+)/i);
+      if (languageMatch) {
+        detectedLanguage = languageMatch[1];
+        logs.push(`🌐 Detected transcript language: ${detectedLanguage} (original language prioritized)`);
+      }
+    }
+    
     // Read transcript file
     let transcript = '';
     try {
       transcript = await fs.readFile(outputFile, 'utf-8');
       logs.push(`✅ Transcript file read successfully`);
       logs.push(`📊 Transcript length: ${transcript.length} characters`);
+      if (detectedLanguage !== 'unknown') {
+        logs.push(`🌐 Language: ${detectedLanguage}`);
+      }
       
       // Clean up the transcript file after reading
       try {

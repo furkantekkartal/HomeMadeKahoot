@@ -98,6 +98,13 @@ async function extractTextFromSRT(filePath) {
 
 /**
  * Extract YouTube video transcript and metadata
+ * 
+ * Uses Python script with youtube-transcript-api library (NOT Firecrawl).
+ * This directly accesses YouTube's transcript API, which is more reliable
+ * than web scraping for YouTube videos.
+ * 
+ * IMPORTANT: Extracts transcript in the ORIGINAL LANGUAGE of the video
+ * (prioritizes original language over English translations).
  */
 async function extractYouTubeTranscript(videoUrl) {
   try {
@@ -448,6 +455,12 @@ async function processFileAndGenerateQuiz(filePath, sourceType, logs = []) {
 
 /**
  * Process YouTube URL and generate complete quiz (matches create-deck flow)
+ * 
+ * IMPORTANT: This function does NOT use Firecrawl for YouTube videos.
+ * Instead, it:
+ * 1. Extracts subtitles/transcript using Python script (youtube-transcript-api)
+ * 2. Converts transcript to markdown format manually
+ * 3. Proceeds with the same flow as other content types (webpages, files, etc.)
  */
 async function processYouTubeAndGenerateQuiz(videoUrl, logs = []) {
   try {
@@ -455,15 +468,15 @@ async function processYouTubeAndGenerateQuiz(videoUrl, logs = []) {
     addLog(logs, `📁 Step 1: URL taken | youtube`);
     addLog(logs, `✅ Step 1 Completed! URL taken: ${videoUrl}`, true);
     
-    // Step 2: Extract YouTube transcript
+    // Step 2: Extract YouTube transcript (using Python script, NOT Firecrawl)
     addLog(logs, `🔄 Step 2: Extracting content`);
-    addLog(logs, `⏳ Extracting YouTube transcript...`, true);
+    addLog(logs, `⏳ Extracting YouTube transcript using Python script (youtube-transcript-api)...`, true);
     const transcriptStartTime = Date.now();
     const videoData = await extractYouTubeTranscript(videoUrl);
     const transcriptTime = ((Date.now() - transcriptStartTime) / 1000).toFixed(2);
     addLog(logs, `✅ Step 2 Completed! Extracted YouTube video content (${transcriptTime}s)`, true);
     
-    // Step 3: Convert to Markdown
+    // Step 3: Convert transcript to Markdown (manual conversion, NOT Firecrawl)
     addLog(logs, `🔄 Step 3: Converting to md`);
     const markdownContent = `# ${videoData.title || 'YouTube Video'}\n\n${videoData.description || ''}\n\n${videoData.transcript}`;
     
@@ -556,16 +569,20 @@ async function processYouTubeAndGenerateQuiz(videoUrl, logs = []) {
 
 /**
  * Process webpage URL and generate complete quiz (matches create-deck flow)
+ * 
+ * IMPORTANT: YouTube URLs are detected and redirected to processYouTubeAndGenerateQuiz,
+ * which uses Python script to extract subtitles (NOT Firecrawl).
+ * Firecrawl is ONLY used for regular webpages, not YouTube videos.
  */
 async function processWebpageAndGenerateQuiz(webpageUrl, logs = []) {
   try {
-    // Safety check: Detect YouTube URLs and redirect to YouTube handler
+    // Safety check: Detect YouTube URLs and redirect to YouTube handler (which does NOT use Firecrawl)
     const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+/;
     const isYouTube = youtubeRegex.test(webpageUrl.trim());
     
     if (isYouTube) {
-      addLog(logs, `⚠️ YouTube URL detected in webpage handler. Redirecting to YouTube processor...`, true);
-      // Redirect to YouTube processing function
+      addLog(logs, `⚠️ YouTube URL detected in webpage handler. Redirecting to YouTube processor (uses Python script, NOT Firecrawl)...`, true);
+      // Redirect to YouTube processing function (which extracts subtitles via Python, not Firecrawl)
       return await processYouTubeAndGenerateQuiz(webpageUrl.trim(), logs);
     }
     
