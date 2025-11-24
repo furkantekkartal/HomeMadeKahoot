@@ -559,6 +559,16 @@ async function processYouTubeAndGenerateQuiz(videoUrl, logs = []) {
  */
 async function processWebpageAndGenerateQuiz(webpageUrl, logs = []) {
   try {
+    // Safety check: Detect YouTube URLs and redirect to YouTube handler
+    const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+/;
+    const isYouTube = youtubeRegex.test(webpageUrl.trim());
+    
+    if (isYouTube) {
+      addLog(logs, `⚠️ YouTube URL detected in webpage handler. Redirecting to YouTube processor...`, true);
+      // Redirect to YouTube processing function
+      return await processYouTubeAndGenerateQuiz(webpageUrl.trim(), logs);
+    }
+    
     // Step 1: URL taken
     addLog(logs, `📁 Step 1: URL taken | webpage`);
     addLog(logs, `✅ Step 1 Completed! URL taken: ${webpageUrl}`, true);
@@ -574,21 +584,54 @@ async function processWebpageAndGenerateQuiz(webpageUrl, logs = []) {
     }
 
     const firecrawlStartTime = Date.now();
-    const response = await axios.post(
-      'https://api.firecrawl.dev/v0/scrape',
-      {
-        url: webpageUrl.trim(),
-        formats: ['markdown'],
-        onlyMainContent: true
-      },
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${FIRECRAWL_API_KEY}`
+    let response;
+    try {
+      response = await axios.post(
+        'https://api.firecrawl.dev/v0/scrape',
+        {
+          url: webpageUrl.trim(),
+          formats: ['markdown'],
+          onlyMainContent: true
         },
-        timeout: 60000
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${FIRECRAWL_API_KEY}`
+          },
+          timeout: 60000
+        }
+      );
+    } catch (firecrawlError) {
+      // Handle Firecrawl API errors with helpful messages
+      if (firecrawlError.response) {
+        const status = firecrawlError.response.status;
+        const statusText = firecrawlError.response.statusText;
+        const errorData = firecrawlError.response.data;
+        
+        if (status === 500) {
+          addLog(logs, `❌ Firecrawl API returned 500 error (Internal Server Error)`, true);
+          throw new Error(
+            `Firecrawl API error (500): The scraping service encountered an internal error. ` +
+            `This may happen if the webpage is too complex, requires authentication, or the service is temporarily unavailable. ` +
+            `Error details: ${errorData?.error || statusText || 'Unknown error'}`
+          );
+        } else if (status === 401) {
+          throw new Error('Firecrawl API authentication failed. Please check your API key.');
+        } else if (status === 429) {
+          throw new Error('Firecrawl API rate limit exceeded. Please try again later.');
+        } else if (status === 400) {
+          throw new Error(`Firecrawl API error (400): Invalid request. ${errorData?.error || statusText || ''}`);
+        } else {
+          throw new Error(`Firecrawl API error (${status}): ${errorData?.error || statusText || 'Unknown error'}`);
+        }
+      } else if (firecrawlError.request) {
+        // Request was made but no response received
+        throw new Error('Firecrawl API request timeout or network error. Please check your internet connection and try again.');
+      } else {
+        // Error setting up the request
+        throw new Error(`Failed to call Firecrawl API: ${firecrawlError.message}`);
       }
-    );
+    }
     const firecrawlTime = ((Date.now() - firecrawlStartTime) / 1000).toFixed(2);
     addLog(logs, `✅ Firecrawl API responded in ${firecrawlTime}s`, true);
 
