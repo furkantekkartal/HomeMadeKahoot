@@ -20,7 +20,6 @@ import LoggedInJoinQuiz from './pages/JoinQuiz';
 import LoggedInPlayQuiz from './pages/PlayQuiz';
 
 // Logged-in only pages
-import Quiz from './pages/Quiz';
 import CreateQuiz from './pages/CreateQuiz';
 import EditQuiz from './pages/EditQuiz';
 import HostQuiz from './pages/HostQuiz';
