@@ -39,6 +39,15 @@ const Spelling = () => {
   const [generatingImage, setGeneratingImage] = useState(false);
   const [showResults, setShowResults] = useState(false);
   
+  // Image management state
+  const [imageHistory, setImageHistory] = useState({});
+  const [customQueries, setCustomQueries] = useState({});
+  const [imageService, setImageService] = useState(() => {
+    const saved = localStorage.getItem('imageService');
+    return saved || 'google';
+  });
+  const [generatingImages, setGeneratingImages] = useState({});
+  
   // Animation state for keyboard triggers
   const [animations, setAnimations] = useState({
     known: false,
@@ -162,6 +171,27 @@ const Spelling = () => {
     setWritingPaneOpacity(1);
     setWritingPaneScale(1);
   }, [currentIndex]);
+
+  // Initialize image history when cards are loaded
+  useEffect(() => {
+    if (cards.length > 0) {
+      setImageHistory(prev => {
+        const newHistory = { ...prev };
+        cards.forEach(card => {
+          if (card._id && card.imageUrl) {
+            const existing = newHistory[card._id];
+            if (!existing || !existing.history.includes(card.imageUrl)) {
+              newHistory[card._id] = {
+                history: [card.imageUrl],
+                currentIndex: 0
+              };
+            }
+          }
+        });
+        return newHistory;
+      });
+    }
+  }, [cards]);
 
   // Auto-read English word when new card appears
   useEffect(() => {
@@ -747,23 +777,100 @@ const Spelling = () => {
     }, CONSTANTS.SWIPE_RESET_DELAY);
   };
 
-  const handleGenerateImage = async (wordId) => {
+  // Helper function to check if a string is a URL
+  const isImageUrl = (str) => {
+    if (!str || typeof str !== 'string') return false;
+    const trimmed = str.trim();
+    return trimmed.startsWith('http://') || trimmed.startsWith('https://');
+  };
+
+  const handleGenerateImage = async (wordId, customQuery = null) => {
     if (!wordId) return;
     
+    setGeneratingImages(prev => ({ ...prev, [wordId]: true }));
+    
     try {
-      setGeneratingImage(true);
-      const response = await wordAPI.generateWordImage(wordId);
+      const customKeyword = customQuery !== null 
+        ? customQuery.trim() 
+        : (customQueries[wordId]?.trim() || '');
       
-      // Update the current card with the new image URL
-      setCards(cards.map(c => 
-        c._id === wordId ? { ...c, imageUrl: response.data.imageUrl } : c
-      ));
+      // Check if the customKeyword is a direct image URL
+      if (customKeyword && isImageUrl(customKeyword)) {
+        const imageUrl = customKeyword.trim();
+        
+        setImageHistory(prev => {
+          const currentHistory = prev[wordId] || { history: [], currentIndex: -1 };
+          const newHistory = [...currentHistory.history, imageUrl];
+          const newCurrentIndex = newHistory.length - 1;
+          return {
+            ...prev,
+            [wordId]: { history: newHistory, currentIndex: newCurrentIndex }
+          };
+        });
+        
+        // Update the current card with the new image URL
+        setCards(prevCards => prevCards.map(c => 
+          c._id === wordId ? { ...c, imageUrl } : c
+        ));
+      } else {
+        const response = await wordAPI.generateWordImage(wordId, customKeyword, imageService);
+        const newImageUrl = response.data.imageUrl;
+        
+        setImageHistory(prev => {
+          const currentHistory = prev[wordId] || { history: [], currentIndex: -1 };
+          const newHistory = [...currentHistory.history, newImageUrl];
+          const newCurrentIndex = newHistory.length - 1;
+          return {
+            ...prev,
+            [wordId]: { history: newHistory, currentIndex: newCurrentIndex }
+          };
+        });
+        
+        // Update the current card with the new image URL
+        setCards(prevCards => prevCards.map(c => 
+          c._id === wordId ? { ...c, imageUrl: newImageUrl } : c
+        ));
+      }
     } catch (error) {
       console.error('Failed to generate image:', error);
       alert('Failed to generate image: ' + (error.response?.data?.message || error.message));
     } finally {
-      setGeneratingImage(false);
+      setGeneratingImages(prev => ({ ...prev, [wordId]: false }));
     }
+  };
+
+  const navigateImage = (wordId, direction) => {
+    setImageHistory(prev => {
+      const currentHistory = prev[wordId];
+      if (!currentHistory || currentHistory.history.length === 0) return prev;
+      
+      const { history, currentIndex } = currentHistory;
+      let newIndex = currentIndex;
+      
+      if (direction === 'prev' && currentIndex > 0) {
+        newIndex = currentIndex - 1;
+      } else if (direction === 'next' && currentIndex < history.length - 1) {
+        newIndex = currentIndex + 1;
+      } else {
+        return prev;
+      }
+      
+      const newImageUrl = history[newIndex];
+      // Update the current card with the new image URL
+      setCards(prevCards => prevCards.map(c => 
+        c._id === wordId ? { ...c, imageUrl: newImageUrl } : c
+      ));
+      
+      return {
+        ...prev,
+        [wordId]: { history, currentIndex: newIndex }
+      };
+    });
+  };
+
+  const handleImageServiceChange = (service) => {
+    setImageService(service);
+    localStorage.setItem('imageService', service);
   };
 
 
@@ -926,19 +1033,221 @@ const Spelling = () => {
 
               {/* Image - Separate from writing pane */}
               {currentCard && (
-                <div className="spelling-image-container">
-                  <img
-                    src={currentCard.imageUrl || CONSTANTS.DEFAULT_IMAGE_URL}
-                    alt={currentCard.englishWord || 'Word image'}
-                    className={`spelling-image ${
-                      animations.known ? 'animate-image-known' : 
-                      animations.unknown ? 'animate-image-unknown' : ''
-                    }`}
-                    onError={(e) => { 
-                      e.target.src = CONSTANTS.DEFAULT_IMAGE_URL;
-                    }}
-                  />
-                </div>
+                <>
+                  <div className="spelling-image-container">
+                    <div style={{ position: 'relative', width: '100%' }}>
+                      <img
+                        src={currentCard.imageUrl || CONSTANTS.DEFAULT_IMAGE_URL}
+                        alt={currentCard.englishWord || 'Word image'}
+                        className={`spelling-image ${
+                          animations.known ? 'animate-image-known' : 
+                          animations.unknown ? 'animate-image-unknown' : ''
+                        }`}
+                        onError={(e) => { 
+                          e.target.src = CONSTANTS.DEFAULT_IMAGE_URL;
+                        }}
+                      />
+                    </div>
+                  </div>
+                  {/* Image Controls - Between image and flashcard */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '100%',
+                    marginTop: '4px',
+                    marginBottom: '0',
+                    zIndex: 100,
+                    position: 'relative'
+                  }}>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.2rem',
+                      background: 'rgba(255, 255, 255, 0.8)',
+                      padding: '0.3rem 0.4rem',
+                      borderRadius: '6px',
+                      border: '1px solid #e2e8f0',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                      flexWrap: 'nowrap',
+                      justifyContent: 'center',
+                      maxWidth: '360px',
+                      width: 'auto'
+                    }}>
+                      {/* Left Arrow - Previous Image */}
+                      {imageHistory[currentCard._id] && (() => {
+                        const history = imageHistory[currentCard._id];
+                        const canGoBack = history.currentIndex > 0;
+                        return (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigateImage(currentCard._id, 'prev');
+                            }}
+                            disabled={!canGoBack}
+                            style={{
+                              background: canGoBack ? 'rgba(255, 255, 255, 0.9)' : 'rgba(240, 240, 240, 0.9)',
+                              border: '1px solid #e2e8f0',
+                              borderRadius: '3px',
+                              padding: '0.2rem',
+                              fontSize: '0.85rem',
+                              cursor: canGoBack ? 'pointer' : 'not-allowed',
+                              opacity: canGoBack ? 1 : 0.5,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '24px',
+                              height: '24px',
+                              flexShrink: 0
+                            }}
+                            title="Previous image"
+                          >
+                            ⬅️
+                          </button>
+                        );
+                      })()}
+                      {/* Search query input */}
+                      <input
+                        type="text"
+                        placeholder="Search query or image URL..."
+                        value={customQueries[currentCard._id] || ''}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          setCustomQueries({
+                            ...customQueries,
+                            [currentCard._id]: e.target.value
+                          });
+                        }}
+                        onPaste={(e) => {
+                          e.stopPropagation();
+                          setTimeout(() => {
+                            const pastedValue = e.clipboardData.getData('text');
+                            const trimmed = pastedValue.trim();
+                            if (trimmed && (trimmed.startsWith('http://') || trimmed.startsWith('https://'))) {
+                              setCustomQueries({
+                                ...customQueries,
+                                [currentCard._id]: trimmed
+                              });
+                              handleGenerateImage(currentCard._id, trimmed);
+                            }
+                          }, 50);
+                        }}
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter') {
+                            e.stopPropagation();
+                            const query = customQueries[currentCard._id]?.trim() || null;
+                            handleGenerateImage(currentCard._id, query);
+                          }
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                          padding: '0.2rem 0.4rem',
+                          fontSize: '0.7rem',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '3px',
+                          width: '100px',
+                          minWidth: '70px',
+                          background: 'white',
+                          flexShrink: 1
+                        }}
+                        title="Enter custom search query or paste image URL"
+                      />
+                      {/* Generate Image Button */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const query = customQueries[currentCard._id]?.trim() || null;
+                          handleGenerateImage(currentCard._id, query);
+                        }}
+                        disabled={generatingImages[currentCard._id]}
+                        style={{
+                          background: generatingImages[currentCard._id] ? 'rgba(240, 240, 240, 0.9)' : 'rgba(255, 255, 255, 0.9)',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '3px',
+                          padding: '0.2rem',
+                          fontSize: '0.85rem',
+                          cursor: generatingImages[currentCard._id] ? 'not-allowed' : 'pointer',
+                          opacity: generatingImages[currentCard._id] ? 0.5 : 1,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: '24px',
+                          height: '24px',
+                          flexShrink: 0
+                        }}
+                        title={generatingImages[currentCard._id] ? 'Generating...' : 'Generate image'}
+                      >
+                        {generatingImages[currentCard._id] ? '⏳' : '🔄'}
+                      </button>
+                      {/* Right Arrow - Next Image */}
+                      {imageHistory[currentCard._id] && (() => {
+                        const history = imageHistory[currentCard._id];
+                        const canGoForward = history.currentIndex < history.history.length - 1;
+                        return (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigateImage(currentCard._id, 'next');
+                            }}
+                            disabled={!canGoForward}
+                            style={{
+                              background: canGoForward ? 'rgba(255, 255, 255, 0.9)' : 'rgba(240, 240, 240, 0.9)',
+                              border: '1px solid #e2e8f0',
+                              borderRadius: '3px',
+                              padding: '0.2rem',
+                              fontSize: '0.85rem',
+                              cursor: canGoForward ? 'pointer' : 'not-allowed',
+                              opacity: canGoForward ? 1 : 0.5,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '24px',
+                              height: '24px',
+                              flexShrink: 0
+                            }}
+                            title="Next image"
+                          >
+                            ➡️
+                          </button>
+                        );
+                      })()}
+                      {/* Image Service Selector - Right side */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', marginLeft: 'auto', flexShrink: 0 }}>
+                        <div style={{ display: 'flex', gap: '0.2rem' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.1rem', cursor: 'pointer' }}>
+                            <input
+                              type="radio"
+                              name={`imageService-${currentCard._id}`}
+                              value="google"
+                              checked={imageService === 'google'}
+                              onChange={(e) => handleImageServiceChange(e.target.value)}
+                              onClick={(e) => e.stopPropagation()}
+                              style={{ cursor: 'pointer' }}
+                              title="Image service provider: google"
+                            />
+                            <span style={{ fontSize: '0.65rem' }} title="Image service provider: google">G</span>
+                          </label>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.1rem', cursor: 'pointer' }}>
+                            <input
+                              type="radio"
+                              name={`imageService-${currentCard._id}`}
+                              value="unsplash"
+                              checked={imageService === 'unsplash'}
+                              onChange={(e) => handleImageServiceChange(e.target.value)}
+                              onClick={(e) => e.stopPropagation()}
+                              style={{ cursor: 'pointer' }}
+                              title="Image service provider: unsplash"
+                            />
+                            <span style={{ fontSize: '0.65rem' }} title="Image service provider: unsplash">U</span>
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </>
               )}
 
               {/* Writing Pane Container */}
@@ -1023,14 +1332,6 @@ const Spelling = () => {
                   title="Random"
                 >
                   🎲
-                </button>
-                <button 
-                  onClick={() => handleGenerateImage(currentCard?._id)} 
-                  className="nav-btn nav-btn-emoji"
-                  disabled={generatingImage}
-                  title="Generate new image"
-                >
-                  {generatingImage ? '⏳' : '🖼️'}
                 </button>
                 <button 
                   onClick={nextCard} 
