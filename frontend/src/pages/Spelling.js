@@ -1161,8 +1161,10 @@ const Spelling = () => {
                       boxShadow: '0 2px 8px rgba(102, 126, 234, 0.2)',
                       flexWrap: 'nowrap',
                       justifyContent: 'center',
-                      maxWidth: '378px',
-                      width: 'auto'
+                      maxWidth: '416px',
+                      width: 'auto',
+                      height: '45px',
+                      boxSizing: 'border-box'
                     }}>
                       {/* Left Arrow - Previous Image */}
                       {imageHistory[currentCard._id] && (() => {
