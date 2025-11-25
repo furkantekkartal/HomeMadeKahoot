@@ -97,8 +97,9 @@ const cloneUsers = async (prodConn, devConn) => {
         // Remove _id to let MongoDB generate a new one
         const { _id, ...userData } = user;
         
-        // Create new user in dev (password hash is already in the user object)
-        await DevUser.create(userData);
+        // IMPORTANT: Use insertOne directly on the collection to bypass Mongoose hooks
+        // This prevents the password from being re-hashed (it's already hashed from production)
+        await DevUser.collection.insertOne(userData);
         cloned++;
         console.log(`   ✓ Cloned user: ${user.username}`);
       } catch (error) {

@@ -60,14 +60,20 @@ exports.register = async (req, res) => {
 // Login user
 exports.login = async (req, res) => {
   try {
-    const { username, password } = req.body;
+    let { username, password } = req.body;
 
     // Validate input
     if (!username || !password) {
       return res.status(400).json({ message: 'Username and password are required' });
     }
 
-    console.log(`[AUTH] Login attempt for username: ${username}`);
+    // Trim username to handle any whitespace issues
+    username = username.trim();
+
+    console.log(`[AUTH] Login attempt for username: "${username}"`);
+    console.log(`[AUTH] Username length: ${username.length}`);
+    console.log(`[AUTH] Environment: ${process.env.NODE_ENV || 'local'}`);
+    console.log(`[AUTH] Database: ${mongoose.connection.name || 'unknown'}`);
 
     // Find user (case-insensitive search)
     const user = await User.findOne({ 
@@ -75,15 +81,28 @@ exports.login = async (req, res) => {
     });
     if (!user) {
       console.log(`[AUTH] User not found: ${username}`);
+      // Try exact match for debugging
+      const exactUser = await User.findOne({ username: username });
+      if (exactUser) {
+        console.log(`[AUTH] Found user with exact match: ${exactUser.username} (case-sensitive)`);
+      }
+      // List all users for debugging
+      const allUsers = await User.find({}).select('username').limit(10);
+      console.log(`[AUTH] Available users in database: ${allUsers.map(u => u.username).join(', ')}`);
       return res.status(401).json({ message: 'Invalid username or password' });
     }
 
-    console.log(`[AUTH] User found: ${username}, checking password...`);
+    console.log(`[AUTH] User found: ${user.username} (ID: ${user._id})`);
+    console.log(`[AUTH] Password hash exists: ${!!user.password}`);
+    console.log(`[AUTH] Password hash length: ${user.password ? user.password.length : 0}`);
+    console.log(`[AUTH] Checking password...`);
 
     // Check password
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
-      console.log(`[AUTH] Password mismatch for user: ${username}`);
+      console.log(`[AUTH] Password mismatch for user: ${user.username}`);
+      console.log(`[AUTH] Input password length: ${password.length}`);
+      console.log(`[AUTH] Stored hash: ${user.password.substring(0, 20)}...`);
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
