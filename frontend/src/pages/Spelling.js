@@ -33,6 +33,7 @@ const Spelling = () => {
   const [userAnswer, setUserAnswer] = useState('');
   const [showAnswer, setShowAnswer] = useState(false);
   const inputRef = useRef(null);
+  const isCheckingAnswerRef = useRef(false);
 
   // Loading and UI state
   const [loading, setLoading] = useState(true);
@@ -170,6 +171,7 @@ const Spelling = () => {
     setShowAnswer(false);
     setWritingPaneOpacity(1);
     setWritingPaneScale(1);
+    isCheckingAnswerRef.current = false;
   }, [currentIndex]);
 
   // Initialize image history when cards are loaded
@@ -251,8 +253,9 @@ const Spelling = () => {
         e.preventDefault();
       }
       
-      // Don't handle keyboard events if user is typing in an input field (except Enter, 0, 1, Tab)
-      if ((e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') && e.key !== 'Enter' && !isAudioKey && !isResetKey) {
+      // Don't handle keyboard events if user is typing in an input field (except 0, 1, Tab)
+      // Note: Enter is handled by the input's own onKeyDown handler to avoid double calls
+      if ((e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') && !isAudioKey && !isResetKey) {
         return;
       }
 
@@ -279,7 +282,8 @@ const Spelling = () => {
           break;
         case 'Enter':
           e.preventDefault();
-          if (cards.length > 0 && currentIndex < cards.length && userAnswer.trim()) {
+          // Only handle Enter if not in an input field (input field handles its own Enter)
+          if (cards.length > 0 && currentIndex < cards.length && userAnswer.trim() && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
             await checkAnswer();
           }
           break;
@@ -549,7 +553,9 @@ const Spelling = () => {
 
   // Check answer and mark as correct/incorrect (without advancing)
   const checkAnswer = async () => {
-    if (!currentCard || !userAnswer.trim()) return;
+    if (!currentCard || !userAnswer.trim() || isCheckingAnswerRef.current) return;
+    
+    isCheckingAnswerRef.current = true;
 
     const normalizedUserAnswer = userAnswer.trim().toLowerCase();
     const normalizedCorrectAnswer = currentCard.englishWord.trim().toLowerCase();
@@ -563,6 +569,10 @@ const Spelling = () => {
     // Wait a bit, then mark spelling status (but don't advance)
     setTimeout(async () => {
       await updateSpellingStatus(isCorrect);
+      // Reset the flag after a delay to allow next answer
+      setTimeout(() => {
+        isCheckingAnswerRef.current = false;
+      }, 500);
     }, 200);
   };
 
@@ -1049,204 +1059,6 @@ const Spelling = () => {
                       />
                     </div>
                   </div>
-                  {/* Image Controls - Between image and flashcard */}
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    width: '100%',
-                    marginTop: '4px',
-                    marginBottom: '0',
-                    zIndex: 100,
-                    position: 'relative'
-                  }}>
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.2rem',
-                      background: 'rgba(255, 255, 255, 0.8)',
-                      padding: '0.3rem 0.4rem',
-                      borderRadius: '6px',
-                      border: '1px solid #e2e8f0',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                      flexWrap: 'nowrap',
-                      justifyContent: 'center',
-                      maxWidth: '360px',
-                      width: 'auto'
-                    }}>
-                      {/* Left Arrow - Previous Image */}
-                      {imageHistory[currentCard._id] && (() => {
-                        const history = imageHistory[currentCard._id];
-                        const canGoBack = history.currentIndex > 0;
-                        return (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              navigateImage(currentCard._id, 'prev');
-                            }}
-                            disabled={!canGoBack}
-                            style={{
-                              background: canGoBack ? 'rgba(255, 255, 255, 0.9)' : 'rgba(240, 240, 240, 0.9)',
-                              border: '1px solid #e2e8f0',
-                              borderRadius: '3px',
-                              padding: '0.2rem',
-                              fontSize: '0.85rem',
-                              cursor: canGoBack ? 'pointer' : 'not-allowed',
-                              opacity: canGoBack ? 1 : 0.5,
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              width: '24px',
-                              height: '24px',
-                              flexShrink: 0
-                            }}
-                            title="Previous image"
-                          >
-                            ⬅️
-                          </button>
-                        );
-                      })()}
-                      {/* Search query input */}
-                      <input
-                        type="text"
-                        placeholder="Search query or image URL..."
-                        value={customQueries[currentCard._id] || ''}
-                        onChange={(e) => {
-                          e.stopPropagation();
-                          setCustomQueries({
-                            ...customQueries,
-                            [currentCard._id]: e.target.value
-                          });
-                        }}
-                        onPaste={(e) => {
-                          e.stopPropagation();
-                          setTimeout(() => {
-                            const pastedValue = e.clipboardData.getData('text');
-                            const trimmed = pastedValue.trim();
-                            if (trimmed && (trimmed.startsWith('http://') || trimmed.startsWith('https://'))) {
-                              setCustomQueries({
-                                ...customQueries,
-                                [currentCard._id]: trimmed
-                              });
-                              handleGenerateImage(currentCard._id, trimmed);
-                            }
-                          }, 50);
-                        }}
-                        onKeyPress={(e) => {
-                          if (e.key === 'Enter') {
-                            e.stopPropagation();
-                            const query = customQueries[currentCard._id]?.trim() || null;
-                            handleGenerateImage(currentCard._id, query);
-                          }
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                        style={{
-                          padding: '0.2rem 0.4rem',
-                          fontSize: '0.7rem',
-                          border: '1px solid #e2e8f0',
-                          borderRadius: '3px',
-                          width: '100px',
-                          minWidth: '70px',
-                          background: 'white',
-                          flexShrink: 1
-                        }}
-                        title="Enter custom search query or paste image URL"
-                      />
-                      {/* Generate Image Button */}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const query = customQueries[currentCard._id]?.trim() || null;
-                          handleGenerateImage(currentCard._id, query);
-                        }}
-                        disabled={generatingImages[currentCard._id]}
-                        style={{
-                          background: generatingImages[currentCard._id] ? 'rgba(240, 240, 240, 0.9)' : 'rgba(255, 255, 255, 0.9)',
-                          border: '1px solid #e2e8f0',
-                          borderRadius: '3px',
-                          padding: '0.2rem',
-                          fontSize: '0.85rem',
-                          cursor: generatingImages[currentCard._id] ? 'not-allowed' : 'pointer',
-                          opacity: generatingImages[currentCard._id] ? 0.5 : 1,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          width: '24px',
-                          height: '24px',
-                          flexShrink: 0
-                        }}
-                        title={generatingImages[currentCard._id] ? 'Generating...' : 'Generate image'}
-                      >
-                        {generatingImages[currentCard._id] ? '⏳' : '🔄'}
-                      </button>
-                      {/* Right Arrow - Next Image */}
-                      {imageHistory[currentCard._id] && (() => {
-                        const history = imageHistory[currentCard._id];
-                        const canGoForward = history.currentIndex < history.history.length - 1;
-                        return (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              navigateImage(currentCard._id, 'next');
-                            }}
-                            disabled={!canGoForward}
-                            style={{
-                              background: canGoForward ? 'rgba(255, 255, 255, 0.9)' : 'rgba(240, 240, 240, 0.9)',
-                              border: '1px solid #e2e8f0',
-                              borderRadius: '3px',
-                              padding: '0.2rem',
-                              fontSize: '0.85rem',
-                              cursor: canGoForward ? 'pointer' : 'not-allowed',
-                              opacity: canGoForward ? 1 : 0.5,
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              width: '24px',
-                              height: '24px',
-                              flexShrink: 0
-                            }}
-                            title="Next image"
-                          >
-                            ➡️
-                          </button>
-                        );
-                      })()}
-                      {/* Image Service Selector - Right side */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', marginLeft: 'auto', flexShrink: 0 }}>
-                        <div style={{ display: 'flex', gap: '0.2rem' }}>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.1rem', cursor: 'pointer' }}>
-                            <input
-                              type="radio"
-                              name={`imageService-${currentCard._id}`}
-                              value="google"
-                              checked={imageService === 'google'}
-                              onChange={(e) => handleImageServiceChange(e.target.value)}
-                              onClick={(e) => e.stopPropagation()}
-                              style={{ cursor: 'pointer' }}
-                              title="Image service provider: google"
-                            />
-                            <span style={{ fontSize: '0.65rem' }} title="Image service provider: google">G</span>
-                          </label>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.1rem', cursor: 'pointer' }}>
-                            <input
-                              type="radio"
-                              name={`imageService-${currentCard._id}`}
-                              value="unsplash"
-                              checked={imageService === 'unsplash'}
-                              onChange={(e) => handleImageServiceChange(e.target.value)}
-                              onClick={(e) => e.stopPropagation()}
-                              style={{ cursor: 'pointer' }}
-                              title="Image service provider: unsplash"
-                            />
-                            <span style={{ fontSize: '0.65rem' }} title="Image service provider: unsplash">U</span>
-                          </label>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
                 </>
               )}
 
@@ -1326,13 +1138,206 @@ const Spelling = () => {
                 >
                   ⬅️
                 </button>
-                <button 
-                  onClick={randomCard} 
-                  className={`nav-btn nav-btn-emoji ${animations.navRandom ? 'animate-press' : ''}`} 
-                  title="Random"
-                >
-                  🎲
-                </button>
+                {/* Image Controls Container - Between navigation arrows */}
+                {currentCard && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: 'auto',
+                    marginTop: '0',
+                    marginBottom: '0',
+                    zIndex: 100,
+                    position: 'relative'
+                  }}>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.21rem',
+                      background: 'linear-gradient(135deg, rgba(224, 231, 255, 0.95) 0%, rgba(221, 214, 254, 0.95) 100%)',
+                      padding: '0.315rem 0.42rem',
+                      borderRadius: '6.3px',
+                      border: '1px solid rgba(199, 210, 254, 0.6)',
+                      boxShadow: '0 2px 8px rgba(102, 126, 234, 0.2)',
+                      flexWrap: 'nowrap',
+                      justifyContent: 'center',
+                      maxWidth: '378px',
+                      width: 'auto'
+                    }}>
+                      {/* Left Arrow - Previous Image */}
+                      {imageHistory[currentCard._id] && (() => {
+                        const history = imageHistory[currentCard._id];
+                        const canGoBack = history.currentIndex > 0;
+                        return (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigateImage(currentCard._id, 'prev');
+                            }}
+                            disabled={!canGoBack}
+                            style={{
+                              background: canGoBack ? 'rgba(255, 255, 255, 0.95)' : 'rgba(199, 210, 254, 0.5)',
+                              border: '1px solid rgba(199, 210, 254, 0.8)',
+                              borderRadius: '3.15px',
+                              padding: '0.21rem',
+                              fontSize: '0.8925rem',
+                              cursor: canGoBack ? 'pointer' : 'not-allowed',
+                              opacity: canGoBack ? 1 : 0.5,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '25.2px',
+                              height: '25.2px',
+                              flexShrink: 0
+                            }}
+                            title="Previous image"
+                          >
+                            ⬅️
+                          </button>
+                        );
+                      })()}
+                      {/* Search query input */}
+                      <input
+                        type="text"
+                        placeholder="Search query or image URL..."
+                        value={customQueries[currentCard._id] || ''}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          setCustomQueries({
+                            ...customQueries,
+                            [currentCard._id]: e.target.value
+                          });
+                        }}
+                        onPaste={(e) => {
+                          e.stopPropagation();
+                          setTimeout(() => {
+                            const pastedValue = e.clipboardData.getData('text');
+                            const trimmed = pastedValue.trim();
+                            if (trimmed && (trimmed.startsWith('http://') || trimmed.startsWith('https://'))) {
+                              setCustomQueries({
+                                ...customQueries,
+                                [currentCard._id]: trimmed
+                              });
+                              handleGenerateImage(currentCard._id, trimmed);
+                            }
+                          }, 50);
+                        }}
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter') {
+                            e.stopPropagation();
+                            const query = customQueries[currentCard._id]?.trim() || null;
+                            handleGenerateImage(currentCard._id, query);
+                          }
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                          padding: '0.21rem 0.42rem',
+                          fontSize: '0.735rem',
+                          border: '1px solid rgba(199, 210, 254, 0.6)',
+                          borderRadius: '3.15px',
+                          width: '105px',
+                          minWidth: '73.5px',
+                          background: 'rgba(255, 255, 255, 0.95)',
+                          flexShrink: 1
+                        }}
+                        title="Enter custom search query or paste image URL"
+                      />
+                      {/* Generate Image Button */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const query = customQueries[currentCard._id]?.trim() || null;
+                          handleGenerateImage(currentCard._id, query);
+                        }}
+                        disabled={generatingImages[currentCard._id]}
+                        style={{
+                          background: generatingImages[currentCard._id] ? 'rgba(199, 210, 254, 0.5)' : 'rgba(255, 255, 255, 0.95)',
+                          border: '1px solid rgba(199, 210, 254, 0.8)',
+                          borderRadius: '3.15px',
+                          padding: '0.21rem',
+                          fontSize: '0.8925rem',
+                          cursor: generatingImages[currentCard._id] ? 'not-allowed' : 'pointer',
+                          opacity: generatingImages[currentCard._id] ? 0.5 : 1,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: '25.2px',
+                          height: '25.2px',
+                          flexShrink: 0
+                        }}
+                        title={generatingImages[currentCard._id] ? 'Generating...' : 'Generate image'}
+                      >
+                        {generatingImages[currentCard._id] ? '⏳' : '🔄'}
+                      </button>
+                      {/* Right Arrow - Next Image */}
+                      {imageHistory[currentCard._id] && (() => {
+                        const history = imageHistory[currentCard._id];
+                        const canGoForward = history.currentIndex < history.history.length - 1;
+                        return (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigateImage(currentCard._id, 'next');
+                            }}
+                            disabled={!canGoForward}
+                            style={{
+                              background: canGoForward ? 'rgba(255, 255, 255, 0.95)' : 'rgba(199, 210, 254, 0.5)',
+                              border: '1px solid rgba(199, 210, 254, 0.8)',
+                              borderRadius: '3.15px',
+                              padding: '0.21rem',
+                              fontSize: '0.8925rem',
+                              cursor: canGoForward ? 'pointer' : 'not-allowed',
+                              opacity: canGoForward ? 1 : 0.5,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '25.2px',
+                              height: '25.2px',
+                              flexShrink: 0
+                            }}
+                            title="Next image"
+                          >
+                            ➡️
+                          </button>
+                        );
+                      })()}
+                      {/* Image Service Selector - Right side */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.21rem', marginLeft: 'auto', flexShrink: 0 }}>
+                        <div style={{ display: 'flex', gap: '0.21rem' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.105rem', cursor: 'pointer' }}>
+                            <input
+                              type="radio"
+                              name={`imageService-${currentCard._id}`}
+                              value="google"
+                              checked={imageService === 'google'}
+                              onChange={(e) => handleImageServiceChange(e.target.value)}
+                              onClick={(e) => e.stopPropagation()}
+                              style={{ cursor: 'pointer' }}
+                              title="Image service provider: google"
+                            />
+                            <span style={{ fontSize: '0.6825rem' }} title="Image service provider: google">G</span>
+                          </label>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.105rem', cursor: 'pointer' }}>
+                            <input
+                              type="radio"
+                              name={`imageService-${currentCard._id}`}
+                              value="unsplash"
+                              checked={imageService === 'unsplash'}
+                              onChange={(e) => handleImageServiceChange(e.target.value)}
+                              onClick={(e) => e.stopPropagation()}
+                              style={{ cursor: 'pointer' }}
+                              title="Image service provider: unsplash"
+                            />
+                            <span style={{ fontSize: '0.6825rem' }} title="Image service provider: unsplash">U</span>
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <button 
                   onClick={nextCard} 
                   className={`nav-btn nav-btn-emoji ${animations.navNext ? 'animate-press' : ''}`} 
