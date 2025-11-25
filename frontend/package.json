@@ -16,11 +16,11 @@
     "socket.io-client": "^4.6.1"
   },
   "scripts": {
-    "start": "react-scripts start",
+    "start": "node scripts/setupCloudflareEnv.js && env-cmd -f .env.cloudflare.tmp react-scripts start",
     "start:local": "cross-env NODE_ENV=local node scripts/setupCloudflareEnv.js && env-cmd -f .env.cloudflare.tmp cross-env PORT=3010 ESLINT_NO_DEV_ERRORS=true react-scripts start",
     "start:dev": "cross-env NODE_ENV=development node scripts/setupCloudflareEnv.js && cross-env NODE_ENV=development env-cmd -f .env.cloudflare.tmp cross-env PORT=3020 ESLINT_NO_DEV_ERRORS=true react-scripts start",
     "start:prod": "cross-env NODE_ENV=production node scripts/setupCloudflareEnv.js && cross-env NODE_ENV=production env-cmd -f .env.cloudflare.tmp cross-env PORT=3030 ESLINT_NO_DEV_ERRORS=true react-scripts start",
-    "build": "react-scripts build",
+    "build": "node scripts/setupCloudflareEnv.js && env-cmd -f .env.cloudflare.tmp react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },

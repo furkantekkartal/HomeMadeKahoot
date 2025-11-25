@@ -13,10 +13,14 @@ function setupCloudflareEnv() {
   
   // Local environment doesn't use Cloudflare - use localhost
   if (env === 'local') {
+    // Check if environment variables are set (for flexibility)
+    const apiUrlFromEnv = process.env.REACT_APP_API_URL;
+    const socketUrlFromEnv = process.env.REACT_APP_SOCKET_URL;
+    
     const localEnv = {
-      REACT_APP_API_URL: 'http://localhost:5010/api',
-      REACT_APP_SOCKET_URL: 'http://localhost:5010',
-      PORT: '3010'
+      REACT_APP_API_URL: apiUrlFromEnv || 'http://localhost:5010/api',
+      REACT_APP_SOCKET_URL: socketUrlFromEnv || 'http://localhost:5010',
+      PORT: process.env.PORT || '3010'
     };
     writeEnvFile(localEnv);
     return;
@@ -26,7 +30,29 @@ function setupCloudflareEnv() {
   const cloudflareEnvPath = path.join(__dirname, '..', '..', '.env.cloudflare');
   
   if (!fs.existsSync(cloudflareEnvPath)) {
-    console.warn('⚠️  .env.cloudflare file not found. Using localhost URLs.');
+    console.warn('⚠️  .env.cloudflare file not found.');
+    
+    // Check if we have environment variables set (for Render/production deployment)
+    const apiUrlFromEnv = process.env.REACT_APP_API_URL;
+    const socketUrlFromEnv = process.env.REACT_APP_SOCKET_URL;
+    
+    if (apiUrlFromEnv || socketUrlFromEnv) {
+      // Use environment variables (like master branch) - for Render deployment
+      console.log(`✅ Using environment variables (Render/production mode):`);
+      console.log(`   API URL: ${apiUrlFromEnv || 'not set'}`);
+      console.log(`   Socket URL: ${socketUrlFromEnv || 'not set'}`);
+      
+      const renderEnv = {
+        REACT_APP_API_URL: apiUrlFromEnv || 'http://localhost:5000/api',
+        REACT_APP_SOCKET_URL: socketUrlFromEnv || 'http://localhost:5000',
+        PORT: process.env.PORT || (env === 'development' ? '3020' : '3030')
+      };
+      writeEnvFile(renderEnv);
+      return;
+    }
+    
+    // Fallback to localhost for local development
+    console.warn('   Using localhost URLs as fallback.');
     const defaultEnv = env === 'development' 
       ? { REACT_APP_API_URL: 'http://localhost:5020/api', REACT_APP_SOCKET_URL: 'http://localhost:5020', PORT: '3020' }
       : { REACT_APP_API_URL: 'http://localhost:5030/api', REACT_APP_SOCKET_URL: 'http://localhost:5030', PORT: '3030' };
@@ -64,6 +90,27 @@ function setupCloudflareEnv() {
   
   if (!backendUrl || !frontendUrl) {
     console.warn(`⚠️  Cloudflare URLs not found for ${env} environment in .env.cloudflare`);
+    
+    // Check if we have environment variables set (for Render/production deployment)
+    const apiUrlFromEnv = process.env.REACT_APP_API_URL;
+    const socketUrlFromEnv = process.env.REACT_APP_SOCKET_URL;
+    
+    if (apiUrlFromEnv || socketUrlFromEnv) {
+      // Use environment variables (like master branch) - for Render deployment
+      console.log(`✅ Using environment variables (Render/production mode):`);
+      console.log(`   API URL: ${apiUrlFromEnv || 'not set'}`);
+      console.log(`   Socket URL: ${socketUrlFromEnv || 'not set'}`);
+      
+      const renderEnv = {
+        REACT_APP_API_URL: apiUrlFromEnv || 'http://localhost:5000/api',
+        REACT_APP_SOCKET_URL: socketUrlFromEnv || 'http://localhost:5000',
+        PORT: process.env.PORT || (env === 'development' ? '3020' : '3030')
+      };
+      writeEnvFile(renderEnv);
+      return;
+    }
+    
+    // Fallback to localhost for local development
     console.warn(`   Using localhost URLs as fallback`);
     const fallbackEnv = env === 'development'
       ? { REACT_APP_API_URL: 'http://localhost:5020/api', REACT_APP_SOCKET_URL: 'http://localhost:5020', PORT: '3020' }

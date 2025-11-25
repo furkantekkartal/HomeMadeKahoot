@@ -67,10 +67,17 @@ No manual steps needed! Just run one script and everything is set up.
 
 ## 🔧 Cloudflare URL Management
 
-All Cloudflare URLs are managed in **one file**: `.env.cloudflare` at the project root.
+The application supports **two modes**:
 
-### `.env.cloudflare` File Format
+### Mode 1: Cloudflare Tunnels (Local Development with Public URLs)
 
+When `.env.cloudflare` file exists with valid URLs, the app uses Cloudflare tunnels for public access.
+
+**Setup:**
+1. Run `Run_All.ps1` - it automatically sets up Cloudflare tunnels
+2. URLs are saved to `.env.cloudflare` at the project root
+
+**`.env.cloudflare` File Format:**
 ```env
 # Development Environment
 development_Backend=https://your-dev-backend-url.trycloudflare.com
@@ -81,12 +88,27 @@ production_Backend=https://your-prod-backend-url.trycloudflare.com
 production_frontend=https://your-prod-frontend-url.trycloudflare.com
 ```
 
+### Mode 2: Environment Variables (Render/Production Deployment)
+
+When `.env.cloudflare` doesn't exist or URLs are missing, the app falls back to using environment variables (like master branch).
+
+**For Render Deployment:**
+- Set `REACT_APP_API_URL` and `REACT_APP_SOCKET_URL` in Render environment variables
+- Set `FRONTEND_URL` in backend environment variables
+- The app will automatically use these instead of Cloudflare URLs
+
+**Fallback Priority:**
+1. Cloudflare URLs (if `.env.cloudflare` exists and has valid URLs)
+2. Environment variables (`REACT_APP_API_URL`, `REACT_APP_SOCKET_URL`, `FRONTEND_URL`)
+3. Localhost defaults (for local development)
+
 ### Important Notes
 
 - **Just run `Run_All.ps1`** - it handles everything automatically!
 - The script starts all environments, sets up tunnels, and restarts with Cloudflare URLs
 - Local environment doesn't need Cloudflare (uses localhost)
 - All processes are tracked and can be stopped with Ctrl+C
+- **Render deployments work automatically** - no Cloudflare needed, just set environment variables
 
 ### After Restarting Your Computer
 

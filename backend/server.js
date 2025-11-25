@@ -59,19 +59,24 @@ const cloudflareConfig = getCloudflareConfig();
 // Determine frontend URL based on environment
 let frontendUrl;
 if (cloudflareConfig && cloudflareConfig.frontend) {
-  // Use Cloudflare URL for development/production
+  // Use Cloudflare URL for development/production (when available)
   frontendUrl = cloudflareConfig.frontend;
 } else {
-  // Use localhost for local environment or fallback
-  const env = process.env.NODE_ENV || 'local';
-  if (env === 'local') {
-    frontendUrl = 'http://localhost:3010';
-  } else if (env === 'development') {
-    frontendUrl = 'http://localhost:3020';
-  } else if (env === 'production') {
-    frontendUrl = 'http://localhost:3030';
+  // Fallback: Use FRONTEND_URL environment variable first (for Render/production)
+  // Then fall back to localhost based on environment
+  if (process.env.FRONTEND_URL) {
+    frontendUrl = process.env.FRONTEND_URL;
   } else {
-    frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const env = process.env.NODE_ENV || 'local';
+    if (env === 'local') {
+      frontendUrl = 'http://localhost:3010';
+    } else if (env === 'development') {
+      frontendUrl = 'http://localhost:3020';
+    } else if (env === 'production') {
+      frontendUrl = 'http://localhost:3030';
+    } else {
+      frontendUrl = 'http://localhost:3000';
+    }
   }
 }
 frontendUrl = frontendUrl.replace(/\/$/, ''); // Remove trailing slash
