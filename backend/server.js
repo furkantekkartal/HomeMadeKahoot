@@ -30,6 +30,7 @@ const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
 const cors = require('cors');
+const mongoose = require('mongoose');
 const connectDB = require('./config/database');
 const errorHandler = require('./middleware/errorHandler');
 
@@ -178,22 +179,30 @@ app.use('/api/statistics', statisticsRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
-  const mongoose = require('mongoose');
-  const dbStatus = mongoose.connection.readyState;
-  const dbConnected = dbStatus === 1; // 1 = connected
-  const dbName = mongoose.connection.name || 'unknown';
-  const env = process.env.NODE_ENV || 'development';
-  
-  res.json({ 
-    status: 'ok', 
-    message: 'HomeMadeKahoot API is running',
-    environment: env,
-    database: {
-      connected: dbConnected,
-      name: dbName,
-      status: dbConnected ? 'connected' : 'disconnected'
-    }
-  });
+  try {
+    const dbStatus = mongoose.connection.readyState;
+    const dbConnected = dbStatus === 1; // 1 = connected
+    const dbName = mongoose.connection.name || 'unknown';
+    const env = process.env.NODE_ENV || 'development';
+    
+    res.json({ 
+      status: 'ok', 
+      message: 'HomeMadeKahoot API is running',
+      environment: env,
+      database: {
+        connected: dbConnected,
+        name: dbName,
+        status: dbConnected ? 'connected' : 'disconnected'
+      }
+    });
+  } catch (error) {
+    console.error('Health check error:', error);
+    res.status(500).json({ 
+      status: 'error', 
+      message: 'Health check failed',
+      error: error.message 
+    });
+  }
 });
 
 // Initialize socket handlers
