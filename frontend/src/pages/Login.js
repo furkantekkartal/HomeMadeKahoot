@@ -50,6 +50,12 @@ const LoggedInLogin = () => {
           });
         }
       } catch (err) {
+        // Extract error message from response or error object
+        const errorMessage = err.response?.data?.error || 
+                            err.response?.data?.message || 
+                            err.message || 
+                            'Connection failed';
+        
         setConnectionStatus({
           backend: false,
           database: false,
@@ -58,8 +64,13 @@ const LoggedInLogin = () => {
           socketUrl: socketUrl,
           axiosBaseURL: axiosBaseURL,
           envVars: envVars,
-          error: err.message || 'Connection failed'
+          error: errorMessage
         });
+        
+        // If it's a mongoose error, set it as the main error too
+        if (errorMessage.includes('mongoose')) {
+          setError(errorMessage);
+        }
       }
     };
     checkConnection();

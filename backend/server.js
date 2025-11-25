@@ -197,10 +197,14 @@ app.get('/api/health', (req, res) => {
     });
   } catch (error) {
     console.error('Health check error:', error);
+    // Don't expose internal error details in production
+    const errorMessage = process.env.NODE_ENV === 'production' 
+      ? 'Health check failed' 
+      : error.message;
     res.status(500).json({ 
       status: 'error', 
       message: 'Health check failed',
-      error: error.message 
+      error: errorMessage 
     });
   }
 });
