@@ -93,9 +93,18 @@ production_frontend=https://your-prod-frontend-url.trycloudflare.com
 When `.env.cloudflare` doesn't exist or URLs are missing, the app falls back to using environment variables (like master branch).
 
 **For Render Deployment:**
-- Set `REACT_APP_API_URL` and `REACT_APP_SOCKET_URL` in Render environment variables
-- Set `FRONTEND_URL` in backend environment variables
-- The app will automatically use these instead of Cloudflare URLs
+1. **Frontend Service** - Set these environment variables:
+   - `REACT_APP_API_URL` = `https://your-backend-service.onrender.com/api`
+   - `REACT_APP_SOCKET_URL` = `https://your-backend-service.onrender.com`
+   - `PORT` = `10000` (or Render's assigned port)
+
+2. **Backend Service** - Set these environment variables:
+   - `FRONTEND_URL` = `https://your-frontend-service.onrender.com`
+   - `MONGODB_URI` = Your MongoDB connection string
+   - `JWT_SECRET` = Your JWT secret
+   - Plus all API keys (OPENROUTER_API_KEY, GEMINI_API_KEY, etc.)
+
+3. The app will automatically detect and use these environment variables (no Cloudflare needed)
 
 **Fallback Priority:**
 1. Cloudflare URLs (if `.env.cloudflare` exists and has valid URLs)
@@ -122,18 +131,22 @@ Simply run `Run_All.ps1` again - it will:
 
 ```
 HomeMadeKahoot/
-├── backend/              # Backend server (Node.js/Express)
-│   ├── .env.local       # Local environment config
-│   ├── .env.dev         # Development environment config
-│   ├── .env.prod        # Production environment config
-│   ├── server.js        # Main server file
+├── backend/                    # Backend server (Node.js/Express)
+│   ├── .env.local             # Local environment config
+│   ├── .env.dev               # Development environment config
+│   ├── .env.prod              # Production environment config
+│   ├── server.js              # Main server file
+│   ├── utils/
+│   │   └── cloudflareConfig.js # Cloudflare URL loader
 │   └── ...
-├── frontend/            # Frontend app (React)
-│   ├── src/            # Source files
+├── frontend/                   # Frontend app (React)
+│   ├── src/                   # Source files
+│   ├── scripts/
+│   │   └── setupCloudflareEnv.js # Environment setup script
 │   └── ...
-├── .env.cloudflare      # Cloudflare tunnel URLs (one file for all)
-├── Run_All.ps1          # Master script - runs everything automatically
-└── README.md           # This file
+├── .env.cloudflare             # Cloudflare tunnel URLs (optional, for local dev)
+├── Run_All.ps1                 # Master script - runs everything automatically
+└── README.md                   # This file
 ```
 
 ## 🎯 Features
@@ -164,7 +177,7 @@ HomeMadeKahoot/
 
 ## 🔐 Environment Variables
 
-### Backend Environment Files
+### Backend Environment Files (Local Development)
 
 Each environment needs its own `.env` file in the `backend/` directory:
 
@@ -179,11 +192,24 @@ FRONTEND_URL=http://localhost:3010|3020|3030
 # API Keys
 OPENROUTER_API_KEY=your_key
 GEMINI_API_KEY=your_key
-   UNSPLASH_ACCESS_KEY=your_key
+UNSPLASH_ACCESS_KEY=your_key
 FIRECRAWL_API_KEY=your_key
 AZURE_SPEECH_KEY=your_key
 AZURE_SPEECH_REGION=your_region
 ```
+
+### Render Deployment Environment Variables
+
+**Frontend Service:**
+- `REACT_APP_API_URL` - Backend API URL (e.g., `https://your-backend.onrender.com/api`)
+- `REACT_APP_SOCKET_URL` - Backend Socket URL (e.g., `https://your-backend.onrender.com`)
+- `PORT` - Port number (usually `10000` or Render's assigned port)
+
+**Backend Service:**
+- `FRONTEND_URL` - Frontend URL (e.g., `https://your-frontend.onrender.com`)
+- `MONGODB_URI` - MongoDB connection string
+- `JWT_SECRET` - JWT secret key
+- All API keys (same as local development)
 
 ## 🗄️ Database Management
 
@@ -196,7 +222,7 @@ Databases are created automatically when you first run each environment.
 
 ## 🛠️ Manual Commands
 
-If you prefer to run commands manually:
+**Note:** These commands are optional. `Run_All.ps1` handles everything automatically, but you can run individual environments manually if needed:
 
 ### Local Environment
 ```powershell
@@ -234,11 +260,12 @@ npm run start:prod
 ## 📝 Notes
 
 - **Local environment** always uses localhost (no Cloudflare)
-- **Development & Production** can use Cloudflare URLs from `.env.cloudflare`
+- **Development & Production** can use Cloudflare URLs from `.env.cloudflare` OR environment variables
 - All 3 environments can run **simultaneously** without conflicts
 - Cloudflare URLs are stored in `.env.cloudflare` so they persist after restart
 - Never commit `.env` files or `.env.cloudflare` to git
-- **Always run Dev/Prod environments BEFORE setting up Cloudflare tunnels**
+- **Run_All.ps1 automatically handles everything** - no manual steps needed
+- For Render deployments, just set environment variables - no Cloudflare needed
 
 ## 🆘 Troubleshooting
 
@@ -251,10 +278,11 @@ npm run start:prod
 - Make sure the database name matches the environment
 
 ### Frontend Can't Connect to Backend
-- Check `.env.cloudflare` has the correct URLs
+- **For Cloudflare mode**: Check `.env.cloudflare` has the correct URLs
+- **For Render mode**: Verify `REACT_APP_API_URL` and `REACT_APP_SOCKET_URL` are set correctly
 - Make sure backend is running and accessible
 - Check browser console for CORS errors
-- Verify backend URL in `.env.cloudflare` matches your Cloudflare tunnel
+- Verify backend URL matches your deployment (Cloudflare tunnel or Render URL)
 
 ### Cloudflare Tunnels Can't Connect
 - **Make sure Dev/Prod environments are running FIRST!**
@@ -265,6 +293,13 @@ npm run start:prod
 - Run `Run_All.ps1` - it automatically handles everything
 - The script automatically extracts URLs and updates `.env.cloudflare`
 - If URLs aren't extracted automatically, check the temp log files in `%TEMP%\cloudflare_*.log`
+- If you're deploying to Render, use environment variables instead (no Cloudflare needed)
+
+### Render Deployment Issues
+- Make sure `REACT_APP_API_URL` and `REACT_APP_SOCKET_URL` are set in Render frontend environment variables
+- Make sure `FRONTEND_URL` is set in Render backend environment variables
+- URLs should be your Render service URLs (e.g., `https://your-app.onrender.com`)
+- The app automatically detects and uses environment variables when Cloudflare URLs aren't available
 
 ## 📚 Tech Stack
 

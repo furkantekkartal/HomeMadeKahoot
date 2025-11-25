@@ -51,12 +51,18 @@ export const AuthProvider = ({ children }) => {
   };
 
   const register = async (username, password) => {
-    const response = await authAPI.register({ username, password });
-    const { token: newToken, user: userData } = response.data;
-    localStorage.setItem('token', newToken);
-    setToken(newToken);
-    setUser(userData);
-    return response.data;
+    try {
+      const response = await authAPI.register({ username, password });
+      const { token: newToken, user: userData } = response.data;
+      localStorage.setItem('token', newToken);
+      setToken(newToken);
+      setUser(userData);
+      return response.data;
+    } catch (error) {
+      console.error('AuthContext register error:', error);
+      // Re-throw the error so the Register component can handle it
+      throw error;
+    }
   };
 
   const logout = () => {

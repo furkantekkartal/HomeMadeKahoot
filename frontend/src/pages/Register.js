@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import api from '../services/api';
 import './Auth.css';
 
 const LoggedInRegister = () => {
@@ -9,8 +10,40 @@ const LoggedInRegister = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState({ backend: false, database: false, env: '', apiUrl: '' });
   const { register } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const checkConnection = async () => {
+      try {
+        // Log the API URL being used
+        const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+        console.log('Registration page - API URL:', apiUrl);
+        
+        const response = await api.get('/health');
+        if (response.data) {
+          setConnectionStatus({
+            backend: true,
+            database: response.data.database?.connected || false,
+            env: response.data.environment || 'unknown',
+            apiUrl: apiUrl
+          });
+        }
+      } catch (err) {
+        const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+        console.error('Registration page - Connection check failed:', err);
+        console.error('Registration page - API URL:', apiUrl);
+        setConnectionStatus({
+          backend: false,
+          database: false,
+          env: 'unknown',
+          apiUrl: apiUrl
+        });
+      }
+    };
+    checkConnection();
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -28,7 +61,12 @@ const LoggedInRegister = () => {
       await register(username, password);
       navigate('/quiz');
     } catch (err) {
-      setError(err.response?.data?.message || 'Registration failed');
+      console.error('Registration error:', err);
+      // Show more detailed error message
+      const errorMessage = err.response?.data?.message || 
+                          err.message || 
+                          (err.code === 'ERR_NETWORK' ? 'Cannot connect to server. Please check your connection.' : 'Registration failed');
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -38,6 +76,26 @@ const LoggedInRegister = () => {
     <div className="auth-container">
       <div className="auth-card">
         <h2 className="auth-title">Sign Up</h2>
+        <div className="connection-status">
+          <div className="status-item">
+            <span className="status-label">Backend connection:</span>
+            <span className={connectionStatus.backend ? 'status-success' : 'status-error'}>
+              {connectionStatus.backend ? 'Successful' : 'Failed'} ({connectionStatus.env})
+            </span>
+          </div>
+          <div className="status-item">
+            <span className="status-label">Database connection:</span>
+            <span className={connectionStatus.database ? 'status-success' : 'status-error'}>
+              {connectionStatus.database ? 'Successful' : 'Failed'} ({connectionStatus.env})
+            </span>
+          </div>
+          <div className="status-item">
+            <span className="status-label">API URL:</span>
+            <span className="status-info" style={{ fontSize: '0.8em', wordBreak: 'break-all' }}>
+              {connectionStatus.apiUrl || 'Not set'}
+            </span>
+          </div>
+        </div>
         {error && <div className="error-message">{error}</div>}
         <form onSubmit={handleSubmit}>
           <div className="form-group">

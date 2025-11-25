@@ -12,14 +12,35 @@ exports.register = async (req, res) => {
   try {
     const { username, password } = req.body;
 
-    // Check if user exists
-    const existingUser = await User.findOne({ username });
+    // Validate input
+    if (!username || !password) {
+      return res.status(400).json({ message: 'Username and password are required' });
+    }
+
+    // Validate username length
+    if (username.length < 3 || username.length > 20) {
+      return res.status(400).json({ message: 'Username must be between 3 and 20 characters' });
+    }
+
+    // Validate password length
+    if (password.length < 6) {
+      return res.status(400).json({ message: 'Password must be at least 6 characters long' });
+    }
+
+    console.log(`[AUTH] Registration attempt for username: ${username}`);
+
+    // Check if user exists (case-insensitive search)
+    const existingUser = await User.findOne({ 
+      username: { $regex: new RegExp(`^${username}$`, 'i') }
+    });
     if (existingUser) {
+      console.log(`[AUTH] User already exists: ${username}`);
       return res.status(400).json({ message: 'User already exists' });
     }
 
     // Create user
     const user = await User.create({ username, password });
+    console.log(`[AUTH] Registration successful for user: ${username}`);
     const token = generateToken(user._id);
 
     res.status(201).json({
@@ -31,7 +52,8 @@ exports.register = async (req, res) => {
       }
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error(`[AUTH] Registration error for ${req.body.username}:`, error.message);
+    res.status(500).json({ message: error.message || 'Registration failed' });
   }
 };
 
