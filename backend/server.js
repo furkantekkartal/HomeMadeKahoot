@@ -1,9 +1,19 @@
 // Load environment variables based on NODE_ENV
-// This allows running both dev and prod simultaneously
-const env = process.env.NODE_ENV || 'development';
-const envFile = env === 'production' ? '.env.prod' : '.env.dev';
+// Supports: local, development, production
+// This allows running all three simultaneously on different ports
+const env = process.env.NODE_ENV || 'local';
 const fs = require('fs');
 const path = require('path');
+
+// Map environment to env file
+let envFile;
+if (env === 'production') {
+  envFile = '.env.prod';
+} else if (env === 'development') {
+  envFile = '.env.dev';
+} else {
+  envFile = '.env.local'; // local environment
+}
 
 // Try to load the environment-specific file, fallback to .env if not found
 const envPath = path.join(__dirname, envFile);
@@ -42,18 +52,51 @@ connectDB();
 const app = express();
 const server = http.createServer(app);
 
-// Normalize FRONTEND_URL - remove trailing slash to avoid CORS issues
-const frontendUrl = (process.env.FRONTEND_URL || "http://localhost:3000").replace(/\/$/, '');
+// Load Cloudflare config if available
+const { getCloudflareConfig } = require('./utils/cloudflareConfig');
+const cloudflareConfig = getCloudflareConfig();
 
-// Support multiple origins: configured frontend URL + localhost variants
+// Determine frontend URL based on environment
+let frontendUrl;
+if (cloudflareConfig && cloudflareConfig.frontend) {
+  // Use Cloudflare URL for development/production
+  frontendUrl = cloudflareConfig.frontend;
+} else {
+  // Use localhost for local environment or fallback
+  const env = process.env.NODE_ENV || 'local';
+  if (env === 'local') {
+    frontendUrl = 'http://localhost:3010';
+  } else if (env === 'development') {
+    frontendUrl = 'http://localhost:3020';
+  } else if (env === 'production') {
+    frontendUrl = 'http://localhost:3030';
+  } else {
+    frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+  }
+}
+frontendUrl = frontendUrl.replace(/\/$/, ''); // Remove trailing slash
+
+// Support multiple origins: configured frontend URL + all environment ports + Cloudflare tunnel
 // This allows access from both Cloudflare tunnels and localhost
 const allowedOrigins = [
   frontendUrl,
+  'http://localhost:3010', // Local frontend
+  'http://localhost:3020', // Development frontend
+  'http://localhost:3030', // Production frontend
+  'http://127.0.0.1:3010',
+  'http://127.0.0.1:3020',
+  'http://127.0.0.1:3030',
+  // Legacy ports (for backward compatibility)
   'http://localhost:3000',
   'http://localhost:3001',
   'http://127.0.0.1:3000',
   'http://127.0.0.1:3001'
 ];
+
+// Add Cloudflare frontend URL if configured
+if (cloudflareConfig && cloudflareConfig.frontend) {
+  allowedOrigins.push(cloudflareConfig.frontend);
+}
 
 const corsOptions = {
   origin: function (origin, callback) {

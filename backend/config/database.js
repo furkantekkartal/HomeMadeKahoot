@@ -2,11 +2,12 @@ const mongoose = require('mongoose');
 
 /**
  * Get the appropriate database name based on environment
+ * Supports: local, development, production
  * @param {string} baseURI - Base MongoDB connection string
  * @returns {string} - Modified URI with correct database name
  */
 const getDatabaseURI = (baseURI) => {
-  const env = process.env.NODE_ENV || 'development';
+  const env = process.env.NODE_ENV || 'local';
   
   // Parse the URI to extract database name
   // Handle both mongodb:// and mongodb+srv:// formats
@@ -17,15 +18,17 @@ const getDatabaseURI = (baseURI) => {
   let dbSuffix = '';
   if (env === 'production') {
     dbSuffix = '_prod';
-  } else {
+  } else if (env === 'development') {
     dbSuffix = '_dev';
+  } else {
+    dbSuffix = '_local'; // local environment
   }
   
   // Construct new database name
   let newDbName;
-  if (currentDbName.endsWith('_prod') || currentDbName.endsWith('_dev')) {
+  if (currentDbName.endsWith('_prod') || currentDbName.endsWith('_dev') || currentDbName.endsWith('_local')) {
     // If already has suffix, replace it
-    newDbName = currentDbName.replace(/_(prod|dev)$/, dbSuffix);
+    newDbName = currentDbName.replace(/_(prod|dev|local)$/, dbSuffix);
   } else {
     // Append suffix
     newDbName = currentDbName + dbSuffix;
@@ -40,13 +43,20 @@ const getDatabaseURI = (baseURI) => {
 const connectDB = async () => {
   try {
     const baseURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/homemadekahoot';
-    const env = process.env.NODE_ENV || 'development';
+    const env = process.env.NODE_ENV || 'local';
     
     // For local MongoDB, handle differently
     let mongoURI;
     if (baseURI.startsWith('mongodb://localhost') || baseURI.startsWith('mongodb://127.0.0.1')) {
       // Local MongoDB - append database name directly
-      const dbName = env === 'production' ? 'homemadekahoot_prod' : 'homemadekahoot_dev';
+      let dbName;
+      if (env === 'production') {
+        dbName = 'homemadekahoot_prod';
+      } else if (env === 'development') {
+        dbName = 'homemadekahoot_dev';
+      } else {
+        dbName = 'homemadekahoot_local'; // local environment
+      }
       mongoURI = baseURI.replace(/\/[^\/]*$/, `/${dbName}`);
     } else {
       // MongoDB Atlas - use URL parsing

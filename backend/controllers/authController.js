@@ -40,18 +40,32 @@ exports.login = async (req, res) => {
   try {
     const { username, password } = req.body;
 
-    // Find user
-    const user = await User.findOne({ username });
-    if (!user) {
-      return res.status(401).json({ message: 'Invalid credentials' });
+    // Validate input
+    if (!username || !password) {
+      return res.status(400).json({ message: 'Username and password are required' });
     }
+
+    console.log(`[AUTH] Login attempt for username: ${username}`);
+
+    // Find user (case-insensitive search)
+    const user = await User.findOne({ 
+      username: { $regex: new RegExp(`^${username}$`, 'i') }
+    });
+    if (!user) {
+      console.log(`[AUTH] User not found: ${username}`);
+      return res.status(401).json({ message: 'Invalid username or password' });
+    }
+
+    console.log(`[AUTH] User found: ${username}, checking password...`);
 
     // Check password
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
+      console.log(`[AUTH] Password mismatch for user: ${username}`);
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
+    console.log(`[AUTH] Login successful for user: ${username}`);
     const token = generateToken(user._id);
 
     res.json({
@@ -63,6 +77,7 @@ exports.login = async (req, res) => {
       }
     });
   } catch (error) {
+    console.error('[AUTH] Login error:', error);
     res.status(500).json({ message: error.message });
   }
 };

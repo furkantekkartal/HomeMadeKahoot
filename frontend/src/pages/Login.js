@@ -44,7 +44,12 @@ const LoggedInLogin = () => {
       await login(username, password);
       navigate('/quiz');
     } catch (err) {
-      setError(err.response?.data?.message || 'Login failed');
+      console.error('Login error:', err);
+      // Show more detailed error message
+      const errorMessage = err.response?.data?.message || 
+                          err.message || 
+                          (err.response?.status === 401 ? 'Invalid username or password' : 'Login failed');
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }

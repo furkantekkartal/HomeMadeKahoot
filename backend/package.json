@@ -6,10 +6,12 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "start:dev": "cross-env NODE_ENV=development node server.js",
-    "start:prod": "cross-env NODE_ENV=production node server.js",
-    "dev:dev": "cross-env NODE_ENV=development nodemon server.js",
-    "dev:prod": "cross-env NODE_ENV=production nodemon server.js",
+    "start:local": "cross-env NODE_ENV=local PORT=5010 node server.js",
+    "start:dev": "cross-env NODE_ENV=development PORT=5020 node server.js",
+    "start:prod": "cross-env NODE_ENV=production PORT=5030 node server.js",
+    "dev:local": "cross-env NODE_ENV=local PORT=5010 nodemon server.js",
+    "dev:dev": "cross-env NODE_ENV=development PORT=5020 nodemon server.js",
+    "dev:prod": "cross-env NODE_ENV=production PORT=5030 nodemon server.js",
     "reset-db": "node scripts/resetDatabase.js",
     "db-status": "node scripts/databaseStatus.js",
     "db-cleanup": "node scripts/safeCleanup.js",
@@ -20,7 +22,8 @@
     "generate-all-images": "node scripts/generateAllWordImages.js",
     "reset-and-import": "node scripts/resetAndImportDatabase.js",
     "sync-images-to-prod": "node scripts/syncImagesToProduction.js",
-    "clone-dev-to-prod": "node scripts/cloneDevToProduction.js"
+    "clone-dev-to-prod": "node scripts/cloneDevToProduction.js",
+    "clone-users-prod-to-dev": "node scripts/cloneUsersProdToDev.js"
   },
   "keywords": [
     "quiz",

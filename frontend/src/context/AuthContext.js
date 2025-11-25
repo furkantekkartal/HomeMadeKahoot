@@ -36,12 +36,18 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const login = async (username, password) => {
-    const response = await authAPI.login({ username, password });
-    const { token: newToken, user: userData } = response.data;
-    localStorage.setItem('token', newToken);
-    setToken(newToken);
-    setUser(userData);
-    return response.data;
+    try {
+      const response = await authAPI.login({ username, password });
+      const { token: newToken, user: userData } = response.data;
+      localStorage.setItem('token', newToken);
+      setToken(newToken);
+      setUser(userData);
+      return response.data;
+    } catch (error) {
+      console.error('AuthContext login error:', error);
+      // Re-throw the error so the Login component can handle it
+      throw error;
+    }
   };
 
   const register = async (username, password) => {
