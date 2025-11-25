@@ -108,24 +108,45 @@ const corsOptions = {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
     
-    // Check if origin matches any allowed origin
+    // Check if origin matches any allowed origin (exact match)
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
-    } else {
-      // Also allow if origin starts with any allowed origin (for subdomains)
-      const isAllowed = allowedOrigins.some(allowed => origin.startsWith(allowed.replace('http://', 'https://')));
-      if (isAllowed) {
-        callback(null, true);
-      } else {
-        // For development, allow localhost origins
-        const env = process.env.NODE_ENV || 'development';
-        if (env === 'development' && (origin.includes('localhost') || origin.includes('127.0.0.1'))) {
-          callback(null, true);
-        } else {
-          callback(new Error('Not allowed by CORS'));
-        }
-      }
+      return;
     }
+    
+    // Check if origin matches when converting http to https (for Cloudflare/Render)
+    const isAllowed = allowedOrigins.some(allowed => {
+      // Direct match
+      if (origin === allowed) return true;
+      // Match when converting http to https
+      if (origin === allowed.replace('http://', 'https://')) return true;
+      // Match when converting https to http (for local testing)
+      if (origin === allowed.replace('https://', 'http://')) return true;
+      // Match subdomains (for Render URLs like *.onrender.com)
+      if (origin.startsWith(allowed.replace('http://', 'https://'))) return true;
+      return false;
+    });
+    
+    if (isAllowed) {
+      callback(null, true);
+      return;
+    }
+    
+    // Allow Render URLs (onrender.com domain)
+    if (origin.includes('onrender.com')) {
+      callback(null, true);
+      return;
+    }
+    
+    // For development, allow localhost origins
+    const env = process.env.NODE_ENV || 'development';
+    if (env === 'development' && (origin.includes('localhost') || origin.includes('127.0.0.1'))) {
+      callback(null, true);
+      return;
+    }
+    
+    // Reject all other origins
+    callback(new Error('Not allowed by CORS'));
   },
   credentials: true
 };
